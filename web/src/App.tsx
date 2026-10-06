@@ -7,6 +7,7 @@ import { AccountForm } from './features/accounts/AccountForm';
 import { TransferForm } from './features/transactions/TransferForm';
 import { TransactionForm } from './features/transactions/TransactionForm';
 import { ClassificationManager } from './features/classification/ClassificationManager';
+import { AdjustmentForm } from './features/transactions/AdjustmentForm';
 import { RefundForm } from './features/transactions/RefundForm';
 import { TransactionConflict, type ProposedTransaction, type TransactionComparison } from './features/transactions/TransactionConflict';
 import { TransactionHistory } from './features/transactions/TransactionHistory';
@@ -16,7 +17,7 @@ const storageKey = 'accounting.pending.v1';
 function restore(auth: Auth): Command | null {
   try {
     const value = JSON.parse(sessionStorage.getItem(storageKey) ?? 'null') as Command | null;
-    if (value?.owner === auth.profile.id && value.session === auth.session.id && value.workspace === auth.workspace.id && typeof value.body === 'string' && typeof value.key === 'string' && typeof value.generation === 'string' && (!value.method || ['POST', 'PUT'].includes(value.method)) && new RegExp(`^/workspaces/${value.workspace}/(?:accounts|transactions|categories|tags)(?:/[0-9a-f-]{36})?$`).test(value.path)) return value;
+    if (value?.owner === auth.profile.id && value.session === auth.session.id && value.workspace === auth.workspace.id && typeof value.body === 'string' && typeof value.key === 'string' && typeof value.generation === 'string' && (!value.method || ['POST', 'PUT'].includes(value.method)) && new RegExp(`^/workspaces/${value.workspace}/(?:(?:accounts|transactions|categories|tags)(?:/[0-9a-f-]{36})?|accounts/[0-9a-f-]{36}/adjustments)$`).test(value.path)) return value;
     sessionStorage.removeItem(storageKey);
   } catch { /* Storage unavailable: retries remain available while this page is open. */ }
   return null;
@@ -137,6 +138,8 @@ export function App() {
     {editing && ['expense', 'income'].includes(editing.kind) && <TransactionForm key={`edit-${editing.id}-${editing.version}`} initial={editing} parentVersion={editingParentVersion} accounts={accounts} categories={categories} tags={tags} disabled={busy || loading || !!pending || needsRefresh || !online} submit={body => create(`transactions/${editing.id}`, body, 'PUT')} fail={setError} cancel={() => setEditing(null)} />}
     {editing?.kind === 'transfer' && <TransferForm key={`edit-transfer-${editing.id}-${editing.version}`} initial={editing} initialFee={editingFee} accounts={accounts} categories={categories} disabled={busy || loading || !!pending || needsRefresh || !online} submit={body => create(`transactions/${editing.id}`, body, 'PUT')} fail={setError} cancel={() => setEditing(null)} />}
     {refundParent && (!editing || editing.kind === 'refund') && <RefundForm key={`refund-${refundParent.id}-${refundParent.version}-${editing?.id ?? 'new'}`} parent={refundParent} transferVersion={refundTransferVersion} initial={editing ?? undefined} accounts={accounts} categories={categories} tags={tags} disabled={busy || loading || !!pending || needsRefresh || !online} submit={body => create(editing ? `transactions/${editing.id}` : 'transactions', body, editing ? 'PUT' : 'POST')} fail={setError} cancel={() => { setRefundParent(null); setEditing(null); }} />}
+    <AdjustmentForm key={`adjustment-${formVersion}`} accounts={accounts.filter(a => !a.archived_at)} disabled={busy || loading || !!pending || needsRefresh || !online} submit={create} fail={setError} />
+    {editing?.kind === 'adjustment' && <AdjustmentForm key={`edit-adjustment-${editing.id}-${editing.version}`} accounts={accounts} initial={editing} disabled={busy || loading || !!pending || needsRefresh || !online} submit={create} fail={setError} cancel={() => setEditing(null)} />}
     <ClassificationManager key={`classification-${formVersion}`} categories={categories} tags={tags} disabled={busy || loading || !!pending || needsRefresh || !online} submit={create} fail={setError} />
     <TransactionHistory key={`${auth.session.id}-${auth.workspace.id}`} workspace={auth.workspace.id} revision={historyRevision} accounts={accounts} categories={categories} tags={tags} disabled={busy || loading || !!pending || needsRefresh || !online} edit={id => void editTransaction(id)} refund={id => void newRefund(id)} fail={showError} />
     <SessionManager key={auth.session.id} disabled={busy || loading || !!pending || !online} revoke={revokeSession} fail={showError} />

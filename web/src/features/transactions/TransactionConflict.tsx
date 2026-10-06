@@ -11,17 +11,17 @@ export function TransactionConflict({ value, accounts, categories, tags, disable
   const tagNames = (ids: string[]) => ids.map(id => tags.find(t => t.id === id)?.name ?? 'Тег недоступен').sort().join(', ') || 'Без тегов';
   const parts = (items: Allocation[], currency: string) => items.map(p => { const c = categories.find(c => c.id === p.category_id); return `${c ? categoryLabel(c, categories) : p.category_id ? 'Категория недоступна' : p.category_id === undefined ? 'Категория исходной части' : 'Без категории'}: ${money(p.amount_minor, currency)}`; }).sort().join('; ') || 'Без частей';
   const currency = current.entries[0]?.currency ?? 'EUR';
-  const movement = proposed.kind === 'transfer' ? [
+  const movement = proposed.kind === 'adjustment' ? current.entries.map(e => `${account(e.account_id)}: ${money(e.amount_minor, e.currency)}`).sort().join('; ') : proposed.kind === 'transfer' ? [
     `${account(proposed.source_account_id)}: ${money(`-${proposed.source_amount_minor}`, current.entries.find(e => BigInt(e.amount_minor) < 0n)?.currency ?? currency)}`,
     `${account(proposed.target_account_id)}: ${money(proposed.target_amount_minor!, current.entries.find(e => BigInt(e.amount_minor) > 0n)?.currency ?? currency)}`,
   ].sort().join('; ') : `${account(proposed.account_id)}: ${money(`${proposed.kind === 'expense' ? '-' : ''}${proposed.amount_minor}`, currency)}`;
   const rows = [
     ['Примечание', proposed.note || 'Без примечания', current.note || 'Без примечания'],
-    ['Получатель', proposed.payee || 'Без получателя', current.payee || 'Без получателя'],
-    ['Дата', new Date(proposed.occurred_at).toLocaleString('ru-RU'), new Date(current.occurred_at).toLocaleString('ru-RU')],
+    ['Получатель', (proposed.kind === 'adjustment' ? current.payee : proposed.payee) || 'Без получателя', current.payee || 'Без получателя'],
+    ['Дата', new Date(proposed.occurred_at ?? current.occurred_at).toLocaleString('ru-RU'), new Date(current.occurred_at).toLocaleString('ru-RU')],
     ['Движения', movement, current.entries.map(e => `${account(e.account_id)}: ${money(e.amount_minor, e.currency)}`).sort().join('; ')],
     ['Части', parts(proposed.allocations ?? [], currency), parts(current.allocations, currency)],
-    ['Теги', tagNames(proposed.tag_ids), tagNames(current.tag_ids)],
+    ['Теги', tagNames(proposed.tag_ids ?? current.tag_ids), tagNames(current.tag_ids)],
   ];
   if (proposed.kind === 'transfer') {
     const feeCurrency = accounts.find(a => a.id === proposed.fee?.account_id)?.currency ?? fee?.entries[0]?.currency ?? currency;

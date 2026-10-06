@@ -30,7 +30,7 @@ test('real cookie session, ledger, lost-response retry, container restart and te
   });
   const note = '<img src=x onerror="window.accountingXss=true">';
   await page.getByLabel('Сумма', { exact: true }).fill('12,34');
-  await page.getByLabel('Примечание').fill(note);
+  await page.getByLabel('Примечание', { exact: true }).fill(note);
   await page.getByRole('button', { name: 'Сохранить операцию', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('Операция могла сохраниться');
   await expect(page.getByRole('button', { name: 'Создать счет', exact: true })).toBeDisabled();

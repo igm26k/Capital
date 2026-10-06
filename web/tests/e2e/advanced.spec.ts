@@ -501,3 +501,60 @@ test('partial refund inherits archived categories, retries once and retains part
   const parent = await (await context.request.get(`${root}/transactions/${expense.id}`)).json();
   expect(parent.allocations.reduce((sum: bigint, p: {remaining_refundable_minor: string}) => sum + BigInt(p.remaining_refundable_minor), 0n)).toBe(700n);
 });
+
+test('adjustment rejects stale balance and retries the same target after reload', async ({ page, context }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Создать профиль', exact: true }).click();
+  await page.getByLabel('Электронная почта').fill(`adjustment-${crypto.randomUUID()}@example.test`);
+  await page.getByLabel('Пароль', { exact: true }).fill('synthetic-browser-password-2026');
+  await page.getByRole('button', { name: 'Зарегистрироваться', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Выйти', exact: true })).toBeVisible();
+  await page.getByLabel('Название счета').fill('Сверка');
+  await page.getByLabel('Начальный остаток, EUR').fill('100');
+  await page.getByRole('button', { name: 'Создать счет', exact: true }).click();
+  await expect(page.locator('.accounts')).toContainText('100,00 EUR');
+  await page.getByLabel('Фактический остаток, EUR').fill('80');
+  await page.getByLabel('Причина корректировки', { exact: true }).fill('Сверка наличных');
+  const auth = await (await context.request.get('/api/v1/auth/session')).json();
+  const root = `/api/v1/workspaces/${auth.workspace.id}`;
+  const account = (await (await context.request.get(`${root}/accounts`)).json()).items[0];
+  const income = await context.request.post(`${root}/transactions`, { headers: { Origin: 'https://localhost:8444', 'X-CSRF-Token': auth.csrf_token, 'X-Sync-Generation': auth.workspace.sync_generation_id, 'Idempotency-Key': crypto.randomUUID() }, data: { id: crypto.randomUUID(), kind: 'income', account_id: account.id, amount_minor: '100', occurred_at: new Date().toISOString(), occurred_timezone: 'UTC', note: '', payee: '', tag_ids: [], allocations: [{ id: crypto.randomUUID(), category_id: null, amount_minor: '100' }] } });
+  expect(income.status()).toBe(201);
+  await page.getByRole('button', { name: 'Сохранить корректировку', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('Конфликт');
+  const staleHistory = (await (await context.request.get(`${root}/transactions`)).json()).items;
+  expect(staleHistory.filter((t: {kind: string}) => t.kind === 'adjustment')).toHaveLength(0);
+  await page.getByRole('button', { name: 'Обновить', exact: true }).click();
+  await expect(page.locator('.accounts')).toContainText('101,00 EUR');
+  await page.getByLabel('Фактический остаток, EUR').fill('80');
+  await page.getByLabel('Примечание корректировки', { exact: true }).fill('Проверенная корректировка');
+  const commands: { key: string | undefined; body: string | null }[] = [];
+  let dropped = false, replayed = false;
+  await page.route('**/api/v1/workspaces/*/accounts/*/adjustments', async route => {
+    commands.push({ key: route.request().headers()['idempotency-key'], body: route.request().postData() });
+    const response = await route.fetch(); expect(response.status()).toBe(201);
+    if (!dropped) { dropped = true; await route.abort('connectionfailed'); }
+    else { replayed = response.headers()['idempotency-replayed'] === 'true'; await route.fulfill({ response }); }
+  });
+  await page.getByRole('button', { name: 'Сохранить корректировку', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('Операция могла сохраниться');
+  await page.reload();
+  await page.getByRole('button', { name: 'Повторить ту же команду', exact: true }).click();
+  await expect.poll(() => replayed).toBe(true);
+  await expect(page.getByRole('heading', { name: 'Команда ожидает подтверждения' })).toHaveCount(0);
+  expect(commands).toHaveLength(2); expect(commands[1]).toEqual(commands[0]);
+  await expect(page.locator('.accounts')).toContainText('80,00 EUR');
+  const history = (await (await context.request.get(`${root}/transactions`)).json()).items;
+  const adjustments = history.filter((t: {kind: string}) => t.kind === 'adjustment');
+  expect(adjustments).toHaveLength(1); expect(adjustments[0].entries[0].amount_minor).toBe('-2100');
+  const beforeMetadata = await (await context.request.get(`${root}/accounts/${account.id}`)).json();
+  await page.getByRole('button', { name: 'Изменить операцию Проверенная корректировка', exact: true }).click();
+  const editor = page.getByRole('heading', { name: 'Изменить примечание корректировки', exact: true }).locator('..');
+  await editor.getByLabel('Примечание корректировки', { exact: true }).fill('Уточненное описание');
+  await editor.getByRole('button', { name: 'Сохранить примечание корректировки', exact: true }).click();
+  await expect(editor).toHaveCount(0);
+  const final = await (await context.request.get(`${root}/transactions/${adjustments[0].id}`)).json();
+  const afterMetadata = await (await context.request.get(`${root}/accounts/${account.id}`)).json();
+  expect(final.reason).toBe('Сверка наличных'); expect(final.note).toBe('Уточненное описание');
+  expect(final.entries).toEqual(adjustments[0].entries); expect(afterMetadata.balance_version).toBe(beforeMetadata.balance_version);
+});

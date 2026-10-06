@@ -355,3 +355,7 @@ Version conflict показывает отправленную правку и �
 ## S3-06B: создание и редактор возвратов (2026-10-06)
 
 Возвраты создаются из расхода по исходным частям и доступным reservations; наследуют категории, используют immutable UUID/original links и parent/transfer guards. Сборки PASS; **9/9 Chrome E2E PASS** на настоящем API/PostgreSQL. Refund 5 к expense 10 с архивной category принят после exact replay потерянного POST; edit до 3 сохраняет IDs, balance 93/remaining 7. Отдельный browser fee-refund/concurrency сценарий остается not_run. Далее — корректировки и удаления, пакет in_progress.
+
+## S3-06B: корректировки подтвержденного остатка (2026-10-06)
+
+Корректировка создается с target balance/reason/expected balance version, после создания редактируется только note. Сборки PASS; **10/10 Chrome E2E PASS**. Конкурентный доход защищен от stale adjustment, exact replay после reload дает один delta −21, note edit сохраняет финансовые поля. Далее — удаление и bulk, пакет in_progress.
