@@ -57,10 +57,13 @@ test('real category tree, tags, exact splits, archive and immutable PUT retry', 
   });
   await page.getByRole('button', { name: 'Сохранить категорию', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Повторить ту же команду', exact: true })).toBeVisible();
+  await expect(page.getByRole('alert')).toContainText('Операция могла сохраниться');
   await page.reload();
   await page.getByRole('button', { name: 'Повторить ту же команду', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Повторить ту же команду', exact: true })).toHaveCount(0);
-  expect(commands).toHaveLength(2); expect(commands[1]).toEqual(commands[0]); expect(replayed).toBe(true);
+  await expect.poll(() => replayed).toBe(true);
+  await expect(page.getByRole('heading', { name: 'Команда ожидает подтверждения' })).toHaveCount(0);
+  expect(commands).toHaveLength(2); expect(commands[1]).toEqual(commands[0]);
   await expect(page.getByLabel('Категория', { exact: true }).getByRole('option', { name: 'Дом / Продукты', exact: true })).toHaveCount(0);
   await expect(page.locator('.history')).toContainText('Дом / Продукты · 4,00 EUR');
   await page.getByRole('button', { name: `Изменить тег ${text}`, exact: true }).click();
@@ -75,4 +78,31 @@ test('real category tree, tags, exact splits, archive and immutable PUT retry', 
   await page.getByRole('button', { name: 'Сохранить категорию', exact: true }).click();
   await expect(page.getByLabel('Категория', { exact: true }).getByRole('option', { name: 'Дом / Продукты', exact: true })).toBeAttached();
   await expect(page.locator('.accounts strong')).toHaveText('89,99 EUR');
+});
+
+test('real transfer keeps exact balances and survives reload', async ({ page, context }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Создать профиль', exact: true }).click();
+  await page.getByLabel('Электронная почта').fill(`transfer-${crypto.randomUUID()}@example.test`);
+  await page.getByLabel('Пароль', { exact: true }).fill('synthetic-browser-password-2026');
+  await page.getByRole('button', { name: 'Зарегистрироваться', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Выйти', exact: true })).toBeVisible();
+  for (const name of ['Основной', 'Резерв']) {
+    await page.getByLabel('Название счета').fill(name);
+    await page.getByLabel('Начальный остаток, EUR').fill('100,00');
+    await page.getByRole('button', { name: 'Создать счет', exact: true }).click();
+    await expect(page.locator('.accounts')).toContainText(name);
+  }
+  await page.getByLabel('Со счета', { exact: true }).selectOption({ label: 'Основной · EUR' });
+  await page.getByLabel('На счет', { exact: true }).selectOption({ label: 'Резерв · EUR' });
+  await page.getByLabel('Сумма списания, EUR').fill('10,01');
+  await page.getByRole('button', { name: 'Сохранить перевод', exact: true }).click();
+  await expect(page.locator('.accounts li').filter({ hasText: 'Основной' })).toContainText('89,99 EUR');
+  await expect(page.locator('.accounts li').filter({ hasText: 'Резерв' })).toContainText('110,01 EUR');
+  await page.reload();
+  await expect(page.locator('.history')).toContainText('Перевод');
+  const auth = await (await context.request.get('/api/v1/auth/session')).json();
+  const history = await (await context.request.get(`/api/v1/workspaces/${auth.workspace.id}/transactions`)).json();
+  expect(history.items.filter((t: {kind: string}) => t.kind === 'transfer')).toHaveLength(1);
+  expect(history.items.filter((t: {kind: string}) => ['income', 'expense'].includes(t.kind))).toHaveLength(0);
 });
