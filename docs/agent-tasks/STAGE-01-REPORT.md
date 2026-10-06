@@ -2,7 +2,7 @@
 
 Дата обновления: 2026-10-06. Статус этапа: in_progress.
 
-Актуальный результат: финансовый серверный пакет S3-02A/B/C, sync пакет S3-04A/B/C, первый веб-поток S3-06A и вертикальная приемка S3-07A завершены. Pull: 26 HTTP ответов / 3 OpenAPI schemas; snapshots/bootstrap/cleanup: 54 / 5; advanced financial: 1652 / 5, basic: 179 / 11. Реальные PostgreSQL regression и Go проверки проходят. S3-03A/B завершены: все 35 API операций, 33 private guards, POST/PUT scopes и revoke races приняты на PostgreSQL/TLS (203 HTTP ответа / 10 OpenAPI schemas, 28 / 3; Go race detector PASS). S3-06B начата: категории/теги, архив справочников и разбиение доходов/расходов реализованы, Chrome E2E 2/2 PASS. Следующий шаг — переводы/комиссии и редакторы операций в S3-06B. Клиентское mirror/outbox/staging, расширенный веб и production выпуск еще не завершены.
+Актуальный результат: финансовый серверный пакет S3-02A/B/C, sync пакет S3-04A/B/C, первый веб-поток S3-06A и вертикальная приемка S3-07A завершены. Pull: 26 HTTP ответов / 3 OpenAPI schemas; snapshots/bootstrap/cleanup: 54 / 5; advanced financial: 1652 / 5, basic: 179 / 11. Реальные PostgreSQL regression и Go проверки проходят. S3-03A/B завершены: все 35 API операций, 33 private guards, POST/PUT scopes и revoke races приняты на PostgreSQL/TLS (203 HTTP ответа / 10 OpenAPI schemas, 28 / 3; Go race detector PASS). S3-06A/B завершены: полный online интерфейс ручного учета, справочники, устройства, история/фильтры/страницы, atomic bulk и сравнения конфликтов приняты 14/14 Chrome E2E. Следующий шаг — S3-07B, полная приемка этапа. Клиентское Android mirror/outbox/staging и production выпуск еще не завершены.
 
 Ниже сохранена хронология работ; прежние not_run относятся к состоянию на момент соответствующей записи.
 
@@ -379,3 +379,7 @@ Bulk version conflict показывает desired и current category/tags вс
 ## S3-06B: конфликты справочников и узкий экран (2026-10-06)
 
 Account/category/tag PUT conflicts показывают обе стороны и сохраняют форму; explicit refresh сбрасывает только редакторы справочников. Responsive таблицы и длинные строки проверены на 390px без horizontal overflow. Сборки PASS; **13/13 Chrome E2E PASS**, включая real account/tag conflicts и текстовое SVG-like name без выполнения. Далее — финальные расширенные financial/browser сценарии и S3-07B.
+
+## S3-06B завершена: полный online ручной учет (2026-10-06)
+
+Финальная расширенная приемка — **14/14 Chrome E2E PASS** на настоящих TLS API/PostgreSQL, текущем production bundle. Дополнительно приняты fee-refund parent/grandparent guards и DR-F08 UI, expense date edit, real transfer conflict/diff/explicit reload и сохранение .123456Z/UTC без ложного balance bump. S3-06A/B и пакет S3-06 завершены; docs текущего веба обновлены. Этап остается in_progress до S3-07B. Android outbox/mirror/staging, production/public registration и DR-S10 recovery не объявляются принятыми.
