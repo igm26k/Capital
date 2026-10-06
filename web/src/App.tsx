@@ -7,6 +7,7 @@ import { AccountForm } from './features/accounts/AccountForm';
 import { TransferForm } from './features/transactions/TransferForm';
 import { TransactionForm } from './features/transactions/TransactionForm';
 import { ClassificationManager } from './features/classification/ClassificationManager';
+import { RefundForm } from './features/transactions/RefundForm';
 import { TransactionConflict, type ProposedTransaction, type TransactionComparison } from './features/transactions/TransactionConflict';
 import { TransactionHistory } from './features/transactions/TransactionHistory';
 // A single unfinished command survives reload in this tab. No credentials are persisted.
@@ -26,12 +27,13 @@ export function App() {
   const [needsRefresh, setNeedsRefresh] = useState(false);
   const [auth, setAuth] = useState<Auth | null>(null), [starting, setStarting] = useState(true), [startupError, setStartupError] = useState('');
   const [accounts, setAccounts] = useState<Account[]>([]), [historyRevision, setHistoryRevision] = useState(0);
+  const [refundParent, setRefundParent] = useState<Transaction | null>(null), [refundTransferVersion, setRefundTransferVersion] = useState<string | null>(null);
   const [conflict, setConflict] = useState<TransactionComparison | null>(null);
   const [editingFee, setEditingFee] = useState<Transaction | null>(null), [editingParentVersion, setEditingParentVersion] = useState<string | null>(null);
   const [editing, setEditing] = useState<Transaction | null>(null);
   const [categories, setCategories] = useState<Category[]>([]), [tags, setTags] = useState<Tag[]>([]);
   const [pending, setPending] = useState<Command | null>(null), [busy, setBusy] = useState(false), [loading, setLoading] = useState(false), [message, setMessage] = useState(''), [error, setError] = useState(''), [online, setOnline] = useState(navigator.onLine), [formVersion, setFormVersion] = useState(0);
-  function authenticated(value: Auth) { activeSession.current = value.session.id; setAccounts([]); setCategories([]); setTags([]); setEditing(null); setConflict(null); setAuth(value); setPending(restore(value)); setError(''); setMessage(''); }
+  function authenticated(value: Auth) { activeSession.current = value.session.id; setAccounts([]); setCategories([]); setTags([]); setEditing(null); setRefundParent(null); setConflict(null); setAuth(value); setPending(restore(value)); setError(''); setMessage(''); }
   async function session() {
     setStarting(true); setStartupError('');
     try { authenticated(await request<Auth>('/auth/session')); }
@@ -60,7 +62,7 @@ export function App() {
     setBusy(true); setError(''); setMessage('');
     try {
       await request(command.path, { method: command.method ?? 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': auth.csrf_token, 'X-Sync-Generation': command.generation, 'Idempotency-Key': command.key }, body: command.body });
-      persist(null); setPending(null); setEditing(null); setConflict(null); setFormVersion(v => v + 1); setMessage('Сохранено.');
+      persist(null); setPending(null); setEditing(null); setRefundParent(null); setConflict(null); setFormVersion(v => v + 1); setMessage('Сохранено.');
       try { await refresh(auth); } catch (error) { setError('Операция сохранена, но обновить список не удалось. Нажмите «Обновить».'); showError(error); }
     } catch (error) {
       if (error instanceof RequestError && ['action_result_expired', 'idempotency_conflict'].includes(error.code)) {
@@ -95,7 +97,17 @@ export function App() {
       const value = await request<Transaction>(`/workspaces/${auth.workspace.id}/transactions/${id}`);
       const related = value.fee_transaction_id || value.parent_transaction_id;
       const dependency = related ? await request<Transaction>(`/workspaces/${auth.workspace.id}/transactions/${related}`) : null;
-      if (activeSession.current === auth.session.id) { setEditing(value); setConflict(null); setEditingFee(value.fee_transaction_id ? dependency : null); setEditingParentVersion(value.parent_transaction_id ? dependency?.version ?? null : null); }
+      const transfer = value.kind === 'refund' && dependency?.parent_transaction_id ? await request<Transaction>(`/workspaces/${auth.workspace.id}/transactions/${dependency.parent_transaction_id}`) : null;
+      if (activeSession.current === auth.session.id) { setRefundParent(value.kind === 'refund' ? dependency : null); setRefundTransferVersion(transfer?.version ?? null); setEditing(value); setConflict(null); setEditingFee(value.fee_transaction_id ? dependency : null); setEditingParentVersion(value.parent_transaction_id ? dependency?.version ?? null : null); }
+    } catch (error) { showError(error); } finally { setLoading(false); }
+  }
+  async function newRefund(id: string) {
+    if (!auth || busy || pending) return;
+    setLoading(true); setError('');
+    try {
+      const parent = await request<Transaction>(`/workspaces/${auth.workspace.id}/transactions/${id}`);
+      const transfer = parent.parent_transaction_id ? await request<Transaction>(`/workspaces/${auth.workspace.id}/transactions/${parent.parent_transaction_id}`) : null;
+      if (activeSession.current === auth.session.id) { setEditing(null); setConflict(null); setRefundParent(parent); setRefundTransferVersion(transfer?.version ?? null); }
     } catch (error) { showError(error); } finally { setLoading(false); }
   }
   async function revokeSession(id: string, current: boolean) {
@@ -124,8 +136,9 @@ export function App() {
     {conflict && <TransactionConflict value={conflict} accounts={accounts} categories={categories} tags={tags} disabled={busy || loading || !!pending || !online} reload={() => void editTransaction(conflict.current.id)} dismiss={() => setConflict(null)} />}
     {editing && ['expense', 'income'].includes(editing.kind) && <TransactionForm key={`edit-${editing.id}-${editing.version}`} initial={editing} parentVersion={editingParentVersion} accounts={accounts} categories={categories} tags={tags} disabled={busy || loading || !!pending || needsRefresh || !online} submit={body => create(`transactions/${editing.id}`, body, 'PUT')} fail={setError} cancel={() => setEditing(null)} />}
     {editing?.kind === 'transfer' && <TransferForm key={`edit-transfer-${editing.id}-${editing.version}`} initial={editing} initialFee={editingFee} accounts={accounts} categories={categories} disabled={busy || loading || !!pending || needsRefresh || !online} submit={body => create(`transactions/${editing.id}`, body, 'PUT')} fail={setError} cancel={() => setEditing(null)} />}
+    {refundParent && (!editing || editing.kind === 'refund') && <RefundForm key={`refund-${refundParent.id}-${refundParent.version}-${editing?.id ?? 'new'}`} parent={refundParent} transferVersion={refundTransferVersion} initial={editing ?? undefined} accounts={accounts} categories={categories} tags={tags} disabled={busy || loading || !!pending || needsRefresh || !online} submit={body => create(editing ? `transactions/${editing.id}` : 'transactions', body, editing ? 'PUT' : 'POST')} fail={setError} cancel={() => { setRefundParent(null); setEditing(null); }} />}
     <ClassificationManager key={`classification-${formVersion}`} categories={categories} tags={tags} disabled={busy || loading || !!pending || needsRefresh || !online} submit={create} fail={setError} />
-    <TransactionHistory key={`${auth.session.id}-${auth.workspace.id}`} workspace={auth.workspace.id} revision={historyRevision} accounts={accounts} categories={categories} tags={tags} disabled={busy || loading || !!pending || needsRefresh || !online} edit={id => void editTransaction(id)} fail={showError} />
+    <TransactionHistory key={`${auth.session.id}-${auth.workspace.id}`} workspace={auth.workspace.id} revision={historyRevision} accounts={accounts} categories={categories} tags={tags} disabled={busy || loading || !!pending || needsRefresh || !online} edit={id => void editTransaction(id)} refund={id => void newRefund(id)} fail={showError} />
     <SessionManager key={auth.session.id} disabled={busy || loading || !!pending || !online} revoke={revokeSession} fail={showError} />
     </>}
   </main>;

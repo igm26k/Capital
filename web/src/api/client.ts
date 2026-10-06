@@ -26,6 +26,6 @@ export async function listAll<T>(path: string): Promise<T[]> {
   } while (cursor);
   return items;
 }
-export type Transaction = { id: string; kind: string; version: string; occurred_at: string; occurred_timezone: string; status: string; fee_transaction_id: string | null; rate: { numerator: string; denominator: string } | null; parent_transaction_id: string | null; note: string; payee: string; allocations: { id: string; category_id: string | null; amount_minor: string }[]; tag_ids: string[]; entries: { account_id: string; amount_minor: string; currency: string }[] };
+export type Transaction = { id: string; kind: string; version: string; occurred_at: string; occurred_timezone: string; status: string; fee_transaction_id: string | null; rate: { numerator: string; denominator: string } | null; parent_transaction_id: string | null; note: string; payee: string; allocations: { id: string; category_id: string | null; amount_minor: string; original_allocation_id: string | null; remaining_refundable_minor: string }[]; tag_ids: string[]; entries: { account_id: string; amount_minor: string; currency: string }[] };
 export type List<T> = { items: T[]; next_cursor: string | null };
 export type DeviceSession = { id: string; device_name: string; is_current: boolean; created_at: string; last_seen_at: string; expires_at: string; absolute_expires_at: string };

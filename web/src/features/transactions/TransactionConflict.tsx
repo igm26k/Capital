@@ -1,7 +1,7 @@
 import type { Account, Category, Tag, Transaction } from '../../api/client';
 import { categoryLabel } from '../../shared/categories';
 import { money } from '../../shared/money';
-type Allocation = { category_id: string | null; amount_minor: string };
+type Allocation = { category_id?: string | null; amount_minor: string };
 export type ProposedTransaction = { kind: string; note: string; payee: string; occurred_at: string; tag_ids: string[]; account_id?: string; amount_minor?: string; allocations?: Allocation[]; source_account_id?: string; target_account_id?: string; source_amount_minor?: string; target_amount_minor?: string; fee?: { account_id: string; amount_minor: string; allocations: Allocation[]; note: string; tag_ids: string[] } | null };
 export type TransactionComparison = { proposed: ProposedTransaction; current: Transaction; fee: Transaction | null };
 type Props = { value: TransactionComparison; accounts: Account[]; categories: Category[]; tags: Tag[]; disabled: boolean; reload: () => void; dismiss: () => void };
@@ -9,7 +9,7 @@ export function TransactionConflict({ value, accounts, categories, tags, disable
   const { proposed, current, fee } = value;
   const account = (id: string | undefined) => accounts.find(a => a.id === id)?.name ?? 'Счет недоступен';
   const tagNames = (ids: string[]) => ids.map(id => tags.find(t => t.id === id)?.name ?? 'Тег недоступен').sort().join(', ') || 'Без тегов';
-  const parts = (items: Allocation[], currency: string) => items.map(p => { const c = categories.find(c => c.id === p.category_id); return `${c ? categoryLabel(c, categories) : p.category_id ? 'Категория недоступна' : 'Без категории'}: ${money(p.amount_minor, currency)}`; }).sort().join('; ') || 'Без частей';
+  const parts = (items: Allocation[], currency: string) => items.map(p => { const c = categories.find(c => c.id === p.category_id); return `${c ? categoryLabel(c, categories) : p.category_id ? 'Категория недоступна' : p.category_id === undefined ? 'Категория исходной части' : 'Без категории'}: ${money(p.amount_minor, currency)}`; }).sort().join('; ') || 'Без частей';
   const currency = current.entries[0]?.currency ?? 'EUR';
   const movement = proposed.kind === 'transfer' ? [
     `${account(proposed.source_account_id)}: ${money(`-${proposed.source_amount_minor}`, current.entries.find(e => BigInt(e.amount_minor) < 0n)?.currency ?? currency)}`,

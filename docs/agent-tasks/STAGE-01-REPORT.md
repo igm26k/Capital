@@ -351,3 +351,7 @@ Transfer PUT использует observed root/fee versions, сохраняет
 ## S3-06B: сравнение при конфликте операции (2026-10-06)
 
 Version conflict показывает отправленную правку и актуальное серверное состояние рядом, сохраняя форму; серверная версия загружается в редактор только по кнопке, финансового auto-resubmit нет. Сборки PASS; **8/8 Chrome E2E PASS**, включая реальную concurrent expense правку и явную замену редактора. Transfer diff пока без отдельной browser конфликтной приемки; остальные resource/bulk diff остаются открыты. Далее — возвраты и корректировки, пакет in_progress.
+
+## S3-06B: создание и редактор возвратов (2026-10-06)
+
+Возвраты создаются из расхода по исходным частям и доступным reservations; наследуют категории, используют immutable UUID/original links и parent/transfer guards. Сборки PASS; **9/9 Chrome E2E PASS** на настоящем API/PostgreSQL. Refund 5 к expense 10 с архивной category принят после exact replay потерянного POST; edit до 3 сохраняет IDs, balance 93/remaining 7. Отдельный browser fee-refund/concurrency сценарий остается not_run. Далее — корректировки и удаления, пакет in_progress.
