@@ -16,3 +16,10 @@ export function money(value: string, currency: string): string {
   const amount = BigInt(value), digits = (amount < 0n ? -amount : amount).toString().padStart(scale + 1, '0');
   return `${amount < 0n ? '−' : ''}${scale ? digits.slice(0, -scale) + ',' + digits.slice(-scale) : digits} ${currency}`;
 }
+
+export function decimal(value: string, currency: string): string {
+  const scale = scales[currency];
+  if (scale === undefined) throw new Error('Валюта недоступна.');
+  const amount = BigInt(value), digits = (amount < 0n ? -amount : amount).toString().padStart(scale + 1, '0');
+  return `${amount < 0n ? '-' : ''}${scale ? digits.slice(0, -scale) + '.' + digits.slice(-scale) : digits}`;
+}

@@ -24,9 +24,10 @@ export function App() {
   const [needsRefresh, setNeedsRefresh] = useState(false);
   const [auth, setAuth] = useState<Auth | null>(null), [starting, setStarting] = useState(true), [startupError, setStartupError] = useState('');
   const [accounts, setAccounts] = useState<Account[]>([]), [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [editing, setEditing] = useState<Transaction | null>(null);
   const [categories, setCategories] = useState<Category[]>([]), [tags, setTags] = useState<Tag[]>([]);
   const [pending, setPending] = useState<Command | null>(null), [busy, setBusy] = useState(false), [loading, setLoading] = useState(false), [message, setMessage] = useState(''), [error, setError] = useState(''), [online, setOnline] = useState(navigator.onLine), [formVersion, setFormVersion] = useState(0);
-  function authenticated(value: Auth) { activeSession.current = value.session.id; setAccounts([]); setTransactions([]); setCategories([]); setTags([]); setAuth(value); setPending(restore(value)); setError(''); setMessage(''); }
+  function authenticated(value: Auth) { activeSession.current = value.session.id; setAccounts([]); setTransactions([]); setCategories([]); setTags([]); setEditing(null); setAuth(value); setPending(restore(value)); setError(''); setMessage(''); }
   async function session() {
     setStarting(true); setStartupError('');
     try { authenticated(await request<Auth>('/auth/session')); }
@@ -38,7 +39,7 @@ export function App() {
     setLoading(true);
     try {
       const root = `/workspaces/${value.workspace.id}`;
-      const [a, t, w, c, tags] = await Promise.all([listAll<Account>(`${root}/accounts`), request<List<Transaction>>(`${root}/transactions?limit=100`), request<List<Workspace>>('/workspaces'), listAll<Category>(`${root}/categories?archived=include`), listAll<Tag>(`${root}/tags?archived=include`)]);
+      const [a, t, w, c, tags] = await Promise.all([listAll<Account>(`${root}/accounts?archived=include`), request<List<Transaction>>(`${root}/transactions?limit=100`), request<List<Workspace>>('/workspaces'), listAll<Category>(`${root}/categories?archived=include`), listAll<Tag>(`${root}/tags?archived=include`)]);
       const workspace = w.items.find(item => item.id === value.workspace.id);
       if (!workspace) throw new Error('Пространство недоступно.');
       if (activeSession.current !== value.session.id) return;
@@ -55,7 +56,7 @@ export function App() {
     setBusy(true); setError(''); setMessage('');
     try {
       await request(command.path, { method: command.method ?? 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': auth.csrf_token, 'X-Sync-Generation': command.generation, 'Idempotency-Key': command.key }, body: command.body });
-      persist(null); setPending(null); setFormVersion(v => v + 1); setMessage('Сохранено.');
+      persist(null); setPending(null); setEditing(null); setFormVersion(v => v + 1); setMessage('Сохранено.');
       try { await refresh(auth); } catch (error) { setError('Операция сохранена, но обновить список не удалось. Нажмите «Обновить».'); showError(error); }
     } catch (error) {
       if (error instanceof RequestError && ['action_result_expired', 'idempotency_conflict'].includes(error.code)) {
@@ -74,6 +75,14 @@ export function App() {
     const command: Command = { owner: auth.profile.id, session: auth.session.id, workspace: auth.workspace.id, generation: auth.workspace.sync_generation_id, key: crypto.randomUUID(), path: `/workspaces/${auth.workspace.id}/${path}`, method, body: JSON.stringify(body) };
     persist(command); setPending(command); void execute(command);
   }
+  async function editTransaction(id: string) {
+    if (!auth || busy || pending) return;
+    setLoading(true); setError('');
+    try {
+      const value = await request<Transaction>(`/workspaces/${auth.workspace.id}/transactions/${id}`);
+      if (activeSession.current === auth.session.id) setEditing(value);
+    } catch (error) { showError(error); } finally { setLoading(false); }
+  }
   async function logout() {
     if (!auth || pending) return;
     setBusy(true);
@@ -87,10 +96,11 @@ export function App() {
     {message && <p role="status" className="notice success">{message}</p>}{error && <p role="alert" className="notice">{error}</p>}
     {pending && <section className="notice"><h2>Команда ожидает подтверждения</h2><p>Проверьте результат повтором той же команды. Ее данные и ключ сохранены в этой вкладке.</p><button disabled={busy || !online} onClick={() => void execute(pending)}>{busy ? 'Сохраняем…' : 'Повторить ту же команду'}</button></section>}
     <section><h2>Счета</h2>{accounts.length ? <ul className="accounts">{accounts.map(account => <li key={account.id}><span>{account.name}</span><strong data-testid={`balance-${account.id}`}>{money(account.posted_balance_minor, account.currency)}</strong></li>)}</ul> : <p>{loading ? 'Загружаем счета…' : 'Создайте первый счет с начальным остатком.'}</p>}</section>
-    <div className="forms"><AccountForm key={`account-${formVersion}`} disabled={busy || loading || !!pending || needsRefresh || !online} submit={body => create('accounts', body)} fail={setError} /><TransactionForm key={`transaction-${formVersion}`} accounts={accounts} categories={categories} tags={tags} disabled={busy || loading || !!pending || needsRefresh || !online} submit={body => create('transactions', body)} fail={setError} /></div>
-    <TransferForm key={`transfer-${formVersion}`} accounts={accounts} categories={categories} disabled={busy || loading || !!pending || needsRefresh || !online} submit={body => create('transactions', body)} fail={setError} />
+    <div className="forms"><AccountForm key={`account-${formVersion}`} disabled={busy || loading || !!pending || needsRefresh || !online} submit={body => create('accounts', body)} fail={setError} /><TransactionForm key={`transaction-${formVersion}`} accounts={accounts.filter(a => !a.archived_at)} categories={categories} tags={tags} disabled={busy || loading || !!pending || needsRefresh || !online} submit={body => create('transactions', body)} fail={setError} /></div>
+    <TransferForm key={`transfer-${formVersion}`} accounts={accounts.filter(a => !a.archived_at)} categories={categories} disabled={busy || loading || !!pending || needsRefresh || !online} submit={body => create('transactions', body)} fail={setError} />
+    {editing && <TransactionForm key={`edit-${editing.id}-${editing.version}`} initial={editing} accounts={accounts} categories={categories} tags={tags} disabled={busy || loading || !!pending || needsRefresh || !online} submit={body => create(`transactions/${editing.id}`, body, 'PUT')} fail={setError} cancel={() => setEditing(null)} />}
     <ClassificationManager key={`classification-${formVersion}`} categories={categories} tags={tags} disabled={busy || loading || !!pending || needsRefresh || !online} submit={create} fail={setError} />
-    <section><h2>Последние операции</h2><p className="hint">Показаны до 100 последних операций. Полная история и синхронизация будут добавлены на следующем этапе.</p>{transactions.length ? <ul className="history">{transactions.map(transaction => <li key={transaction.id}><div><strong>{transaction.kind === 'expense' && transaction.parent_transaction_id ? 'Комиссия перевода' : ({ opening: 'Начальный остаток', expense: 'Расход', income: 'Доход', transfer: 'Перевод', refund: 'Возврат', adjustment: 'Корректировка' } as Record<string, string>)[transaction.kind] ?? transaction.kind}</strong>{transaction.payee && <p>{transaction.payee}</p>}{transaction.note && <p>{transaction.note}</p>}{transaction.allocations.map(part => <p className="hint" key={part.id}>{part.category_id ? categories.find(item => item.id === part.category_id) ? categoryLabel(categories.find(item => item.id === part.category_id)!, categories) : 'Категория недоступна' : 'Без категории'} · {money(part.amount_minor, transaction.entries[0]?.currency ?? 'EUR')}</p>)}{transaction.tag_ids.length > 0 && <p className="hint">Теги: {transaction.tag_ids.map(id => tags.find(item => item.id === id)?.name ?? 'Недоступный тег').join(', ')}</p>}</div><div>{transaction.entries.map((entry, index) => <p key={index}>{accounts.find(account => account.id === entry.account_id)?.name ?? 'Счет недоступен'} · {money(entry.amount_minor, entry.currency)}</p>)}</div></li>)}</ul> : <p>Операций пока нет.</p>}</section>
+    <section><h2>Последние операции</h2><p className="hint">Показаны до 100 последних операций. Полная история и синхронизация будут добавлены на следующем этапе.</p>{transactions.length ? <ul className="history">{transactions.map(transaction => <li key={transaction.id} data-testid={`transaction-${transaction.id}`}><div><strong>{transaction.kind === 'expense' && transaction.parent_transaction_id ? 'Комиссия перевода' : ({ opening: 'Начальный остаток', expense: 'Расход', income: 'Доход', transfer: 'Перевод', refund: 'Возврат', adjustment: 'Корректировка' } as Record<string, string>)[transaction.kind] ?? transaction.kind}</strong>{['expense', 'income'].includes(transaction.kind) && !transaction.parent_transaction_id && <button className="secondary" disabled={busy || loading || !!pending || needsRefresh || !online} onClick={() => void editTransaction(transaction.id)} aria-label={`Изменить операцию ${transaction.payee || transaction.note || transaction.id}`}>Изменить</button>}{transaction.payee && <p>{transaction.payee}</p>}{transaction.note && <p>{transaction.note}</p>}{transaction.allocations.map(part => <p className="hint" key={part.id}>{part.category_id ? categories.find(item => item.id === part.category_id) ? categoryLabel(categories.find(item => item.id === part.category_id)!, categories) : 'Категория недоступна' : 'Без категории'} · {money(part.amount_minor, transaction.entries[0]?.currency ?? 'EUR')}</p>)}{transaction.tag_ids.length > 0 && <p className="hint">Теги: {transaction.tag_ids.map(id => tags.find(item => item.id === id)?.name ?? 'Недоступный тег').join(', ')}</p>}</div><div>{transaction.entries.map((entry, index) => <p key={index}>{accounts.find(account => account.id === entry.account_id)?.name ?? 'Счет недоступен'} · {money(entry.amount_minor, entry.currency)}</p>)}</div></li>)}</ul> : <p>Операций пока нет.</p>}</section>
     </>}
   </main>;
 }

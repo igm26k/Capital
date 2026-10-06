@@ -168,3 +168,66 @@ test('FX transfer and third-currency fee commit once after lost response', async
   expect(accounts.items.find((a: {name: string}) => a.name === 'Доллары').type).toBe('card');
   expect(accounts.items.find((a: {name: string}) => a.name === 'Комиссии').type).toBe('cash');
 });
+
+test('expense editor preserves parts, retries PUT and rejects stale versions', async ({ page, context }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Создать профиль', exact: true }).click();
+  await page.getByLabel('Электронная почта').fill(`editor-${crypto.randomUUID()}@example.test`);
+  await page.getByLabel('Пароль', { exact: true }).fill('synthetic-browser-password-2026');
+  await page.getByRole('button', { name: 'Зарегистрироваться', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Выйти', exact: true })).toBeVisible();
+  await page.getByLabel('Название счета').fill('Редактор');
+  await page.getByLabel('Начальный остаток, EUR').fill('100');
+  await page.getByRole('button', { name: 'Создать счет', exact: true }).click();
+  await expect(page.locator('.accounts')).toContainText('100,00 EUR');
+  await page.getByLabel('Сумма', { exact: true }).fill('10');
+  await page.getByLabel('Примечание', { exact: true }).fill('Редактируемый расход');
+  await page.getByRole('button', { name: 'Добавить часть', exact: true }).click();
+  await page.getByLabel('Сумма части 1').fill('4');
+  await page.getByLabel('Сумма части 2').fill('6');
+  await page.getByRole('button', { name: 'Сохранить операцию', exact: true }).click();
+  await expect(page.locator('.accounts')).toContainText('90,00 EUR');
+  const auth = await (await context.request.get('/api/v1/auth/session')).json();
+  const root = `/api/v1/workspaces/${auth.workspace.id}`;
+  const before = (await (await context.request.get(`${root}/transactions`)).json()).items.find((t: {kind: string}) => t.kind === 'expense');
+  await page.getByRole('button', { name: 'Изменить операцию Редактируемый расход', exact: true }).click();
+  const editor = page.getByRole('heading', { name: 'Изменить операцию', exact: true }).locator('..');
+  await expect(editor.getByLabel('Тип операции', { exact: true })).toBeDisabled();
+  await editor.getByLabel('Сумма', { exact: true }).fill('12');
+  await editor.getByLabel('Сумма части 1').fill('4');
+  await editor.getByLabel('Сумма части 2').fill('8');
+  const commands: { key: string | undefined; body: string | null }[] = [];
+  let dropped = false, replayed = false;
+  await page.route('**/api/v1/workspaces/*/transactions/*', async route => {
+    if (route.request().method() !== 'PUT') { await route.continue(); return; }
+    commands.push({ key: route.request().headers()['idempotency-key'], body: route.request().postData() });
+    const response = await route.fetch();
+    expect(response.status()).toBe(200);
+    if (!dropped) { dropped = true; await route.abort('connectionfailed'); }
+    else { replayed = response.headers()['idempotency-replayed'] === 'true'; await route.fulfill({ response }); }
+  });
+  await editor.getByRole('button', { name: 'Сохранить изменения операции', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('Операция могла сохраниться');
+  await page.reload();
+  await page.getByRole('button', { name: 'Повторить ту же команду', exact: true }).click();
+  await expect.poll(() => replayed).toBe(true);
+  await expect(page.getByRole('heading', { name: 'Команда ожидает подтверждения' })).toHaveCount(0);
+  expect(commands).toHaveLength(2); expect(commands[1]).toEqual(commands[0]);
+  const after = await (await context.request.get(`${root}/transactions/${before.id}`)).json();
+  expect(after.allocations.map((p: {id: string}) => p.id).sort()).toEqual(before.allocations.map((p: {id: string}) => p.id).sort());
+  expect(after.entries[0].id).toBe(before.entries[0].id);
+  expect(after.occurred_at).toBe(before.occurred_at);
+  await expect(page.locator('.accounts')).toContainText('88,00 EUR');
+  await page.unroute('**/api/v1/workspaces/*/transactions/*');
+  await page.getByRole('button', { name: 'Изменить операцию Редактируемый расход', exact: true }).click();
+  await expect(editor.getByLabel('Сумма', { exact: true })).toHaveValue('12.00');
+  const body = { ...JSON.parse(commands[0].body!), expected_version: after.version, note: 'Правка другого устройства' };
+  const concurrent = await context.request.put(`${root}/transactions/${before.id}`, { headers: { Origin: 'https://localhost:8444', 'X-CSRF-Token': auth.csrf_token, 'X-Sync-Generation': auth.workspace.sync_generation_id, 'Idempotency-Key': crypto.randomUUID() }, data: body });
+  expect(concurrent.status()).toBe(200);
+  await editor.getByLabel('Примечание', { exact: true }).fill('Моя устаревшая правка');
+  await editor.getByRole('button', { name: 'Сохранить изменения операции', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('Конфликт');
+  const final = await (await context.request.get(`${root}/transactions/${before.id}`)).json();
+  expect(final.note).toBe('Правка другого устройства');
+  await expect(editor.getByLabel('Примечание', { exact: true })).toHaveValue('Моя устаревшая правка');
+});
