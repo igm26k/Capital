@@ -18,7 +18,7 @@ const storageKey = 'accounting.pending.v1';
 function restore(auth: Auth): Command | null {
   try {
     const value = JSON.parse(sessionStorage.getItem(storageKey) ?? 'null') as Command | null;
-    if (value?.owner === auth.profile.id && value.session === auth.session.id && value.workspace === auth.workspace.id && typeof value.body === 'string' && typeof value.key === 'string' && typeof value.generation === 'string' && (!value.method || ['POST', 'PUT', 'DELETE'].includes(value.method)) && new RegExp(`^/workspaces/${value.workspace}/(?:(?:accounts|transactions|categories|tags)(?:/[0-9a-f-]{36})?|accounts/[0-9a-f-]{36}/adjustments)$`).test(value.path)) return value;
+    if (value?.owner === auth.profile.id && value.session === auth.session.id && value.workspace === auth.workspace.id && typeof value.body === 'string' && typeof value.key === 'string' && typeof value.generation === 'string' && (!value.method || ['POST', 'PUT', 'DELETE'].includes(value.method)) && new RegExp(`^/workspaces/${value.workspace}/(?:(?:accounts|transactions|categories|tags)(?:/[0-9a-f-]{36})?|accounts/[0-9a-f-]{36}/adjustments|transactions/classification)$`).test(value.path)) return value;
     sessionStorage.removeItem(storageKey);
   } catch { /* Storage unavailable: retries remain available while this page is open. */ }
   return null;
@@ -159,7 +159,7 @@ export function App() {
     <AdjustmentForm key={`adjustment-${formVersion}`} accounts={accounts.filter(a => !a.archived_at)} disabled={busy || loading || !!pending || needsRefresh || !online} submit={create} fail={setError} />
     {editing?.kind === 'adjustment' && <AdjustmentForm key={`edit-adjustment-${editing.id}-${editing.version}`} accounts={accounts} initial={editing} disabled={busy || loading || !!pending || needsRefresh || !online} submit={create} fail={setError} cancel={() => setEditing(null)} />}
     <ClassificationManager key={`classification-${formVersion}`} categories={categories} tags={tags} disabled={busy || loading || !!pending || needsRefresh || !online} submit={create} fail={setError} />
-    <TransactionHistory key={`${auth.session.id}-${auth.workspace.id}`} workspace={auth.workspace.id} revision={historyRevision} accounts={accounts} categories={categories} tags={tags} disabled={busy || loading || !!pending || needsRefresh || !online} edit={id => void editTransaction(id)} refund={id => void newRefund(id)} remove={id => void deleteTransaction(id)} fail={showError} />
+    <TransactionHistory key={`${auth.session.id}-${auth.workspace.id}`} workspace={auth.workspace.id} revision={historyRevision} accounts={accounts} categories={categories} tags={tags} disabled={busy || loading || !!pending || needsRefresh || !online} edit={id => void editTransaction(id)} refund={id => void newRefund(id)} remove={id => void deleteTransaction(id)} classify={body => create('transactions/classification', body)} fail={showError} />
     <SessionManager key={auth.session.id} disabled={busy || loading || !!pending || !online} revoke={revokeSession} fail={showError} />
     </>}
   </main>;

@@ -612,3 +612,77 @@ test('adjustment rejects stale balance and retries the same target after reload'
   expect(final.reason).toBe('Сверка наличных'); expect(final.note).toBe('Уточненное описание');
   expect(final.entries).toEqual(adjustments[0].entries); expect(afterMetadata.balance_version).toBe(beforeMetadata.balance_version);
 });
+
+test('bulk classification rejects the whole stale package and replays one atomic write', async ({ page, context }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Создать профиль', exact: true }).click();
+  await page.getByLabel('Электронная почта').fill(`bulk-${crypto.randomUUID()}@example.test`);
+  await page.getByLabel('Пароль', { exact: true }).fill('synthetic-browser-password-2026');
+  await page.getByRole('button', { name: 'Зарегистрироваться', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Выйти', exact: true })).toBeVisible();
+  await page.getByLabel('Название счета').fill('Пакет');
+  await page.getByLabel('Начальный остаток, EUR').fill('100');
+  await page.getByRole('button', { name: 'Создать счет', exact: true }).click();
+  await expect(page.locator('.accounts')).toContainText('100,00 EUR');
+  for (let i = 1; i <= 2; i++) {
+    await page.getByLabel('Сумма', { exact: true }).fill('1');
+    await page.getByLabel('Примечание', { exact: true }).fill(`Пакет ${i}`);
+    await page.getByRole('button', { name: 'Сохранить операцию', exact: true }).click();
+    await expect(page.locator('.accounts')).toContainText(`${100 - i},00 EUR`);
+  }
+  await page.getByLabel('Название категории', { exact: true }).fill('Массовая категория');
+  await page.getByRole('button', { name: 'Создать категорию', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Изменить категорию Массовая категория', exact: true })).toBeVisible();
+  await page.getByLabel('Название тега', { exact: true }).fill('Пакетный');
+  await page.getByRole('button', { name: 'Создать тег', exact: true }).click();
+  await expect(page.getByLabel('Пакетный', { exact: true })).toBeVisible();
+  const auth = await (await context.request.get('/api/v1/auth/session')).json();
+  const root = `/api/v1/workspaces/${auth.workspace.id}`;
+  const source = (await (await context.request.get(`${root}/transactions`)).json()).items.filter((t: {kind: string}) => t.kind === 'expense');
+  const accountBefore = (await (await context.request.get(`${root}/accounts`)).json()).items[0];
+  await page.getByLabel('Выбрать операцию Пакет 1', { exact: true }).check();
+  await page.getByLabel('Выбрать операцию Пакет 2', { exact: true }).check();
+  await page.getByLabel('Категория выбранных операций', { exact: true }).selectOption({ label: 'Массовая категория' });
+  await page.getByLabel('Массовый тег Пакетный', { exact: true }).check();
+  const changed = source[0];
+  const concurrent = await context.request.put(`${root}/transactions/${changed.id}`, { headers: { Origin: 'https://localhost:8444', 'X-CSRF-Token': auth.csrf_token, 'X-Sync-Generation': auth.workspace.sync_generation_id, 'Idempotency-Key': crypto.randomUUID() }, data: { kind: 'expense', expected_version: changed.version, expected_parent_version: null, account_id: changed.entries[0].account_id, amount_minor: '100', occurred_at: changed.occurred_at, occurred_timezone: changed.occurred_timezone, note: 'Чужая правка пакета', payee: '', allocations: changed.allocations.map((p: {id: string}) => ({id: p.id, category_id: null, amount_minor: '100'})), tag_ids: [] } });
+  expect(concurrent.status()).toBe(200);
+  await page.getByRole('button', { name: 'Применить ко всем выбранным', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('Конфликт');
+  const rejected = (await (await context.request.get(`${root}/transactions`)).json()).items.filter((t: {kind: string}) => t.kind === 'expense');
+  for (const transaction of rejected) {
+    expect(transaction.allocations[0].category_id).toBeNull(); expect(transaction.tag_ids).toEqual([]);
+    const original = source.find((t: {id: string}) => t.id === transaction.id);
+    expect(BigInt(transaction.version)).toBe(BigInt(original.version) + (transaction.id === changed.id ? 1n : 0n));
+  }
+  await page.getByRole('button', { name: 'Обновить', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Массовая классификация', exact: true })).toHaveCount(0);
+  for (const transaction of rejected) await page.getByTestId(`transaction-${transaction.id}`).getByRole('checkbox').check();
+  await page.getByLabel('Категория выбранных операций', { exact: true }).selectOption({ label: 'Массовая категория' });
+  await page.getByLabel('Массовый тег Пакетный', { exact: true }).check();
+  const commands: {key: string | undefined; body: string | null}[] = [];
+  let dropped = false, replayed = false;
+  await page.route('**/api/v1/workspaces/*/transactions/classification', async route => {
+    commands.push({key: route.request().headers()['idempotency-key'], body: route.request().postData()});
+    const response = await route.fetch(); expect(response.status()).toBe(200);
+    if (!dropped) { dropped = true; await route.abort('connectionfailed'); }
+    else { replayed = response.headers()['idempotency-replayed'] === 'true'; await route.fulfill({response}); }
+  });
+  await page.getByRole('button', { name: 'Применить ко всем выбранным', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('Операция могла сохраниться');
+  await page.reload();
+  await page.getByRole('button', { name: 'Повторить ту же команду', exact: true }).click();
+  await expect.poll(() => replayed).toBe(true);
+  await expect(page.getByRole('heading', { name: 'Команда ожидает подтверждения' })).toHaveCount(0);
+  expect(commands).toHaveLength(2); expect(commands[1]).toEqual(commands[0]);
+  const final = (await (await context.request.get(`${root}/transactions`)).json()).items.filter((t: {kind: string}) => t.kind === 'expense');
+  const category = (await (await context.request.get(`${root}/categories`)).json()).items[0];
+  const tag = (await (await context.request.get(`${root}/tags`)).json()).items[0];
+  for (const transaction of final) {
+    expect(transaction.allocations[0].category_id).toBe(category.id); expect(transaction.tag_ids).toEqual([tag.id]);
+    expect(BigInt(transaction.version)).toBe(BigInt(rejected.find((t: {id: string}) => t.id === transaction.id).version) + 1n);
+  }
+  const accountAfter = (await (await context.request.get(`${root}/accounts`)).json()).items[0];
+  expect(accountAfter.balance_version).toBe(accountBefore.balance_version);
+  expect(accountAfter.posted_balance_minor).toBe('9800');
+});

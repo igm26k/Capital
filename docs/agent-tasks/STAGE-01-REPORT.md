@@ -363,3 +363,7 @@ Version conflict показывает отправленную правку и �
 ## S3-06B: удаление операций и зависимостей (2026-10-06)
 
 DELETE использует актуальные root/related versions, показывает движения и каскадную fee перед явным подтверждением; pending DELETE переживает reload с исходным key/body. Сборки PASS; **10/10 Chrome E2E PASS**. Active refund блокирует expense deletion; удаление refund повторяется безопасно, освобождает лимит и позволяет удалить expense. Transfer+fee deletion возвращает исходные остатки трех счетов и 404 обоих aggregates. Далее — atomic bulk и полнота metadata editor, пакет in_progress.
+
+## S3-06B: атомарная массовая классификация (2026-10-06)
+
+History позволяет выбрать до 100 подходящих standalone expense/income и одной командой заменить category/tags с observed versions. Сборки PASS; **11/11 Chrome E2E PASS**. Конкурентная правка одного item отклоняет весь package без частичных изменений; exact replay успешного package после reload не увеличивает versions повторно и не меняет balance_version. Далее — даты и полнота transfer/fee metadata, расширенная финальная приемка. Пакет in_progress.
