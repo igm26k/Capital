@@ -167,6 +167,43 @@ test('FX transfer and third-currency fee commit once after lost response', async
   const accounts = await (await context.request.get(`${root}/accounts`)).json();
   expect(accounts.items.find((a: {name: string}) => a.name === 'Доллары').type).toBe('card');
   expect(accounts.items.find((a: {name: string}) => a.name === 'Комиссии').type).toBe('cash');
+  await page.getByRole('button', { name: `Изменить операцию ${transfers[0].id}`, exact: true }).click();
+  const transferEditor = page.getByRole('heading', { name: 'Изменить перевод', exact: true }).locator('..');
+  await transferEditor.getByLabel('Сумма списания, EUR').fill('6');
+  await transferEditor.getByLabel('Сумма зачисления, USD').fill('2');
+  await transferEditor.getByLabel('Комиссия, KWD', { exact: true }).fill('0,246');
+  await transferEditor.getByRole('button', { name: 'Добавить часть комиссии', exact: true }).click();
+  await transferEditor.getByLabel('Сумма части комиссии 1').fill('0,100');
+  await transferEditor.getByLabel('Сумма части комиссии 2').fill('0,146');
+  await transferEditor.getByRole('button', { name: 'Сохранить изменения перевода', exact: true }).click();
+  await expect(transferEditor).toHaveCount(0);
+  await expect(page.locator('.accounts li').filter({ hasText: 'Евро' })).toContainText('94,00 EUR');
+  await expect(page.locator('.accounts li').filter({ hasText: 'Доллары' })).toContainText('102,00 USD');
+  await expect(page.locator('.accounts li').filter({ hasText: 'Комиссии' })).toContainText('99,754 KWD');
+  const replaced = await (await context.request.get(`${root}/transactions/${transfers[0].id}`)).json();
+  const replacedFee = await (await context.request.get(`${root}/transactions/${fees[0].id}`)).json();
+  expect(replaced.fee_transaction_id).toBe(fees[0].id);
+  expect(replacedFee.allocations.map((p: {id: string}) => p.id)).toContain(fees[0].allocations[0].id);
+  expect(replacedFee.allocations).toHaveLength(2);
+  expect(replaced.entries.map((e: {id: string}) => e.id).sort()).toEqual(transfers[0].entries.map((e: {id: string}) => e.id).sort());
+  await page.getByRole('button', { name: `Изменить операцию ${fees[0].id}`, exact: true }).click();
+  const feeEditor = page.getByRole('heading', { name: 'Изменить операцию', exact: true }).locator('..');
+  await feeEditor.getByLabel('Сумма', { exact: true }).fill('0,300');
+  await feeEditor.getByLabel('Сумма части 1').fill('0,100');
+  await feeEditor.getByLabel('Сумма части 2').fill('0,200');
+  await feeEditor.getByRole('button', { name: 'Сохранить изменения операции', exact: true }).click();
+  await expect(feeEditor).toHaveCount(0);
+  await expect(page.locator('.accounts li').filter({ hasText: 'Комиссии' })).toContainText('99,700 KWD');
+  const parentAfterFee = await (await context.request.get(`${root}/transactions/${transfers[0].id}`)).json();
+  expect(BigInt(parentAfterFee.version)).toBe(BigInt(replaced.version) + 1n);
+  await page.getByRole('button', { name: `Изменить операцию ${transfers[0].id}`, exact: true }).click();
+  await transferEditor.getByLabel('Добавить комиссию', { exact: true }).uncheck();
+  await transferEditor.getByRole('button', { name: 'Сохранить изменения перевода', exact: true }).click();
+  await expect(transferEditor).toHaveCount(0);
+  await expect(page.locator('.accounts li').filter({ hasText: 'Комиссии' })).toContainText('100,000 KWD');
+  const withoutFee = await (await context.request.get(`${root}/transactions/${transfers[0].id}`)).json();
+  expect(withoutFee.fee_transaction_id).toBeNull();
+
 });
 
 test('expense editor preserves parts, retries PUT and rejects stale versions', async ({ page, context }) => {
@@ -230,4 +267,17 @@ test('expense editor preserves parts, retries PUT and rejects stale versions', a
   const final = await (await context.request.get(`${root}/transactions/${before.id}`)).json();
   expect(final.note).toBe('Правка другого устройства');
   await expect(editor.getByLabel('Примечание', { exact: true })).toHaveValue('Моя устаревшая правка');
+  await editor.getByRole('button', { name: 'Отменить редактирование', exact: true }).click();
+  const creator = page.getByRole('heading', { name: 'Новая операция', exact: true }).locator('..');
+  await creator.getByLabel('Тип операции', { exact: true }).selectOption('income');
+  await creator.getByLabel('Сумма', { exact: true }).fill('5');
+  await creator.getByLabel('Примечание', { exact: true }).fill('Редактируемый доход');
+  await creator.getByRole('button', { name: 'Сохранить операцию', exact: true }).click();
+  await expect(page.locator('.accounts')).toContainText('93,00 EUR');
+  await page.getByRole('button', { name: 'Изменить операцию Редактируемый доход', exact: true }).click();
+  await editor.getByLabel('Сумма', { exact: true }).fill('7');
+  await editor.getByRole('button', { name: 'Сохранить изменения операции', exact: true }).click();
+  await expect(editor).toHaveCount(0);
+  await expect(page.locator('.accounts')).toContainText('95,00 EUR');
+
 });

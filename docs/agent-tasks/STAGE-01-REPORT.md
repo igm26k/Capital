@@ -331,3 +331,7 @@ S3-06B остается in_progress: переводы/комиссии/возв�
 ## S3-06B: редактор расходов и доходов (2026-10-06)
 
 Добавлен versioned редактор самостоятельных expense/income с сохранением UUID частей, даты/таймзоны и исторической классификации; повтор неопределенного PUT поддерживается после reload. Новые операции используют активные счета, исторические ссылки видны через archived=include. Сборки PASS, финальный Chrome E2E на настоящих API/PostgreSQL — **5/5 PASS**: новая правка 10→12, UUID parts/entry/date сохранены, lost-response replay и реальная concurrent version rejection без потери введенного текста. Отдельная browser приемка income/date edit/fee/conflict diff еще не выполнена. Следующий шаг — переводы и связанные комиссии; S3-06B in_progress.
+
+## S3-06B: редактирование переводов и комиссий (2026-10-06)
+
+Transfer PUT использует observed root/fee versions, сохраняет currencies/entry UUIDs и existing fee UUID/parts. Поддержаны добавление/изменение/удаление fee вместе с переводом и отдельный fee PUT с parent version. Fee поддерживает 1–100 точных частей. `make web-check`/npm build — PASS; Chrome на настоящем TLS API/PostgreSQL — **5/5 PASS**, включая transfer+fee финансовую правку, части комиссии, standalone fee parent bump, удаление fee и income edit. Остальные регрессии PASS. Далее — редактор и архив счетов; S3-06B остается in_progress.
