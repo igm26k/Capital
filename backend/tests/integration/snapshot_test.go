@@ -21,7 +21,6 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -93,6 +92,7 @@ func TestSnapshot(t *testing.T) {
 	var counter atomic.Int64
 	id := func() string { return fmt.Sprintf("c1000000-0000-4000-8000-%012d", counter.Add(1)) }
 	root := "/api/v1/workspaces/" + user.Workspace.ID
+	commandGeneration := user.Workspace.Generation
 	type observed struct {
 		Schema string          `json:"schema"`
 		Body   json.RawMessage `json:"body"`
@@ -117,7 +117,7 @@ func TestSnapshot(t *testing.T) {
 			req.Header.Set("Content-Type", "application/json")
 			req.Header.Set("Idempotency-Key", action)
 			if !strings.Contains(path, "/sync/snapshots") {
-				req.Header.Set("X-Sync-Generation", user.Workspace.Generation)
+				req.Header.Set("X-Sync-Generation", commandGeneration)
 			}
 		}
 		response, e := server.Client().Do(req)
@@ -199,6 +199,7 @@ func TestSnapshot(t *testing.T) {
 	}
 	call("POST", root+"/sync/snapshots", map[string]any{"id": id()}, id(), user.Credential, 400, "bad_request")
 	call("POST", root+"/sync/snapshots", map[string]any{"id": id(), "extra": true}, id(), user.Credential, 422, "validation_error")
+	call("POST", root+"/sync/snapshots", map[string]any{"ID": id()}, id(), user.Credential, 422, "validation_error")
 	call("GET", root+"/sync/snapshots/"+empty.ID, nil, "", other.Credential, 404, "not_found")
 	call("GET", root+"/sync/snapshots/"+empty.ID, nil, "", "", 401, "unauthenticated")
 	accountID := id()
@@ -466,6 +467,7 @@ func TestSnapshot(t *testing.T) {
 	get(createdResult.snapshot, 410, "snapshot_expired")
 	page(createdResult.snapshot, createdResult.snapshot.First, 410, "snapshot_expired")
 	create(createdResult.snapshot.ID, 410, "snapshot_expired")
+	commandGeneration = newGeneration
 	refreshed := create(id(), 201, "")
 	if refreshed.Generation != newGeneration || refreshed.Base != "0" {
 		t.Fatal("new generation bootstrap")
@@ -478,6 +480,152 @@ func TestSnapshot(t *testing.T) {
 	if _, e = db.Exec(ctx, `UPDATE memberships SET revoked_at=NULL WHERE workspace_id=$1 AND user_id=$2`, user.Workspace.ID, user.Profile.ID); e != nil {
 		t.Fatal(e)
 	}
+	// Failed COPY rolls back the metadata marker and all items; same-ID retry works.
+	faultID := id()
+	if _, e = db.Exec(ctx, `CREATE FUNCTION snapshot_copy_fault() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.position=2 THEN RAISE EXCEPTION 'synthetic snapshot copy failure'; END IF; RETURN NEW; END $$; CREATE TRIGGER snapshot_copy_fault BEFORE INSERT ON sync_snapshot_items FOR EACH ROW EXECUTE FUNCTION snapshot_copy_fault()`); e != nil {
+		t.Fatal(e)
+	}
+	create(faultID, 503, "service_unavailable")
+	var faultMarkers int
+	db.QueryRow(ctx, `SELECT count(*) FROM sync_snapshots WHERE id=$1`, faultID).Scan(&faultMarkers)
+	if faultMarkers != 0 {
+		t.Fatal("failed snapshot marker persisted")
+	}
+	if _, e = db.Exec(ctx, `DROP TRIGGER snapshot_copy_fault ON sync_snapshot_items; DROP FUNCTION snapshot_copy_fault()`); e != nil {
+		t.Fatal(e)
+	}
+	recovered := create(faultID, 201, "")
+	if recovered.Count != 109 {
+		t.Fatal("snapshot retry truncated")
+	}
+	// Cookie POST requires Origin and CSRF, even though snapshot is read-only.
+	csrfReq, _ := http.NewRequest("POST", server.URL+root+"/sync/snapshots", strings.NewReader(`{"id":"`+id()+`"}`))
+	csrfReq.Header.Set("Content-Type", "application/json")
+	csrfReq.Header.Set("Idempotency-Key", id())
+	csrfReq.AddCookie(&http.Cookie{Name: "__Host-accounting_session", Value: user.Credential})
+	// Use matching body/header so CSRF is the actual rejection, not wire validation.
+	csrfID := id()
+	csrfReq.Body = io.NopCloser(strings.NewReader(`{"id":"` + csrfID + `"}`))
+	csrfReq.ContentLength = -1
+	csrfReq.Header.Set("Idempotency-Key", csrfID)
+	csrfResponse, e := server.Client().Do(csrfReq)
+	if e != nil {
+		t.Fatal(e)
+	}
+	csrfData, _ := io.ReadAll(csrfResponse.Body)
+	csrfResponse.Body.Close()
+	if csrfResponse.StatusCode != 403 {
+		t.Fatalf("snapshot CSRF status %d", csrfResponse.StatusCode)
+	}
+	captured = append(captured, observed{"Error", csrfData})
+	// Journal age fixtures: stop at the first young group even if a later group is
+	// older. A locked head must be skipped, and receipts survive group cleanup.
+	for i := 0; i < 3; i++ {
+		call("POST", root+"/tags", map[string]any{"id": id(), "name": fmt.Sprintf("Retention %d", i)}, id(), user.Credential, 201, "")
+	}
+	if _, e = db.Exec(ctx, `UPDATE sync_groups SET created_at=statement_timestamp()-interval '100 days' WHERE workspace_id=$1 AND sequence IN(1,3)`, user.Workspace.ID); e != nil {
+		t.Fatal(e)
+	}
+	held, e := db.Begin(ctx)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if _, e = held.Exec(ctx, `SELECT 1 FROM sync_heads WHERE workspace_id=$1 FOR UPDATE`, user.Workspace.ID); e != nil {
+		t.Fatal(e)
+	}
+	skipped, e := commands.CleanupSync(ctx, db, 100)
+	if e != nil || skipped.Groups != 0 || skipped.Snapshots != 0 {
+		t.Fatal("cleanup did not skip held head", e)
+	}
+	held.Rollback(ctx)
+	var receiptCount int
+	db.QueryRow(ctx, `SELECT count(*) FROM actions WHERE workspace_id=$1`, user.Workspace.ID).Scan(&receiptCount)
+	cleaned, e = commands.CleanupSync(ctx, db, 100)
+	if e != nil || cleaned.Groups != 1 {
+		t.Fatal("retention prefix", cleaned, e)
+	}
+	var minimum int64
+	db.QueryRow(ctx, `SELECT min_available_sequence FROM sync_heads WHERE workspace_id=$1`, user.Workspace.ID).Scan(&minimum)
+	if minimum != 2 {
+		t.Fatal("retention crossed young group")
+	}
+	var changeCount int
+	db.QueryRow(ctx, `SELECT count(*) FROM sync_changes WHERE workspace_id=$1 AND sequence=1`, user.Workspace.ID).Scan(&changeCount)
+	if changeCount != 0 {
+		t.Fatal("partial retained group")
+	}
+	cleaned, e = commands.CleanupSync(ctx, db, 100)
+	if e != nil || cleaned.Groups != 0 {
+		t.Fatal("young prefix was skipped", e)
+	}
+	zeroCurrent, _ := keys.Sign(user.Profile.ID, user.Workspace.ID, newGeneration, 0)
+	call("GET", root+"/sync/changes?cursor="+url.QueryEscape(zeroCurrent), nil, "", user.Credential, 410, "cursor_expired")
+	boundaryCurrent, _ := keys.Sign(user.Profile.ID, user.Workspace.ID, newGeneration, 1)
+	call("GET", root+"/sync/changes?cursor="+url.QueryEscape(boundaryCurrent), nil, "", user.Credential, 200, "")
+	// Snapshot payload deletion and retention advance roll back together on failure.
+	expire(refreshed.ID)
+	if _, e = db.Exec(ctx, `UPDATE sync_groups SET created_at=statement_timestamp()-interval '100 days' WHERE workspace_id=$1 AND sequence=2`, user.Workspace.ID); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = db.Exec(ctx, `CREATE FUNCTION retention_fault() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'synthetic retention failure'; END $$; CREATE TRIGGER retention_fault BEFORE DELETE ON sync_groups FOR EACH ROW EXECUTE FUNCTION retention_fault()`); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = commands.CleanupSync(ctx, db, 100); e == nil {
+		t.Fatal("retention fault accepted")
+	}
+	var stillLive bool
+	db.QueryRow(ctx, `SELECT payload_cleared_at IS NULL FROM sync_snapshots WHERE id=$1`, refreshed.ID).Scan(&stillLive)
+	db.QueryRow(ctx, `SELECT count(*) FROM sync_snapshot_items WHERE snapshot_id=$1`, refreshed.ID).Scan(&items)
+	db.QueryRow(ctx, `SELECT min_available_sequence FROM sync_heads WHERE workspace_id=$1`, user.Workspace.ID).Scan(&minimum)
+	if !stillLive || items != refreshed.Count || minimum != 2 {
+		t.Fatal("cleanup left partial state")
+	}
+	if _, e = db.Exec(ctx, `DROP TRIGGER retention_fault ON sync_groups; DROP FUNCTION retention_fault()`); e != nil {
+		t.Fatal(e)
+	}
+	cleaned, e = commands.CleanupSync(ctx, db, 100)
+	if e != nil || cleaned.Groups != 2 || cleaned.Snapshots != 1 {
+		t.Fatal("cleanup retry", cleaned, e)
+	}
+	db.QueryRow(ctx, `SELECT min_available_sequence FROM sync_heads WHERE workspace_id=$1`, user.Workspace.ID).Scan(&minimum)
+	if minimum != 4 {
+		t.Fatal("empty journal boundary")
+	}
+	var survivingReceipts int
+	db.QueryRow(ctx, `SELECT count(*) FROM actions WHERE workspace_id=$1`, user.Workspace.ID).Scan(&survivingReceipts)
+	if survivingReceipts != receiptCount {
+		t.Fatal("retention erased receipts")
+	}
+	create(refreshed.ID, 410, "snapshot_expired")
+	page(refreshed, refreshed.First, 410, "snapshot_expired")
+	// Budget overflow is a complete failure, never a truncated successful snapshot.
+	expire(recovered.ID)
+	if _, e = db.Exec(ctx, `INSERT INTO tags(id,workspace_id,name,name_normalized) SELECT gen_random_uuid(),$1,'Budget '||n,'budget '||n FROM generate_series(1,50001)n`, user.Workspace.ID); e != nil {
+		t.Fatal(e)
+	}
+	countID := id()
+	create(countID, 422, "snapshot_too_large")
+	db.QueryRow(ctx, `SELECT count(*) FROM sync_snapshots WHERE id=$1`, countID).Scan(&faultMarkers)
+	if faultMarkers != 0 {
+		t.Fatal("count overflow marker")
+	}
+	if _, e = db.Exec(ctx, `DELETE FROM tags WHERE workspace_id=$1 AND name_normalized LIKE 'budget %'`, user.Workspace.ID); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = db.Exec(ctx, `WITH inserted AS (INSERT INTO transactions(id,workspace_id,kind,status,occurred_at,occurred_timezone,note) SELECT gen_random_uuid(),$1,'income','posted',statement_timestamp(),'UTC',repeat('😀',2000) FROM generate_series(1,8000) RETURNING id,workspace_id), movements AS (INSERT INTO entries(id,workspace_id,transaction_id,account_id,amount_minor) SELECT gen_random_uuid(),workspace_id,id,$2,1 FROM inserted) INSERT INTO allocations(id,workspace_id,transaction_id,amount_minor) SELECT gen_random_uuid(),workspace_id,id,1 FROM inserted`, user.Workspace.ID, accountID); e != nil {
+		t.Fatal(e)
+	}
+	// Bulk SQL fixtures need fresh planner statistics before the size acceptance.
+	if _, e = db.Exec(ctx, `ANALYZE tags; ANALYZE transactions; ANALYZE entries; ANALYZE allocations`); e != nil {
+		t.Fatal(e)
+	}
+	bytesID := id()
+	create(bytesID, 422, "snapshot_too_large")
+	db.QueryRow(ctx, `SELECT count(*) FROM sync_snapshots WHERE id=$1`, bytesID).Scan(&faultMarkers)
+	if faultMarkers != 0 {
+		t.Fatal("byte overflow marker")
+	}
+
 	if artifact := os.Getenv("SNAPSHOT_RESPONSE_ARTIFACT"); artifact != "" {
 		if e = os.MkdirAll(filepath.Dir(artifact), 0700); e != nil {
 			t.Fatal(e)

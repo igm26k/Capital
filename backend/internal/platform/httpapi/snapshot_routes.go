@@ -56,7 +56,7 @@ func MountSnapshots(mux *http.ServeMux, service *commands.SnapshotService, optio
 			ID string `json:"id"`
 		}
 		var fields map[string]json.RawMessage
-		if json.Unmarshal(body, &input) != nil || json.Unmarshal(body, &fields) != nil || len(fields) != 1 || !validUUID(input.ID) {
+		if json.Unmarshal(body, &input) != nil || json.Unmarshal(body, &fields) != nil || len(fields) != 1 || fields["id"] == nil || !validUUID(input.ID) {
 			reject(w, fail(422, "validation_error"))
 			return
 		}

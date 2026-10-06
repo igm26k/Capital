@@ -73,6 +73,20 @@ services:
     depends_on:
       db: {condition: service_healthy}
     profiles: [checks]
+  access-check:
+    build: {context: ./backend, target: build}
+    command: [go, test, ./tests/integration, -run, '^Test(Access|SessionRace)$', -v, -count=1]
+    environment:
+      <<: *test-env
+      GOCACHE: /tmp/accounting-go-check-build
+      HOME: /tmp
+      ACCESS_RESPONSE_ARTIFACT: /output/access-responses.json
+      SESSION_RACE_RESPONSE_ARTIFACT: /output/session-race-responses.json
+    volumes: ["./ops/.runtime/checks:/output"]
+    networks: [private]
+    depends_on:
+      db: {condition: service_healthy}
+    profiles: [checks]
   snapshot-check:
     build: {context: ./backend, target: build}
     command: [go, test, ./tests/integration, -run, '^TestSnapshot$', -v, -count=1]

@@ -65,3 +65,19 @@ pull-check:
 	rm -f ops/.runtime/checks/pull-responses.json
 	$(TEST_COMPOSE) --profile checks run --build --rm --user "$$(id -u):$$(id -g)" pull-check
 	python3 scripts/check-ledger-responses.py ops/.runtime/checks/pull-responses.json
+
+.PHONY: snapshot-check
+snapshot-check:
+	mkdir -p ops/.runtime/checks
+	rm -f ops/.runtime/checks/snapshot-responses.json
+	$(TEST_COMPOSE) --profile checks run --build --rm --user "$$(id -u):$$(id -g)" snapshot-check
+	python3 scripts/check-ledger-responses.py ops/.runtime/checks/snapshot-responses.json
+
+.PHONY: access-check
+access-check:
+	mkdir -p ops/.runtime/checks
+	rm -f ops/.runtime/checks/access-responses.json ops/.runtime/checks/session-race-responses.json
+	$(TEST_COMPOSE) --profile checks run --build --rm --user "$$(id -u):$$(id -g)" access-check
+	python3 scripts/check-ledger-responses.py ops/.runtime/checks/access-responses.json
+	python3 scripts/check-ledger-responses.py ops/.runtime/checks/session-race-responses.json
+	python3 scripts/check-access-responses.py

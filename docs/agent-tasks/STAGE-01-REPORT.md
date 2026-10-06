@@ -2,7 +2,7 @@
 
 Дата обновления: 2026-10-06. Статус этапа: in_progress.
 
-Актуальный результат: финансовый серверный пакет S3-02A/B/C, первый веб-поток S3-06A и вертикальная приемка S3-07A завершены. Реализованы transfer/fee, refund, правки/удаление, adjustment и атомарная bulk классификация. Advanced PostgreSQL acceptance: 1652 HTTP ответа / 5 OpenAPI schemas; basic: 179 / 11; Go и vertical проверки проходят. S3-04B (pull) завершена: PostgreSQL/TLS, 26 HTTP ответов / 3 OpenAPI schemas. Следующий готовый шаг — S3-04C (snapshot/bootstrap и retention). Полная синхронизация, доступ, расширенный веб и production выпуск еще не завершены.
+Актуальный результат: финансовый серверный пакет S3-02A/B/C, sync пакет S3-04A/B/C, первый веб-поток S3-06A и вертикальная приемка S3-07A завершены. Pull: 26 HTTP ответов / 3 OpenAPI schemas; snapshots/bootstrap/cleanup: 54 / 5; advanced financial: 1652 / 5, basic: 179 / 11. Реальные PostgreSQL regression и Go проверки проходят. S3-03A/B завершены: все 35 API операций, 33 private guards, POST/PUT scopes и revoke races приняты на PostgreSQL/TLS (203 HTTP ответа / 10 OpenAPI schemas, 28 / 3; Go race detector PASS). Следующий готовый шаг — S3-06B (полный интерфейс ручного учета). Клиентское mirror/outbox/staging, расширенный веб и production выпуск еще не завершены.
 
 Ниже сохранена хронология работ; прежние not_run относятся к состоянию на момент соответствующей записи.
 
@@ -301,3 +301,13 @@ HMAC cursor/key rotation, HTTP adapter и REPEATABLE READ чтение целы�
 Local API/worker собраны из финальных исходников через cached runtime images. Локальный ключ создан в .env без вывода значения; прежние пользовательские параметры сохранены (REGISTRATION_ENABLED=true). HTTPS page/ready — 200/ready, pull без session — 401. Регрессия Chrome/Playwright — PASS, 1 сценарий lost response → API/web restart → same-key replay; одна expense и ожидаемый остаток. Cached запуск scripts/e2e.sh использует существующие npm dependencies и compose up --no-build; test остановлен без удаления volume. Нового sync UI этот сценарий не проверяет.
 
 После сохранения прежних lock_timeout=3s/statement_timeout=10s в новом beginIsolation повторены финальные проверки: backend-check и TestPull — PASS; общая PostgreSQL регрессия TestCommand/TestLedgerAdvanced/TestLedgerBasic/TestVertical — PASS. Local active signing key проверен как настроенный без вывода значения.
+
+## Snapshot/bootstrap и retention S3-04C (2026-10-06)
+
+Серверная materialization, actor quota/replay, immutable pages/TTL, подписанные page tokens и worker cleanup завершены: [S3-04C](S3-04C.md). 54 HTTP ответа / 5 схем OpenAPI приняты на PostgreSQL/TLS. Добавочная миграция 0004 сохраняет key ID, предыдущие SQL неизменны; локальный upgrade применен и повторен без изменений. Пакет S3-04 закрыт по результатам всех дочерних задач, этап 1 остается in_progress. DR-S04 подтвержден на сервере; Android Room/staging/outbox и DR-S10 restore drill не выполнялись.
+
+Финальная Chrome/Playwright basic регрессия на новых API binaries и migration 0004 — PASS (1 сценарий, lost response → API/web restart → same-key replay, одна expense и ожидаемый остаток). Cached-image вариант scripts/e2e.sh использует имеющиеся npm dependencies; test Compose остановлен без удаления volume. Snapshot UI/Android atomic apply этим browser сценарием не проверяются. Local REGISTRATION_ENABLED=true сохранен.
+
+## S3-03B: ресурсный доступ и отзыв (2026-10-06)
+
+[Пакет негативной приемки](S3-03B.md) завершен: 203 HTTP ответа resource tests и 28 ответов deterministic session/membership races валидированы по OpenAPI. Все 35 операций/33 private guards покрыты; pg_blocking_pids подтверждает фактический порядок locks. Go race detector и повтор TestAuth — PASS. Runtime код и миграции не менялись; браузер не перезапускался ради серверных tests. Пакет S3-03 закрыт по проверенным дочерним результатам; этап остается in_progress. Следующая готовая задача — S3-06B, включая DR-A10 UI rendering.
