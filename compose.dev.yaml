@@ -1,0 +1,16 @@
+services:
+  web-dev:
+    build: {context: ./web, target: dev, network: "${DOCKER_BUILD_NETWORK:-default}"}
+    volumes:
+      - ./web/src:/app/src:ro
+      - ./web/index.html:/app/index.html:ro
+    networks: [private]
+  web:
+    volumes:
+      - ./ops/nginx.dev.conf:/etc/nginx/nginx.conf:ro
+    depends_on: [api, web-dev]
+networks:
+  private:
+    ipam:
+      config:
+        - subnet: ${ACCOUNTING_DEV_SUBNET:-192.168.240.0/24}

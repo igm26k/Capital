@@ -1,0 +1,6047 @@
+{
+  "openapi": "3.1.1",
+  "info": {
+    "title": "Accounting API",
+    "version": "0.2.0",
+    "description": "Stage 1 manual accounting contract. Future imports, budgets, reports and sync transport are specified separately; no server exists yet."
+  },
+  "servers": [
+    {
+      "url": "/api/v1"
+    }
+  ],
+  "security": [
+    {
+      "sessionCookie": []
+    },
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/auth/register": {
+      "post": {
+        "operationId": "auth_register",
+        "summary": "Register and create personal workspace",
+        "tags": [
+          "auth"
+        ],
+        "security": [],
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Register"
+              }
+            }
+          }
+        },
+        "description": "Atomic user/workspace/session creation in explicitly enabled local/test registration. Disabled by default: 403 registration_disabled. Duplicate email uses generic validation_error, but immediate success/failure reveals availability; email verification is required before public registration."
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "operationId": "auth_login",
+        "summary": "Create a session",
+        "tags": [
+          "auth"
+        ],
+        "security": [],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Login"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/session": {
+      "get": {
+        "operationId": "auth_session",
+        "summary": "Restore current session and cookie CSRF token",
+        "tags": [
+          "auth"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "description": "Returns current session without creating a new one. Bearer response returns the presented token. Cache-Control: no-store."
+      }
+    },
+    "/auth/renew": {
+      "post": {
+        "operationId": "auth_renew",
+        "summary": "Extend idle expiry within absolute expiry",
+        "tags": [
+          "auth"
+        ],
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfToken": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "description": "Does not rotate the credential. Idle expiry is min(now+7 days, absolute expiry); absolute lifetime 30 days."
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "operationId": "auth_logout",
+        "summary": "Revoke current session",
+        "tags": [
+          "auth"
+        ],
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfToken": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Acknowledgement"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        }
+      }
+    },
+    "/me": {
+      "get": {
+        "operationId": "profile_get",
+        "summary": "Read own profile",
+        "tags": [
+          "profile"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Profile"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        }
+      },
+      "put": {
+        "operationId": "profile_update",
+        "summary": "Set profile timezone",
+        "tags": [
+          "profile"
+        ],
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfToken": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Profile"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProfileUpdate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions": {
+      "get": {
+        "operationId": "sessions_list",
+        "summary": "List active own sessions",
+        "tags": [
+          "sessions"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionList"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        }
+      }
+    },
+    "/sessions/{id}": {
+      "delete": {
+        "operationId": "sessions_revoke",
+        "summary": "Revoke own session",
+        "tags": [
+          "sessions"
+        ],
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfToken": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ResourceId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Acknowledgement"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "description": "Already revoked own session returns ok. Unknown or foreign session returns 404."
+      }
+    },
+    "/workspaces": {
+      "get": {
+        "operationId": "workspaces_list",
+        "summary": "List accessible workspaces",
+        "tags": [
+          "workspaces"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceList"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        }
+      }
+    },
+    "/currencies": {
+      "get": {
+        "operationId": "currencies_list",
+        "summary": "List supported currencies and scales",
+        "tags": [
+          "currencies"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CurrencyList"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        }
+      }
+    },
+    "/workspaces/{workspace_id}/accounts": {
+      "get": {
+        "operationId": "accounts_list",
+        "summary": "List accounts",
+        "tags": [
+          "accounts"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "name": "archived",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "exclude",
+                "include",
+                "only"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountList"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        }
+      },
+      "post": {
+        "operationId": "accounts_create",
+        "summary": "Create account",
+        "tags": [
+          "accounts"
+        ],
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfToken": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          },
+          {
+            "$ref": "#/components/parameters/ActionId"
+          },
+          {
+            "$ref": "#/components/parameters/SyncGeneration"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MutationResult"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true for a retained replay response; false for first completion",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountCreate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspaces/{workspace_id}/accounts/{id}": {
+      "get": {
+        "operationId": "accounts_get",
+        "summary": "Read account",
+        "tags": [
+          "accounts"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          },
+          {
+            "$ref": "#/components/parameters/ResourceId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Account"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "description": "Read versions, balances and child records from one consistent DB snapshot."
+      },
+      "put": {
+        "operationId": "accounts_update",
+        "summary": "Replace editable account metadata",
+        "tags": [
+          "accounts"
+        ],
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfToken": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          },
+          {
+            "$ref": "#/components/parameters/ResourceId"
+          },
+          {
+            "$ref": "#/components/parameters/ActionId"
+          },
+          {
+            "$ref": "#/components/parameters/SyncGeneration"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MutationResult"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true for a retained replay response; false for first completion",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountUpdate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspaces/{workspace_id}/categories": {
+      "get": {
+        "operationId": "categories_list",
+        "summary": "List categories",
+        "tags": [
+          "categories"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "name": "archived",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "exclude",
+                "include",
+                "only"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoryList"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        }
+      },
+      "post": {
+        "operationId": "categories_create",
+        "summary": "Create category",
+        "tags": [
+          "categories"
+        ],
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfToken": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          },
+          {
+            "$ref": "#/components/parameters/ActionId"
+          },
+          {
+            "$ref": "#/components/parameters/SyncGeneration"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MutationResult"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true for a retained replay response; false for first completion",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CategoryCreate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspaces/{workspace_id}/categories/{id}": {
+      "get": {
+        "operationId": "categories_get",
+        "summary": "Read category",
+        "tags": [
+          "categories"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          },
+          {
+            "$ref": "#/components/parameters/ResourceId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Category"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        }
+      },
+      "put": {
+        "operationId": "categories_update",
+        "summary": "Replace editable category metadata",
+        "tags": [
+          "categories"
+        ],
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfToken": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          },
+          {
+            "$ref": "#/components/parameters/ResourceId"
+          },
+          {
+            "$ref": "#/components/parameters/ActionId"
+          },
+          {
+            "$ref": "#/components/parameters/SyncGeneration"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MutationResult"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true for a retained replay response; false for first completion",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CategoryUpdate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspaces/{workspace_id}/tags": {
+      "get": {
+        "operationId": "tags_list",
+        "summary": "List tags",
+        "tags": [
+          "tags"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "name": "archived",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "exclude",
+                "include",
+                "only"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TagList"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        }
+      },
+      "post": {
+        "operationId": "tags_create",
+        "summary": "Create tag",
+        "tags": [
+          "tags"
+        ],
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfToken": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          },
+          {
+            "$ref": "#/components/parameters/ActionId"
+          },
+          {
+            "$ref": "#/components/parameters/SyncGeneration"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MutationResult"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true for a retained replay response; false for first completion",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TagCreate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspaces/{workspace_id}/tags/{id}": {
+      "get": {
+        "operationId": "tags_get",
+        "summary": "Read tag",
+        "tags": [
+          "tags"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          },
+          {
+            "$ref": "#/components/parameters/ResourceId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Tag"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        }
+      },
+      "put": {
+        "operationId": "tags_update",
+        "summary": "Replace editable tag metadata",
+        "tags": [
+          "tags"
+        ],
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfToken": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          },
+          {
+            "$ref": "#/components/parameters/ResourceId"
+          },
+          {
+            "$ref": "#/components/parameters/ActionId"
+          },
+          {
+            "$ref": "#/components/parameters/SyncGeneration"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MutationResult"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true for a retained replay response; false for first completion",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TagUpdate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspaces/{workspace_id}/accounts/{id}/adjustments": {
+      "post": {
+        "operationId": "accounts_adjust",
+        "summary": "Create balance adjustment",
+        "tags": [
+          "accounts"
+        ],
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfToken": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          },
+          {
+            "$ref": "#/components/parameters/ResourceId"
+          },
+          {
+            "$ref": "#/components/parameters/ActionId"
+          },
+          {
+            "$ref": "#/components/parameters/SyncGeneration"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MutationResult"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true for a retained replay response; false for first completion",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdjustmentCreate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspaces/{workspace_id}/transactions": {
+      "get": {
+        "operationId": "transactions_list",
+        "summary": "Search and filter operations",
+        "tags": [
+          "transactions"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "name": "account_id",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/UUID"
+            }
+          },
+          {
+            "name": "category_id",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/UUID"
+            }
+          },
+          {
+            "name": "tag_id",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/UUID"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/Instant"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/Instant"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "opening",
+                "expense",
+                "income",
+                "transfer",
+                "refund",
+                "adjustment"
+              ]
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "posted",
+                "pending"
+              ]
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransactionList"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "description": "Stable ordering occurred_at DESC, id DESC. Deleted operations excluded. Filters combine with AND; category matches exact category, not descendants."
+      },
+      "post": {
+        "operationId": "transactions_create",
+        "summary": "Create expense, income, transfer or refund",
+        "tags": [
+          "transactions"
+        ],
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfToken": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          },
+          {
+            "$ref": "#/components/parameters/ActionId"
+          },
+          {
+            "$ref": "#/components/parameters/SyncGeneration"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MutationResult"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true for a retained replay response; false for first completion",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransactionCreate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspaces/{workspace_id}/transactions/{id}": {
+      "get": {
+        "operationId": "transactions_get",
+        "summary": "Read aggregate operation",
+        "tags": [
+          "transactions"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          },
+          {
+            "$ref": "#/components/parameters/ResourceId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Transaction"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "description": "Read versions, balances and child records from one consistent DB snapshot."
+      },
+      "put": {
+        "operationId": "transactions_replace",
+        "summary": "Replace editable operation aggregate",
+        "tags": [
+          "transactions"
+        ],
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfToken": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          },
+          {
+            "$ref": "#/components/parameters/ResourceId"
+          },
+          {
+            "$ref": "#/components/parameters/ActionId"
+          },
+          {
+            "$ref": "#/components/parameters/SyncGeneration"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MutationResult"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true for a retained replay response; false for first completion",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransactionReplace"
+              }
+            }
+          }
+        },
+        "description": "Kind and path identity immutable; every editable field supplied. Transfer fee uses explicit null to remove, expected_fee_version protects existing fee. Opening immutable."
+      },
+      "delete": {
+        "operationId": "transactions_delete",
+        "summary": "Soft-delete operation and linked fee atomically",
+        "tags": [
+          "transactions"
+        ],
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfToken": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          },
+          {
+            "$ref": "#/components/parameters/ResourceId"
+          },
+          {
+            "$ref": "#/components/parameters/ActionId"
+          },
+          {
+            "$ref": "#/components/parameters/SyncGeneration"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MutationResult"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true for a retained replay response; false for first completion",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransactionDelete"
+              }
+            }
+          }
+        },
+        "description": "JSON body is mandatory. related_versions contains all affected existing parents/fee; server checks completeness and versions."
+      }
+    },
+    "/workspaces/{workspace_id}/transactions/classification": {
+      "post": {
+        "operationId": "transactions_classify",
+        "summary": "Atomically assign category and tags",
+        "tags": [
+          "transactions"
+        ],
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfToken": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          },
+          {
+            "$ref": "#/components/parameters/ActionId"
+          },
+          {
+            "$ref": "#/components/parameters/SyncGeneration"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MutationResult"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true for a retained replay response; false for first completion",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkClassification"
+              }
+            }
+          }
+        },
+        "description": "Only unsplit expense/income without active refunds; category/tags replace existing values. Transfers/refunds/adjustments/opening/split operations rejected. Whole package rolls back on any failure. Linked transfer fees are rejected; edit them through PUT with expected_parent_version."
+      }
+    },
+    "/workspaces/{workspace_id}/sync/changes": {
+      "get": {
+        "operationId": "sync_changes",
+        "summary": "sync changes",
+        "tags": [
+          "sync"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/SyncCursor"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          }
+        ],
+        "description": "Returns whole committed groups only; max 4 MiB per page. Apply groups and advance cursor in one local DB transaction. Expired cursor => 410 cursor_expired. Empty page retains cursor.",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncChanges"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error410"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        }
+      }
+    },
+    "/workspaces/{workspace_id}/sync/snapshots": {
+      "post": {
+        "operationId": "sync_snapshot_create",
+        "summary": "sync snapshot create",
+        "tags": [
+          "sync"
+        ],
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfToken": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          },
+          {
+            "$ref": "#/components/parameters/ActionId"
+          }
+        ],
+        "description": "Read-only materialization, Idempotency-Key must equal body id. Retries reuse same actor/workspace/id snapshot while live. No journal group, not a financial actions receipt. Expired id => 410 snapshot_expired; use new snapshot id.",
+        "responses": {
+          "201": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Snapshot"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error410"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SnapshotCreate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspaces/{workspace_id}/sync/snapshots/{id}": {
+      "get": {
+        "operationId": "sync_snapshot_get",
+        "summary": "sync snapshot get",
+        "tags": [
+          "sync"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          },
+          {
+            "$ref": "#/components/parameters/ResourceId"
+          }
+        ],
+        "description": "Actor-scoped immutable snapshot metadata; TTL 15 minutes. Reauthorize membership on every read.",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Snapshot"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error410"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        }
+      }
+    },
+    "/workspaces/{workspace_id}/sync/snapshots/{id}/pages": {
+      "get": {
+        "operationId": "sync_snapshot_page",
+        "summary": "sync snapshot page",
+        "tags": [
+          "sync"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          },
+          {
+            "$ref": "#/components/parameters/ResourceId"
+          },
+          {
+            "name": "page_token",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/PageToken"
+            }
+          }
+        ],
+        "description": "Fixed pages of at most 100 items. Repeat same token returns same page while snapshot lives. Install staged mirror and resume cursor only after final page.",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SnapshotPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error410"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        }
+      }
+    },
+    "/workspaces/{workspace_id}/actions/{id}": {
+      "get": {
+        "operationId": "sync_action_outcome",
+        "summary": "sync action outcome",
+        "tags": [
+          "sync"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          },
+          {
+            "$ref": "#/components/parameters/ResourceId"
+          }
+        ],
+        "description": "Only receipts of current actor. 404 means no completed receipt, not proof that a concurrent request cannot commit. Full result retained 30 days; compact receipt retained for workspace lifetime. Null response_body after expiry. generation_id identifies the original applied stream; rejected has null. Across a generation reset reconcile through a fresh snapshot, not by comparing sequence numbers.",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionOutcome"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error410"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "UUID": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "Version": {
+        "type": "string",
+        "pattern": "^[1-9][0-9]{0,18}$",
+        "description": "Positive int64 encoded as a string; server checks <= 9223372036854775807."
+      },
+      "Money": {
+        "type": "string",
+        "pattern": "^(0|-?([1-9][0-9]{0,14}|[1-8][0-9]{15}|9000000000000000))$",
+        "description": "Signed minor units, absolute value <= 9000000000000000; encoded as a canonical decimal integer string."
+      },
+      "PositiveMoney": {
+        "type": "string",
+        "pattern": "^([1-9][0-9]{0,14}|[1-8][0-9]{15}|9000000000000000)$",
+        "description": "Positive minor units <= 9000000000000000."
+      },
+      "PositiveInteger": {
+        "type": "string",
+        "pattern": "^[1-9][0-9]*$",
+        "maxLength": 40,
+        "description": "Exact positive numerator/denominator; no float."
+      },
+      "Instant": {
+        "type": "string",
+        "format": "date-time",
+        "pattern": "Z$",
+        "description": "UTC RFC3339 instant ending in Z."
+      },
+      "Timezone": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100,
+        "description": "IANA timezone; checked against timezone database."
+      },
+      "CurrencyCode": {
+        "type": "string",
+        "enum": [
+          "EUR",
+          "USD",
+          "RUB",
+          "GBP",
+          "JPY",
+          "KWD"
+        ]
+      },
+      "Rate": {
+        "type": "object",
+        "properties": {
+          "numerator": {
+            "$ref": "#/components/schemas/PositiveInteger"
+          },
+          "denominator": {
+            "$ref": "#/components/schemas/PositiveInteger"
+          }
+        },
+        "required": [
+          "numerator",
+          "denominator"
+        ],
+        "additionalProperties": false
+      },
+      "Workspace": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "version": {
+            "$ref": "#/components/schemas/Version"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "owner",
+              "member"
+            ]
+          },
+          "sync_generation_id": {
+            "$ref": "#/components/schemas/UUID"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "version",
+          "role",
+          "sync_generation_id"
+        ],
+        "additionalProperties": false
+      },
+      "Profile": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "timezone": {
+            "$ref": "#/components/schemas/Timezone"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "timezone"
+        ],
+        "additionalProperties": false
+      },
+      "Session": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "device_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "is_current": {
+            "type": "boolean"
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "last_seen_at": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "expires_at": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "absolute_expires_at": {
+            "$ref": "#/components/schemas/Instant"
+          }
+        },
+        "required": [
+          "id",
+          "device_name",
+          "is_current",
+          "created_at",
+          "last_seen_at",
+          "expires_at",
+          "absolute_expires_at"
+        ],
+        "additionalProperties": false
+      },
+      "Login": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 254,
+            "pattern": "^[\\x21-\\x7e]+$",
+            "description": "MVP accepts ASCII email only. Identity uses trimmed ASCII lowercase of entire address; not password normalization."
+          },
+          "password": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "writeOnly": true,
+            "description": "Exact UTF-8 secret; no trimming or Unicode normalization. Registration minimum 12 code points, maximum 128; malformed UTF-8/surrogates rejected."
+          },
+          "device_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "transport": {
+            "type": "string",
+            "enum": [
+              "cookie",
+              "bearer"
+            ]
+          }
+        },
+        "required": [
+          "email",
+          "password",
+          "device_name",
+          "transport"
+        ],
+        "additionalProperties": false
+      },
+      "Register": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 254,
+            "pattern": "^[\\x21-\\x7e]+$",
+            "description": "MVP accepts ASCII email only. Identity uses trimmed ASCII lowercase of entire address; not password normalization."
+          },
+          "password": {
+            "type": "string",
+            "minLength": 12,
+            "maxLength": 128,
+            "writeOnly": true,
+            "description": "Exact UTF-8 secret; no trimming or Unicode normalization. Registration minimum 12 code points, maximum 128; malformed UTF-8/surrogates rejected."
+          },
+          "device_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "transport": {
+            "type": "string",
+            "enum": [
+              "cookie",
+              "bearer"
+            ]
+          },
+          "timezone": {
+            "$ref": "#/components/schemas/Timezone"
+          }
+        },
+        "required": [
+          "email",
+          "password",
+          "device_name",
+          "transport",
+          "timezone"
+        ],
+        "additionalProperties": false
+      },
+      "CookieAuth": {
+        "type": "object",
+        "properties": {
+          "profile": {
+            "$ref": "#/components/schemas/Profile"
+          },
+          "workspace": {
+            "$ref": "#/components/schemas/Workspace"
+          },
+          "session": {
+            "$ref": "#/components/schemas/Session"
+          },
+          "transport": {
+            "const": "cookie"
+          },
+          "csrf_token": {
+            "type": "string",
+            "minLength": 32,
+            "maxLength": 256
+          }
+        },
+        "required": [
+          "profile",
+          "workspace",
+          "session",
+          "transport",
+          "csrf_token"
+        ],
+        "additionalProperties": false
+      },
+      "BearerAuth": {
+        "type": "object",
+        "properties": {
+          "profile": {
+            "$ref": "#/components/schemas/Profile"
+          },
+          "workspace": {
+            "$ref": "#/components/schemas/Workspace"
+          },
+          "session": {
+            "$ref": "#/components/schemas/Session"
+          },
+          "transport": {
+            "const": "bearer"
+          },
+          "access_token": {
+            "type": "string",
+            "minLength": 32,
+            "maxLength": 256
+          },
+          "token_type": {
+            "const": "Bearer"
+          }
+        },
+        "required": [
+          "profile",
+          "workspace",
+          "session",
+          "transport",
+          "access_token",
+          "token_type"
+        ],
+        "additionalProperties": false
+      },
+      "AuthResult": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/CookieAuth"
+          },
+          {
+            "$ref": "#/components/schemas/BearerAuth"
+          }
+        ]
+      },
+      "Currency": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/CurrencyCode"
+          },
+          "scale": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 3
+          }
+        },
+        "required": [
+          "code",
+          "scale"
+        ],
+        "additionalProperties": false
+      },
+      "Account": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "workspace_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "version": {
+            "$ref": "#/components/schemas/Version"
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "updated_at": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "deleted_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Instant"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "cash",
+              "bank",
+              "card"
+            ]
+          },
+          "currency": {
+            "$ref": "#/components/schemas/CurrencyCode"
+          },
+          "opened_at": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "archived_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Instant"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "balance_version": {
+            "$ref": "#/components/schemas/Version"
+          },
+          "posted_balance_minor": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "pending_delta_minor": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "projected_balance_minor": {
+            "$ref": "#/components/schemas/Money"
+          }
+        },
+        "required": [
+          "id",
+          "workspace_id",
+          "version",
+          "created_at",
+          "updated_at",
+          "deleted_at",
+          "name",
+          "type",
+          "currency",
+          "opened_at",
+          "archived_at",
+          "balance_version",
+          "posted_balance_minor",
+          "pending_delta_minor",
+          "projected_balance_minor"
+        ],
+        "additionalProperties": false
+      },
+      "AccountCreate": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "cash",
+              "bank",
+              "card"
+            ]
+          },
+          "currency": {
+            "$ref": "#/components/schemas/CurrencyCode"
+          },
+          "opened_at": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "occurred_timezone": {
+            "$ref": "#/components/schemas/Timezone"
+          },
+          "opening_balance_minor": {
+            "$ref": "#/components/schemas/Money"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "type",
+          "currency",
+          "opened_at",
+          "occurred_timezone",
+          "opening_balance_minor"
+        ],
+        "additionalProperties": false
+      },
+      "AccountUpdate": {
+        "type": "object",
+        "properties": {
+          "expected_version": {
+            "$ref": "#/components/schemas/Version"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "cash",
+              "bank",
+              "card"
+            ]
+          },
+          "archived": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "expected_version",
+          "name",
+          "type",
+          "archived"
+        ],
+        "additionalProperties": false
+      },
+      "Category": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "workspace_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "version": {
+            "$ref": "#/components/schemas/Version"
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "updated_at": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "deleted_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Instant"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "archived_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Instant"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUID"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "workspace_id",
+          "version",
+          "created_at",
+          "updated_at",
+          "deleted_at",
+          "name",
+          "archived_at",
+          "parent_id"
+        ],
+        "additionalProperties": false
+      },
+      "CategoryCreate": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUID"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "parent_id"
+        ],
+        "additionalProperties": false
+      },
+      "CategoryUpdate": {
+        "type": "object",
+        "properties": {
+          "expected_version": {
+            "$ref": "#/components/schemas/Version"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "archived": {
+            "type": "boolean"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUID"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "expected_version",
+          "name",
+          "archived",
+          "parent_id"
+        ],
+        "additionalProperties": false
+      },
+      "Tag": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "workspace_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "version": {
+            "$ref": "#/components/schemas/Version"
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "updated_at": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "deleted_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Instant"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50
+          },
+          "archived_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Instant"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "workspace_id",
+          "version",
+          "created_at",
+          "updated_at",
+          "deleted_at",
+          "name",
+          "archived_at"
+        ],
+        "additionalProperties": false
+      },
+      "TagCreate": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "TagUpdate": {
+        "type": "object",
+        "properties": {
+          "expected_version": {
+            "$ref": "#/components/schemas/Version"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50
+          },
+          "archived": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "expected_version",
+          "name",
+          "archived"
+        ],
+        "additionalProperties": false
+      },
+      "Entry": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "account_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "currency": {
+            "$ref": "#/components/schemas/CurrencyCode"
+          },
+          "amount_minor": {
+            "$ref": "#/components/schemas/Money"
+          }
+        },
+        "required": [
+          "id",
+          "account_id",
+          "currency",
+          "amount_minor"
+        ],
+        "additionalProperties": false
+      },
+      "AllocationInput": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "category_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUID"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "amount_minor": {
+            "$ref": "#/components/schemas/PositiveMoney"
+          }
+        },
+        "required": [
+          "id",
+          "category_id",
+          "amount_minor"
+        ],
+        "additionalProperties": false
+      },
+      "RefundAllocationInput": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "original_allocation_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "amount_minor": {
+            "$ref": "#/components/schemas/PositiveMoney"
+          }
+        },
+        "required": [
+          "id",
+          "original_allocation_id",
+          "amount_minor"
+        ],
+        "additionalProperties": false
+      },
+      "Allocation": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "category_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUID"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "amount_minor": {
+            "$ref": "#/components/schemas/PositiveMoney"
+          },
+          "original_allocation_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUID"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "remaining_refundable_minor": {
+            "$ref": "#/components/schemas/Money",
+            "description": "Nonnegative remaining amount only for allocations of expense; zero for all other kinds. Active posted/pending refunds reserve the limit."
+          }
+        },
+        "required": [
+          "id",
+          "category_id",
+          "amount_minor",
+          "original_allocation_id",
+          "remaining_refundable_minor"
+        ],
+        "additionalProperties": false
+      },
+      "VersionExpectation": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "version": {
+            "$ref": "#/components/schemas/Version"
+          }
+        },
+        "required": [
+          "id",
+          "version"
+        ],
+        "additionalProperties": false
+      },
+      "Transaction": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "workspace_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "version": {
+            "$ref": "#/components/schemas/Version"
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "updated_at": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "deleted_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Instant"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "opening",
+              "expense",
+              "income",
+              "transfer",
+              "refund",
+              "adjustment"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "posted"
+            ]
+          },
+          "occurred_at": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "occurred_timezone": {
+            "$ref": "#/components/schemas/Timezone"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "payee": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "parent_transaction_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUID"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "fee_transaction_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUID"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rate": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Rate"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Entry"
+            },
+            "maxItems": 2
+          },
+          "allocations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Allocation"
+            },
+            "maxItems": 100
+          },
+          "tag_ids": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UUID"
+            },
+            "uniqueItems": true,
+            "maxItems": 50
+          }
+        },
+        "required": [
+          "id",
+          "workspace_id",
+          "version",
+          "created_at",
+          "updated_at",
+          "deleted_at",
+          "kind",
+          "status",
+          "occurred_at",
+          "occurred_timezone",
+          "note",
+          "payee",
+          "reason",
+          "parent_transaction_id",
+          "fee_transaction_id",
+          "rate",
+          "entries",
+          "allocations",
+          "tag_ids"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseCreate": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "occurred_at": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "occurred_timezone": {
+            "$ref": "#/components/schemas/Timezone"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "payee": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "tag_ids": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UUID"
+            },
+            "uniqueItems": true,
+            "maxItems": 50
+          },
+          "kind": {
+            "const": "expense"
+          },
+          "account_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "amount_minor": {
+            "$ref": "#/components/schemas/PositiveMoney"
+          },
+          "allocations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AllocationInput"
+            },
+            "minItems": 1,
+            "maxItems": 100
+          }
+        },
+        "required": [
+          "id",
+          "occurred_at",
+          "occurred_timezone",
+          "note",
+          "payee",
+          "tag_ids",
+          "kind",
+          "account_id",
+          "amount_minor",
+          "allocations"
+        ],
+        "additionalProperties": false
+      },
+      "IncomeCreate": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "occurred_at": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "occurred_timezone": {
+            "$ref": "#/components/schemas/Timezone"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "payee": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "tag_ids": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UUID"
+            },
+            "uniqueItems": true,
+            "maxItems": 50
+          },
+          "kind": {
+            "const": "income"
+          },
+          "account_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "amount_minor": {
+            "$ref": "#/components/schemas/PositiveMoney"
+          },
+          "allocations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AllocationInput"
+            },
+            "minItems": 1,
+            "maxItems": 100
+          }
+        },
+        "required": [
+          "id",
+          "occurred_at",
+          "occurred_timezone",
+          "note",
+          "payee",
+          "tag_ids",
+          "kind",
+          "account_id",
+          "amount_minor",
+          "allocations"
+        ],
+        "additionalProperties": false
+      },
+      "FeeInput": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "account_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "amount_minor": {
+            "$ref": "#/components/schemas/PositiveMoney"
+          },
+          "allocations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AllocationInput"
+            },
+            "minItems": 1,
+            "maxItems": 100
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "tag_ids": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UUID"
+            },
+            "uniqueItems": true,
+            "maxItems": 50
+          }
+        },
+        "required": [
+          "id",
+          "account_id",
+          "amount_minor",
+          "allocations",
+          "note",
+          "tag_ids"
+        ],
+        "additionalProperties": false
+      },
+      "TransferCreate": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "occurred_at": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "occurred_timezone": {
+            "$ref": "#/components/schemas/Timezone"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "payee": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "tag_ids": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UUID"
+            },
+            "uniqueItems": true,
+            "maxItems": 50
+          },
+          "kind": {
+            "const": "transfer"
+          },
+          "source_account_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "target_account_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "source_amount_minor": {
+            "$ref": "#/components/schemas/PositiveMoney"
+          },
+          "target_amount_minor": {
+            "$ref": "#/components/schemas/PositiveMoney"
+          },
+          "rate": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Rate"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "fee": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FeeInput"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "occurred_at",
+          "occurred_timezone",
+          "note",
+          "payee",
+          "tag_ids",
+          "kind",
+          "source_account_id",
+          "target_account_id",
+          "source_amount_minor",
+          "target_amount_minor",
+          "rate",
+          "fee"
+        ],
+        "additionalProperties": false
+      },
+      "RefundCreate": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "occurred_at": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "occurred_timezone": {
+            "$ref": "#/components/schemas/Timezone"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "payee": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "tag_ids": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UUID"
+            },
+            "uniqueItems": true,
+            "maxItems": 50
+          },
+          "kind": {
+            "const": "refund"
+          },
+          "account_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "amount_minor": {
+            "$ref": "#/components/schemas/PositiveMoney"
+          },
+          "parent_transaction_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "expected_parent_version": {
+            "$ref": "#/components/schemas/Version"
+          },
+          "expected_transfer_version": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Version"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "allocations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RefundAllocationInput"
+            },
+            "minItems": 1,
+            "maxItems": 100
+          }
+        },
+        "required": [
+          "id",
+          "occurred_at",
+          "occurred_timezone",
+          "note",
+          "payee",
+          "tag_ids",
+          "kind",
+          "account_id",
+          "amount_minor",
+          "parent_transaction_id",
+          "expected_parent_version",
+          "expected_transfer_version",
+          "allocations"
+        ],
+        "additionalProperties": false
+      },
+      "TransactionCreate": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/ExpenseCreate"
+          },
+          {
+            "$ref": "#/components/schemas/IncomeCreate"
+          },
+          {
+            "$ref": "#/components/schemas/TransferCreate"
+          },
+          {
+            "$ref": "#/components/schemas/RefundCreate"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "kind",
+          "mapping": {
+            "expense": "#/components/schemas/ExpenseCreate",
+            "income": "#/components/schemas/IncomeCreate",
+            "transfer": "#/components/schemas/TransferCreate",
+            "refund": "#/components/schemas/RefundCreate"
+          }
+        }
+      },
+      "ExpenseReplace": {
+        "type": "object",
+        "properties": {
+          "occurred_at": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "occurred_timezone": {
+            "$ref": "#/components/schemas/Timezone"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "payee": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "tag_ids": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UUID"
+            },
+            "uniqueItems": true,
+            "maxItems": 50
+          },
+          "kind": {
+            "const": "expense"
+          },
+          "account_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "amount_minor": {
+            "$ref": "#/components/schemas/PositiveMoney"
+          },
+          "allocations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AllocationInput"
+            },
+            "minItems": 1,
+            "maxItems": 100
+          },
+          "expected_version": {
+            "$ref": "#/components/schemas/Version"
+          },
+          "expected_parent_version": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Version"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "occurred_at",
+          "occurred_timezone",
+          "note",
+          "payee",
+          "tag_ids",
+          "kind",
+          "account_id",
+          "amount_minor",
+          "allocations",
+          "expected_version",
+          "expected_parent_version"
+        ],
+        "additionalProperties": false,
+        "description": "Kind, identity and monetary currency/currency pair are immutable. Account changes only within the same currency. Cross-field invariants are checked by service."
+      },
+      "IncomeReplace": {
+        "type": "object",
+        "properties": {
+          "occurred_at": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "occurred_timezone": {
+            "$ref": "#/components/schemas/Timezone"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "payee": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "tag_ids": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UUID"
+            },
+            "uniqueItems": true,
+            "maxItems": 50
+          },
+          "kind": {
+            "const": "income"
+          },
+          "account_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "amount_minor": {
+            "$ref": "#/components/schemas/PositiveMoney"
+          },
+          "allocations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AllocationInput"
+            },
+            "minItems": 1,
+            "maxItems": 100
+          },
+          "expected_version": {
+            "$ref": "#/components/schemas/Version"
+          }
+        },
+        "required": [
+          "occurred_at",
+          "occurred_timezone",
+          "note",
+          "payee",
+          "tag_ids",
+          "kind",
+          "account_id",
+          "amount_minor",
+          "allocations",
+          "expected_version"
+        ],
+        "additionalProperties": false,
+        "description": "Kind, identity and monetary currency/currency pair are immutable. Account changes only within the same currency. Cross-field invariants are checked by service."
+      },
+      "TransferReplace": {
+        "type": "object",
+        "properties": {
+          "occurred_at": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "occurred_timezone": {
+            "$ref": "#/components/schemas/Timezone"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "payee": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "tag_ids": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UUID"
+            },
+            "uniqueItems": true,
+            "maxItems": 50
+          },
+          "kind": {
+            "const": "transfer"
+          },
+          "source_account_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "target_account_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "source_amount_minor": {
+            "$ref": "#/components/schemas/PositiveMoney"
+          },
+          "target_amount_minor": {
+            "$ref": "#/components/schemas/PositiveMoney"
+          },
+          "rate": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Rate"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "fee": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FeeInput"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "For an existing fee its UUID and currency are immutable. Explicit null removes fee after dependency checks."
+          },
+          "expected_version": {
+            "$ref": "#/components/schemas/Version"
+          },
+          "expected_fee_version": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Version"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "occurred_at",
+          "occurred_timezone",
+          "note",
+          "payee",
+          "tag_ids",
+          "kind",
+          "source_account_id",
+          "target_account_id",
+          "source_amount_minor",
+          "target_amount_minor",
+          "rate",
+          "fee",
+          "expected_version",
+          "expected_fee_version"
+        ],
+        "additionalProperties": false,
+        "description": "Kind, identity and monetary currency/currency pair are immutable. Account changes only within the same currency. Cross-field invariants are checked by service."
+      },
+      "RefundReplace": {
+        "type": "object",
+        "properties": {
+          "occurred_at": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "occurred_timezone": {
+            "$ref": "#/components/schemas/Timezone"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "payee": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "tag_ids": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UUID"
+            },
+            "uniqueItems": true,
+            "maxItems": 50
+          },
+          "kind": {
+            "const": "refund"
+          },
+          "account_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "amount_minor": {
+            "$ref": "#/components/schemas/PositiveMoney"
+          },
+          "parent_transaction_id": {
+            "$ref": "#/components/schemas/UUID",
+            "description": "Must equal immutable parent of existing refund; changing parent is rejected."
+          },
+          "expected_parent_version": {
+            "$ref": "#/components/schemas/Version"
+          },
+          "expected_transfer_version": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Version"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "allocations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RefundAllocationInput"
+            },
+            "minItems": 1,
+            "maxItems": 100
+          },
+          "expected_version": {
+            "$ref": "#/components/schemas/Version"
+          }
+        },
+        "required": [
+          "occurred_at",
+          "occurred_timezone",
+          "note",
+          "payee",
+          "tag_ids",
+          "kind",
+          "account_id",
+          "amount_minor",
+          "parent_transaction_id",
+          "expected_parent_version",
+          "expected_transfer_version",
+          "allocations",
+          "expected_version"
+        ],
+        "additionalProperties": false,
+        "description": "Kind, identity and monetary currency/currency pair are immutable. Account changes only within the same currency. Cross-field invariants are checked by service."
+      },
+      "AdjustmentReplace": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "const": "adjustment"
+          },
+          "expected_version": {
+            "$ref": "#/components/schemas/Version"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "kind",
+          "expected_version",
+          "note"
+        ],
+        "additionalProperties": false
+      },
+      "TransactionReplace": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/ExpenseReplace"
+          },
+          {
+            "$ref": "#/components/schemas/IncomeReplace"
+          },
+          {
+            "$ref": "#/components/schemas/TransferReplace"
+          },
+          {
+            "$ref": "#/components/schemas/RefundReplace"
+          },
+          {
+            "$ref": "#/components/schemas/AdjustmentReplace"
+          }
+        ]
+      },
+      "TransactionDelete": {
+        "type": "object",
+        "properties": {
+          "expected_version": {
+            "$ref": "#/components/schemas/Version"
+          },
+          "related_versions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VersionExpectation"
+            },
+            "uniqueItems": true,
+            "maxItems": 4
+          }
+        },
+        "required": [
+          "expected_version",
+          "related_versions"
+        ],
+        "additionalProperties": false
+      },
+      "AdjustmentCreate": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "expected_balance_version": {
+            "$ref": "#/components/schemas/Version"
+          },
+          "target_balance_minor": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "occurred_timezone": {
+            "$ref": "#/components/schemas/Timezone"
+          }
+        },
+        "required": [
+          "id",
+          "expected_balance_version",
+          "target_balance_minor",
+          "reason",
+          "note",
+          "occurred_timezone"
+        ],
+        "additionalProperties": false
+      },
+      "BulkItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "expected_version": {
+            "$ref": "#/components/schemas/Version"
+          }
+        },
+        "required": [
+          "id",
+          "expected_version"
+        ],
+        "additionalProperties": false
+      },
+      "BulkClassification": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BulkItem"
+            },
+            "minItems": 1,
+            "maxItems": 100
+          },
+          "category_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUID"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "tag_ids": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UUID"
+            },
+            "uniqueItems": true,
+            "maxItems": 50
+          }
+        },
+        "required": [
+          "items",
+          "category_id",
+          "tag_ids"
+        ],
+        "additionalProperties": false
+      },
+      "Tombstone": {
+        "type": "object",
+        "properties": {
+          "entity_type": {
+            "type": "string",
+            "enum": [
+              "account",
+              "transaction",
+              "category",
+              "tag"
+            ]
+          },
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "workspace_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "version": {
+            "$ref": "#/components/schemas/Version"
+          },
+          "deleted_at": {
+            "$ref": "#/components/schemas/Instant"
+          }
+        },
+        "required": [
+          "entity_type",
+          "id",
+          "workspace_id",
+          "version",
+          "deleted_at"
+        ],
+        "additionalProperties": false
+      },
+      "MutationResult": {
+        "type": "object",
+        "properties": {
+          "action_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "accounts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Account"
+            }
+          },
+          "transactions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Transaction"
+            }
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Category"
+            }
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Tag"
+            }
+          },
+          "deleted": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Tombstone"
+            }
+          },
+          "sync_group_sequence": {
+            "$ref": "#/components/schemas/Version"
+          },
+          "generation_id": {
+            "$ref": "#/components/schemas/UUID"
+          }
+        },
+        "required": [
+          "action_id",
+          "accounts",
+          "transactions",
+          "categories",
+          "tags",
+          "deleted",
+          "sync_group_sequence",
+          "generation_id"
+        ],
+        "additionalProperties": false
+      },
+      "FieldError": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "code",
+          "message"
+        ],
+        "additionalProperties": false
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "request_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "code": {
+            "type": "string",
+            "enum": [
+              "bad_request",
+              "validation_error",
+              "unauthenticated",
+              "forbidden",
+              "csrf_invalid",
+              "not_found",
+              "version_conflict",
+              "idempotency_conflict",
+              "dependent_transactions",
+              "account_archived",
+              "amount_out_of_range",
+              "no_change",
+              "rate_limited",
+              "service_unavailable",
+              "internal_error",
+              "cursor_expired",
+              "cursor_invalid",
+              "snapshot_expired",
+              "snapshot_too_large",
+              "action_result_expired",
+              "sync_group_too_large",
+              "sync_generation_conflict",
+              "registration_disabled"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "field_errors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FieldError"
+            }
+          },
+          "current_versions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConflictVersion"
+            }
+          },
+          "retry_after_seconds": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          }
+        },
+        "required": [
+          "request_id",
+          "code",
+          "message",
+          "field_errors",
+          "current_versions",
+          "retry_after_seconds"
+        ],
+        "additionalProperties": false
+      },
+      "AccountList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Account"
+            }
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2048
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "additionalProperties": false
+      },
+      "TransactionList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Transaction"
+            }
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2048
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "additionalProperties": false
+      },
+      "CategoryList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Category"
+            }
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2048
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "additionalProperties": false
+      },
+      "TagList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Tag"
+            }
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2048
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "additionalProperties": false
+      },
+      "WorkspaceList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Workspace"
+            }
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2048
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "additionalProperties": false
+      },
+      "SessionList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Session"
+            }
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2048
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "additionalProperties": false
+      },
+      "CurrencyList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Currency"
+            }
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2048
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "additionalProperties": false
+      },
+      "Acknowledgement": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      },
+      "ProfileUpdate": {
+        "type": "object",
+        "properties": {
+          "timezone": {
+            "$ref": "#/components/schemas/Timezone"
+          }
+        },
+        "required": [
+          "timezone"
+        ],
+        "additionalProperties": false
+      },
+      "ConflictVersion": {
+        "type": "object",
+        "properties": {
+          "entity_type": {
+            "type": "string",
+            "enum": [
+              "account",
+              "transaction",
+              "category",
+              "tag"
+            ]
+          },
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "version": {
+            "$ref": "#/components/schemas/Version"
+          },
+          "balance_version": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Version"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "entity_type",
+          "id",
+          "version",
+          "balance_version"
+        ],
+        "additionalProperties": false
+      },
+      "Sequence": {
+        "type": "string",
+        "pattern": "^(0|[1-9][0-9]{0,18})$",
+        "description": "Committed workspace group sequence, zero for empty workspace; service checks int64 range."
+      },
+      "SyncCursor": {
+        "type": "string",
+        "minLength": 16,
+        "maxLength": 2048,
+        "description": "Opaque integrity-protected workspace/actor/protocol-bound journal cursor. Not a list pagination cursor."
+      },
+      "PageToken": {
+        "type": "string",
+        "minLength": 16,
+        "maxLength": 2048,
+        "description": "Opaque snapshot-specific token. Immutable page position; not a sync cursor."
+      },
+      "WorkspaceChange": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "schema_version": {
+                "const": 1
+              },
+              "change_id": {
+                "$ref": "#/components/schemas/UUID"
+              },
+              "action_id": {
+                "$ref": "#/components/schemas/UUID"
+              },
+              "workspace_id": {
+                "$ref": "#/components/schemas/UUID"
+              },
+              "sequence": {
+                "$ref": "#/components/schemas/Version"
+              },
+              "ordinal": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 200
+              },
+              "group_size": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 200
+              },
+              "created_at": {
+                "$ref": "#/components/schemas/Instant"
+              },
+              "operation": {
+                "const": "upsert"
+              },
+              "entity_type": {
+                "const": "account"
+              },
+              "data": {
+                "$ref": "#/components/schemas/Account"
+              },
+              "generation_id": {
+                "$ref": "#/components/schemas/UUID"
+              }
+            },
+            "required": [
+              "schema_version",
+              "change_id",
+              "action_id",
+              "workspace_id",
+              "sequence",
+              "ordinal",
+              "group_size",
+              "created_at",
+              "operation",
+              "entity_type",
+              "data",
+              "generation_id"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "schema_version": {
+                "const": 1
+              },
+              "change_id": {
+                "$ref": "#/components/schemas/UUID"
+              },
+              "action_id": {
+                "$ref": "#/components/schemas/UUID"
+              },
+              "workspace_id": {
+                "$ref": "#/components/schemas/UUID"
+              },
+              "sequence": {
+                "$ref": "#/components/schemas/Version"
+              },
+              "ordinal": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 200
+              },
+              "group_size": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 200
+              },
+              "created_at": {
+                "$ref": "#/components/schemas/Instant"
+              },
+              "operation": {
+                "const": "delete"
+              },
+              "entity_type": {
+                "const": "account"
+              },
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Tombstone"
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "entity_type": {
+                        "const": "account"
+                      }
+                    }
+                  }
+                ]
+              },
+              "generation_id": {
+                "$ref": "#/components/schemas/UUID"
+              }
+            },
+            "required": [
+              "schema_version",
+              "change_id",
+              "action_id",
+              "workspace_id",
+              "sequence",
+              "ordinal",
+              "group_size",
+              "created_at",
+              "operation",
+              "entity_type",
+              "data",
+              "generation_id"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "schema_version": {
+                "const": 1
+              },
+              "change_id": {
+                "$ref": "#/components/schemas/UUID"
+              },
+              "action_id": {
+                "$ref": "#/components/schemas/UUID"
+              },
+              "workspace_id": {
+                "$ref": "#/components/schemas/UUID"
+              },
+              "sequence": {
+                "$ref": "#/components/schemas/Version"
+              },
+              "ordinal": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 200
+              },
+              "group_size": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 200
+              },
+              "created_at": {
+                "$ref": "#/components/schemas/Instant"
+              },
+              "operation": {
+                "const": "upsert"
+              },
+              "entity_type": {
+                "const": "transaction"
+              },
+              "data": {
+                "$ref": "#/components/schemas/Transaction"
+              },
+              "generation_id": {
+                "$ref": "#/components/schemas/UUID"
+              }
+            },
+            "required": [
+              "schema_version",
+              "change_id",
+              "action_id",
+              "workspace_id",
+              "sequence",
+              "ordinal",
+              "group_size",
+              "created_at",
+              "operation",
+              "entity_type",
+              "data",
+              "generation_id"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "schema_version": {
+                "const": 1
+              },
+              "change_id": {
+                "$ref": "#/components/schemas/UUID"
+              },
+              "action_id": {
+                "$ref": "#/components/schemas/UUID"
+              },
+              "workspace_id": {
+                "$ref": "#/components/schemas/UUID"
+              },
+              "sequence": {
+                "$ref": "#/components/schemas/Version"
+              },
+              "ordinal": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 200
+              },
+              "group_size": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 200
+              },
+              "created_at": {
+                "$ref": "#/components/schemas/Instant"
+              },
+              "operation": {
+                "const": "delete"
+              },
+              "entity_type": {
+                "const": "transaction"
+              },
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Tombstone"
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "entity_type": {
+                        "const": "transaction"
+                      }
+                    }
+                  }
+                ]
+              },
+              "generation_id": {
+                "$ref": "#/components/schemas/UUID"
+              }
+            },
+            "required": [
+              "schema_version",
+              "change_id",
+              "action_id",
+              "workspace_id",
+              "sequence",
+              "ordinal",
+              "group_size",
+              "created_at",
+              "operation",
+              "entity_type",
+              "data",
+              "generation_id"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "schema_version": {
+                "const": 1
+              },
+              "change_id": {
+                "$ref": "#/components/schemas/UUID"
+              },
+              "action_id": {
+                "$ref": "#/components/schemas/UUID"
+              },
+              "workspace_id": {
+                "$ref": "#/components/schemas/UUID"
+              },
+              "sequence": {
+                "$ref": "#/components/schemas/Version"
+              },
+              "ordinal": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 200
+              },
+              "group_size": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 200
+              },
+              "created_at": {
+                "$ref": "#/components/schemas/Instant"
+              },
+              "operation": {
+                "const": "upsert"
+              },
+              "entity_type": {
+                "const": "category"
+              },
+              "data": {
+                "$ref": "#/components/schemas/Category"
+              },
+              "generation_id": {
+                "$ref": "#/components/schemas/UUID"
+              }
+            },
+            "required": [
+              "schema_version",
+              "change_id",
+              "action_id",
+              "workspace_id",
+              "sequence",
+              "ordinal",
+              "group_size",
+              "created_at",
+              "operation",
+              "entity_type",
+              "data",
+              "generation_id"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "schema_version": {
+                "const": 1
+              },
+              "change_id": {
+                "$ref": "#/components/schemas/UUID"
+              },
+              "action_id": {
+                "$ref": "#/components/schemas/UUID"
+              },
+              "workspace_id": {
+                "$ref": "#/components/schemas/UUID"
+              },
+              "sequence": {
+                "$ref": "#/components/schemas/Version"
+              },
+              "ordinal": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 200
+              },
+              "group_size": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 200
+              },
+              "created_at": {
+                "$ref": "#/components/schemas/Instant"
+              },
+              "operation": {
+                "const": "delete"
+              },
+              "entity_type": {
+                "const": "category"
+              },
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Tombstone"
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "entity_type": {
+                        "const": "category"
+                      }
+                    }
+                  }
+                ]
+              },
+              "generation_id": {
+                "$ref": "#/components/schemas/UUID"
+              }
+            },
+            "required": [
+              "schema_version",
+              "change_id",
+              "action_id",
+              "workspace_id",
+              "sequence",
+              "ordinal",
+              "group_size",
+              "created_at",
+              "operation",
+              "entity_type",
+              "data",
+              "generation_id"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "schema_version": {
+                "const": 1
+              },
+              "change_id": {
+                "$ref": "#/components/schemas/UUID"
+              },
+              "action_id": {
+                "$ref": "#/components/schemas/UUID"
+              },
+              "workspace_id": {
+                "$ref": "#/components/schemas/UUID"
+              },
+              "sequence": {
+                "$ref": "#/components/schemas/Version"
+              },
+              "ordinal": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 200
+              },
+              "group_size": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 200
+              },
+              "created_at": {
+                "$ref": "#/components/schemas/Instant"
+              },
+              "operation": {
+                "const": "upsert"
+              },
+              "entity_type": {
+                "const": "tag"
+              },
+              "data": {
+                "$ref": "#/components/schemas/Tag"
+              },
+              "generation_id": {
+                "$ref": "#/components/schemas/UUID"
+              }
+            },
+            "required": [
+              "schema_version",
+              "change_id",
+              "action_id",
+              "workspace_id",
+              "sequence",
+              "ordinal",
+              "group_size",
+              "created_at",
+              "operation",
+              "entity_type",
+              "data",
+              "generation_id"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "schema_version": {
+                "const": 1
+              },
+              "change_id": {
+                "$ref": "#/components/schemas/UUID"
+              },
+              "action_id": {
+                "$ref": "#/components/schemas/UUID"
+              },
+              "workspace_id": {
+                "$ref": "#/components/schemas/UUID"
+              },
+              "sequence": {
+                "$ref": "#/components/schemas/Version"
+              },
+              "ordinal": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 200
+              },
+              "group_size": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 200
+              },
+              "created_at": {
+                "$ref": "#/components/schemas/Instant"
+              },
+              "operation": {
+                "const": "delete"
+              },
+              "entity_type": {
+                "const": "tag"
+              },
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Tombstone"
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "entity_type": {
+                        "const": "tag"
+                      }
+                    }
+                  }
+                ]
+              },
+              "generation_id": {
+                "$ref": "#/components/schemas/UUID"
+              }
+            },
+            "required": [
+              "schema_version",
+              "change_id",
+              "action_id",
+              "workspace_id",
+              "sequence",
+              "ordinal",
+              "group_size",
+              "created_at",
+              "operation",
+              "entity_type",
+              "data",
+              "generation_id"
+            ],
+            "additionalProperties": false
+          }
+        ],
+        "description": "One item of an atomic committed group; envelope/payload workspace_id must match."
+      },
+      "SyncGroup": {
+        "type": "object",
+        "properties": {
+          "sequence": {
+            "$ref": "#/components/schemas/Version"
+          },
+          "action_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "workspace_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkspaceChange"
+            },
+            "minItems": 1,
+            "maxItems": 200
+          },
+          "generation_id": {
+            "$ref": "#/components/schemas/UUID"
+          }
+        },
+        "required": [
+          "sequence",
+          "action_id",
+          "workspace_id",
+          "changes",
+          "generation_id"
+        ],
+        "additionalProperties": false
+      },
+      "SyncChanges": {
+        "type": "object",
+        "properties": {
+          "workspace_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SyncGroup"
+            },
+            "maxItems": 100
+          },
+          "next_cursor": {
+            "$ref": "#/components/schemas/SyncCursor"
+          },
+          "has_more": {
+            "type": "boolean"
+          },
+          "head_sequence": {
+            "$ref": "#/components/schemas/Sequence"
+          },
+          "min_available_sequence": {
+            "$ref": "#/components/schemas/Version"
+          },
+          "generation_id": {
+            "$ref": "#/components/schemas/UUID"
+          }
+        },
+        "required": [
+          "workspace_id",
+          "groups",
+          "next_cursor",
+          "has_more",
+          "head_sequence",
+          "min_available_sequence",
+          "generation_id"
+        ],
+        "additionalProperties": false
+      },
+      "SnapshotItem": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "entity_type": {
+                "const": "account"
+              },
+              "data": {
+                "$ref": "#/components/schemas/Account"
+              }
+            },
+            "required": [
+              "entity_type",
+              "data"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "entity_type": {
+                "const": "transaction"
+              },
+              "data": {
+                "$ref": "#/components/schemas/Transaction"
+              }
+            },
+            "required": [
+              "entity_type",
+              "data"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "entity_type": {
+                "const": "category"
+              },
+              "data": {
+                "$ref": "#/components/schemas/Category"
+              }
+            },
+            "required": [
+              "entity_type",
+              "data"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "entity_type": {
+                "const": "tag"
+              },
+              "data": {
+                "$ref": "#/components/schemas/Tag"
+              }
+            },
+            "required": [
+              "entity_type",
+              "data"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "SnapshotCreate": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "Snapshot": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "workspace_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "base_sequence": {
+            "$ref": "#/components/schemas/Sequence"
+          },
+          "resume_cursor": {
+            "$ref": "#/components/schemas/SyncCursor"
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "expires_at": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "item_count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 50000
+          },
+          "first_page_token": {
+            "$ref": "#/components/schemas/PageToken"
+          },
+          "generation_id": {
+            "$ref": "#/components/schemas/UUID"
+          }
+        },
+        "required": [
+          "id",
+          "workspace_id",
+          "base_sequence",
+          "resume_cursor",
+          "created_at",
+          "expires_at",
+          "item_count",
+          "first_page_token",
+          "generation_id"
+        ],
+        "additionalProperties": false
+      },
+      "SnapshotPage": {
+        "type": "object",
+        "properties": {
+          "snapshot_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "workspace_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "base_sequence": {
+            "$ref": "#/components/schemas/Sequence"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SnapshotItem"
+            },
+            "maxItems": 100
+          },
+          "next_page_token": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PageToken"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "generation_id": {
+            "$ref": "#/components/schemas/UUID"
+          }
+        },
+        "required": [
+          "snapshot_id",
+          "workspace_id",
+          "base_sequence",
+          "items",
+          "next_page_token",
+          "generation_id"
+        ],
+        "additionalProperties": false
+      },
+      "ReceiptEntity": {
+        "type": "object",
+        "properties": {
+          "entity_type": {
+            "type": "string",
+            "enum": [
+              "account",
+              "transaction",
+              "category",
+              "tag"
+            ]
+          },
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "version": {
+            "$ref": "#/components/schemas/Version"
+          }
+        },
+        "required": [
+          "entity_type",
+          "id",
+          "version"
+        ],
+        "additionalProperties": false
+      },
+      "ActionOutcome": {
+        "type": "object",
+        "properties": {
+          "action_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "workspace_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "applied",
+              "rejected"
+            ]
+          },
+          "completed_at": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "response_expires_at": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "original_http_status": {
+            "type": "integer",
+            "minimum": 200,
+            "maximum": 499
+          },
+          "group_sequence": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Version"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "entity_refs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReceiptEntity"
+            },
+            "maxItems": 200
+          },
+          "response_body": {
+            "anyOf": [
+              {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/MutationResult"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Error"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "generation_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUID"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "action_id",
+          "workspace_id",
+          "state",
+          "completed_at",
+          "response_expires_at",
+          "original_http_status",
+          "group_sequence",
+          "entity_refs",
+          "response_body",
+          "generation_id"
+        ],
+        "additionalProperties": false
+      },
+      "AggregateMoney": {
+        "type": "string",
+        "pattern": "^(0|-?[1-9][0-9]{0,39})$",
+        "description": "Exact aggregate minor units, up to 40 digits; uses arbitrary precision, not int64/float. Input and individual account money keep the narrower Money limit."
+      }
+    },
+    "parameters": {
+      "WorkspaceId": {
+        "name": "workspace_id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/UUID"
+        }
+      },
+      "ResourceId": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/UUID"
+        }
+      },
+      "ActionId": {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/UUID"
+        },
+        "description": "Actor/workspace scoped action UUID; retry unchanged request with same key."
+      },
+      "Limit": {
+        "name": "limit",
+        "in": "query",
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 50
+        }
+      },
+      "Cursor": {
+        "name": "cursor",
+        "in": "query",
+        "schema": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        }
+      },
+      "SyncGeneration": {
+        "name": "X-Sync-Generation",
+        "in": "header",
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/UUID"
+        },
+        "description": "Generation observed from workspace or snapshot. Existing receipt replay checks original hash first; a new action in a stale generation is rejected without financial write."
+      }
+    },
+    "responses": {
+      "Error400": {
+        "description": "Malformed request",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Error401": {
+        "description": "Missing, expired or revoked session",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Error403": {
+        "description": "CSRF check failed or operation forbidden",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Error404": {
+        "description": "Resource missing or inaccessible",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Error409": {
+        "description": "Version, idempotency or dependency conflict",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        },
+        "headers": {
+          "Idempotency-Replayed": {
+            "description": "Present when returning a registered terminal action result; true on retained replay, false on initial completion. Not set for nonregistered errors.",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        }
+      },
+      "Error422": {
+        "description": "Domain validation failed",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        },
+        "headers": {
+          "Idempotency-Replayed": {
+            "description": "Present when returning a registered terminal action result; true on retained replay, false on initial completion. Not set for nonregistered errors.",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        }
+      },
+      "Error429": {
+        "description": "Rate limited",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        },
+        "headers": {
+          "Retry-After": {
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "description": "Seconds before retry"
+          }
+        }
+      },
+      "Error500": {
+        "description": "Internal error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Error503": {
+        "description": "Temporary unavailability",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        },
+        "headers": {
+          "Retry-After": {
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "description": "Seconds before retry"
+          }
+        }
+      },
+      "Error413": {
+        "description": "Request body exceeds configured limit",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Error410": {
+        "description": "Sync cursor or snapshot expired",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Opaque session token, not JWT."
+      },
+      "sessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "__Host-accounting_session"
+      },
+      "csrfToken": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-CSRF-Token"
+      }
+    }
+  }
+}

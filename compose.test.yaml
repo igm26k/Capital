@@ -1,0 +1,117 @@
+# Used with project name accounting-test; resources never share the local project.
+x-test-env: &test-env
+  APP_ENV: test
+  DATABASE_URL: postgres://${POSTGRES_USER:-accounting}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@db:5432/accounting_test?sslmode=disable
+  TEST_DATABASE_URL: postgres://${POSTGRES_USER:-accounting}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@db:5432/accounting_test?sslmode=disable
+  HTTP_ADDR: 0.0.0.0:8080
+  PUBLIC_ORIGIN: https://localhost:8444
+  REGISTRATION_ENABLED: 'false'
+services:
+  db:
+    environment: {POSTGRES_DB: accounting_test}
+  api:
+    environment: *test-env
+  worker:
+    environment: *test-env
+  migrate:
+    environment: *test-env
+  web:
+    ports: !override ["127.0.0.1:8444:443"]
+  platform-check:
+    build: {context: ./backend, target: build}
+    command: [go, test, ./migrate, -run, TestPostgresMigrationTransactions, -v, -count=1]
+    environment: *test-env
+    networks: [private]
+    depends_on:
+      db: {condition: service_healthy}
+    profiles: [checks]
+  schema-check:
+    build: {context: ./backend, target: build}
+    command: [go, test, ./tests/integration, -run, TestSchema, -v, -count=1]
+    environment: *test-env
+    networks: [private]
+    depends_on:
+      db: {condition: service_healthy}
+    profiles: [checks]
+  auth-check:
+    build: {context: ./backend, target: build}
+    command: [go, test, ./tests/integration, -run, TestAuth, -v, -count=1]
+    environment: *test-env
+    networks: [private]
+    depends_on:
+      db: {condition: service_healthy}
+    profiles: [checks]
+  command-check:
+    build: {context: ./backend, target: build}
+    command: [go, test, ./tests/integration, -run, TestCommand, -v, -count=1]
+    environment: *test-env
+    networks: [private]
+    depends_on:
+      db: {condition: service_healthy}
+    profiles: [checks]
+  vertical-check:
+    build: {context: ./backend, target: build}
+    command: [go, test, ./tests/integration, -run, '^TestVertical$', -v, -count=1]
+    environment:
+      <<: *test-env
+      VERTICAL_RESPONSE_FILE: /output/vertical-backend.json
+    volumes: ["./ops/.runtime/checks:/output"]
+    networks: [private]
+    depends_on:
+      db: {condition: service_healthy}
+    profiles: [checks]
+  advanced-check:
+    build: {context: ./backend, target: build}
+    command: [go, test, ./tests/integration, -run, '^TestLedgerAdvanced$', -v, -count=1]
+    environment:
+      <<: *test-env
+      GOCACHE: /tmp/accounting-go-check-build
+      HOME: /tmp
+      ADVANCED_RESPONSE_FILE: /output/ledger-advanced-responses.json
+    volumes: ["./ops/.runtime/checks:/output"]
+    networks: [private]
+    depends_on:
+      db: {condition: service_healthy}
+    profiles: [checks]
+  snapshot-check:
+    build: {context: ./backend, target: build}
+    command: [go, test, ./tests/integration, -run, '^TestSnapshot$', -v, -count=1]
+    environment:
+      <<: *test-env
+      GOCACHE: /tmp/accounting-go-check-build
+      HOME: /tmp
+      SNAPSHOT_RESPONSE_ARTIFACT: /output/snapshot-responses.json
+    volumes: ["./ops/.runtime/checks:/output"]
+    networks: [private]
+    depends_on:
+      db: {condition: service_healthy}
+    profiles: [checks]
+  pull-check:
+    build: {context: ./backend, target: build}
+    command: [go, test, ./tests/integration, -run, '^TestPull$', -v, -count=1]
+    environment:
+      <<: *test-env
+      GOCACHE: /tmp/accounting-go-check-build
+      HOME: /tmp
+      PULL_RESPONSE_ARTIFACT: /output/pull-responses.json
+    volumes: ["./ops/.runtime/checks:/output"]
+    networks: [private]
+    depends_on:
+      db: {condition: service_healthy}
+    profiles: [checks]
+  ledger-check:
+    build: {context: ./backend, target: build}
+    command: [go, test, ./tests/integration, -run, TestLedgerBasic, -v, -count=1]
+    environment:
+      <<: *test-env
+      LEDGER_RESPONSE_FILE: /output/ledger-responses.json
+    volumes: ["./ops/.runtime/checks:/output"]
+    networks: [private]
+    depends_on:
+      db: {condition: service_healthy}
+    profiles: [checks]
+networks:
+  private:
+    ipam:
+      config:
+        - subnet: ${ACCOUNTING_TEST_SUBNET:-192.168.241.0/24}

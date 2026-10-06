@@ -1,0 +1,561 @@
+{
+  "schema_version": 1,
+  "integration_cases": [
+    {
+      "id": "DR-F01",
+      "owner": "S3-02",
+      "method": "post",
+      "path": "/workspaces/{workspace_id}/transactions",
+      "expected_http": 422,
+      "expected_code": "validation_error",
+      "setup": "Перевод EUR A→A или EUR A→B с суммами 10000/9999.",
+      "expectation": "Нет движения, группы и applied receipt; счета неизменны.",
+      "integration_status": "not_run"
+    },
+    {
+      "id": "DR-F02",
+      "owner": "S3-02",
+      "method": "post",
+      "path": "/workspaces/{workspace_id}/transactions",
+      "expected_http": 422,
+      "expected_code": "amount_out_of_range",
+      "setup": "На счете 9000000000000000; доход 1.",
+      "expectation": "Отказ до commit; остаток и версии прежние.",
+      "integration_status": "not_run"
+    },
+    {
+      "id": "DR-F03",
+      "owner": "S3-02",
+      "method": "post",
+      "path": "/workspaces/{workspace_id}/transactions",
+      "expected_http": 422,
+      "expected_code": "validation_error",
+      "setup": "Расход 6000; части 4000+1999.",
+      "expectation": "Нет операции/движения; разница 1 не округляется.",
+      "integration_status": "not_run"
+    },
+    {
+      "id": "DR-F04",
+      "owner": "S3-02",
+      "method": "post",
+      "path": "/workspaces/{workspace_id}/transactions",
+      "expected_http": 422,
+      "expected_code": "validation_error",
+      "setup": "Расход: продукты 4000, быт 2000; продукты уже возвращены на 3500; новый возврат продуктов 1000.",
+      "expectation": "Общий оставшийся лимит 2500 не разрешает возврат части с остатком 500.",
+      "integration_status": "not_run"
+    },
+    {
+      "id": "DR-F05",
+      "owner": "S3-02",
+      "method": "post",
+      "path": "/workspaces/{workspace_id}/transactions",
+      "expected_http": 422,
+      "expected_code": "validation_error",
+      "setup": "Две части расхода имеют один UUID и разные суммы; сумма частей формально совпадает с расходом.",
+      "expectation": "UUID частей уникальны по идентичности, а не по equality всего JSON.",
+      "integration_status": "not_run"
+    },
+    {
+      "id": "DR-F06",
+      "owner": "S3-02",
+      "method": "put",
+      "path": "/workspaces/{workspace_id}/transactions/{id}",
+      "expected_http": 422,
+      "expected_code": "validation_error",
+      "setup": "RefundReplace подменяет parent_transaction_id другим своим расходом с достаточной суммой.",
+      "expectation": "Исходный расход возврата неизменен; оба расхода и остатки прежние.",
+      "integration_status": "not_run"
+    },
+    {
+      "id": "DR-F07",
+      "owner": "S3-02",
+      "method": "put",
+      "path": "/workspaces/{workspace_id}/transactions/{id}",
+      "expected_http": 422,
+      "expected_code": "validation_error",
+      "setup": "Существующий расход EUR 1000 minor переносится на JPY счет при остальных валидных полях.",
+      "expectation": "Валюта операции неизменна; 10 EUR не превращаются в 1000 JPY.",
+      "integration_status": "not_run"
+    },
+    {
+      "id": "DR-F08",
+      "owner": "S3-02",
+      "method": "put",
+      "path": "/workspaces/{workspace_id}/transactions/{id}",
+      "expected_http": 409,
+      "expected_code": "dependent_transactions",
+      "setup": "PUT перевода меняет дату связанной комиссии, имеющей posted refund.",
+      "expectation": "Проверка родительского PUT не обходит блокировку финансовой правки возвращенного расхода.",
+      "integration_status": "not_run"
+    },
+    {
+      "id": "DR-F09",
+      "owner": "S3-02",
+      "method": "delete",
+      "path": "/workspaces/{workspace_id}/transactions/{id}",
+      "expected_http": 409,
+      "expected_code": "dependent_transactions",
+      "setup": "Удаление перевода с комиссией и активным возвратом комиссии.",
+      "expectation": "Все связанные записи и остатки остаются; нет частичного удаления.",
+      "integration_status": "not_run"
+    },
+    {
+      "id": "DR-F10",
+      "owner": "S3-04",
+      "method": "post",
+      "path": "/workspaces/{workspace_id}/transactions/classification",
+      "expected_http": 409,
+      "expected_code": "version_conflict",
+      "setup": "Пакет 2 операций; только вторая имеет устаревшую version.",
+      "expectation": "Категория/теги/версии первой не меняются; группа отсутствует.",
+      "integration_status": "not_run"
+    },
+    {
+      "id": "DR-F11",
+      "owner": "S3-02",
+      "method": "post",
+      "path": "/workspaces/{workspace_id}/transactions",
+      "expected_http": 422,
+      "expected_code": "account_archived",
+      "setup": "После чтения редактором активного счета другая команда архивирует счет; редактор сохраняет расход.",
+      "expectation": "Архив проверяется под head lock, а не только в UI; баланс не меняется.",
+      "integration_status": "not_run"
+    },
+    {
+      "id": "DR-F12",
+      "owner": "S3-04",
+      "method": "post",
+      "path": "/workspaces/{workspace_id}/accounts/{id}/adjustments",
+      "expected_http": 409,
+      "expected_code": "version_conflict",
+      "setup": "Корректировка с balance_version=7; перед ее commit другой расход повысил версию до 8.",
+      "expectation": "Target balance не применяется к новому остатку молча; движения нет.",
+      "integration_status": "not_run"
+    },
+    {
+      "id": "DR-A01",
+      "owner": "S3-03",
+      "method": "get",
+      "path": "/workspaces/{workspace_id}/accounts/{id}",
+      "expected_http": 404,
+      "expected_code": "not_found",
+      "setup": "UUID workspace/account принадлежат пользователю B; запрос от A.",
+      "expectation": "Нет финансового payload, current_versions и признака существования ресурса.",
+      "integration_status": "not_run"
+    },
+    {
+      "id": "DR-A02",
+      "owner": "S3-03",
+      "method": "post",
+      "path": "/workspaces/{workspace_id}/transactions",
+      "expected_http": 404,
+      "expected_code": "not_found",
+      "setup": "A состоит в двух workspace; вложенный account/tag/parent/allocation из другого workspace.",
+      "expectation": "Членство в обоих пространствах не разрешает смешанные ссылки; нет writes.",
+      "integration_status": "not_run"
+    },
+    {
+      "id": "DR-A03",
+      "owner": "S3-03",
+      "method": "delete",
+      "path": "/sessions/{id}",
+      "expected_http": 404,
+      "expected_code": "not_found",
+      "setup": "A передает UUID сессии B.",
+      "expectation": "Сессия B не отзывается, детали устройства не раскрываются.",
+      "integration_status": "not_run"
+    },
+    {
+      "id": "DR-A04",
+      "owner": "S3-03",
+      "method": "get",
+      "path": "/me",
+      "expected_http": 400,
+      "expected_code": "bad_request",
+      "setup": "Одновременно переданы валидные Cookie и Authorization.",
+      "expectation": "Ни один способ не выбирается автоматически; запрос отклоняется.",
+      "integration_status": "not_run"
+    },
+    {
+      "id": "DR-A05",
+      "owner": "S3-03",
+      "method": "post",
+      "path": "/workspaces/{workspace_id}/transactions",
+      "expected_http": 403,
+      "expected_code": "csrf_invalid",
+      "setup": "Cookie auth без X-CSRF-Token или с чужим Origin; валидные UUID и суммы.",
+      "expectation": "Проверка раньше action lookup; не раскрывается история квитанций, движения нет.",
+      "integration_status": "not_run"
+    },
+    {
+      "id": "DR-A06",
+      "owner": "S3-03",
+      "method": "get",
+      "path": "/workspaces/{workspace_id}/accounts/{id}",
+      "expected_http": 401,
+      "expected_code": "unauthenticated",
+      "setup": "Пользователь disabled, его токен и membership еще сохранены.",
+      "expectation": "Disabled проверяется каждый раз, а не только при login.",
+      "integration_status": "not_run"
+    },
+    {
+      "id": "DR-A07",
+      "owner": "S3-03",
+      "method": "post",
+      "path": "/workspaces/{workspace_id}/transactions",
+      "expected_http": 401,
+      "expected_code": "unauthenticated",
+      "setup": "Расход и отзыв сессии гоняются; revoke уже завершил commit прежде, чем расход получил защитные locks.",
+      "expectation": "Расход отвергается; обратный порядок означает завершение расхода до успешного revoke, без deadlock.",
+      "integration_status": "not_run"
+    },
+    {
+      "id": "DR-A08",
+      "owner": "S3-03",
+      "method": "post",
+      "path": "/auth/register",
+      "expected_http": 403,
+      "expected_code": "registration_disabled",
+      "setup": "REGISTRATION_ENABLED=false, корректные новые учетные данные.",
+      "expectation": "Не создаются user/workspace/session; публичный режим выключен по умолчанию.",
+      "integration_status": "not_run"
+    },
+    {
+      "id": "DR-A09",
+      "owner": "S3-03",
+      "method": "post",
+      "path": "/auth/login",
+      "expected_http": 401,
+      "expected_code": "unauthenticated",
+      "setup": "Неизвестный email и существующий email с неверным паролем.",
+      "expectation": "Одинаковая структура общего отказа; обе ветки выполняют password hash работу с одинаковыми параметрами, без утверждения о полной временной неразличимости.",
+      "integration_status": "not_run"
+    },
+    {
+      "id": "DR-A10",
+      "owner": "S3-06",
+      "method": "get",
+      "path": "/workspaces/{workspace_id}/transactions/{id}",
+      "expected_http": 200,
+      "expected_code": null,
+      "setup": "В payee/note сохранена строка с HTML/script и кавычками.",
+      "expectation": "UI показывает текст, не выполняет HTML/JS; секреты не попадают в логи или URL.",
+      "integration_status": "not_run"
+    },
+    {
+      "id": "DR-S01",
+      "owner": "S3-04",
+      "method": "get",
+      "path": "/workspaces/{workspace_id}/sync/changes",
+      "expected_http": 400,
+      "expected_code": "cursor_invalid",
+      "setup": "A имеет доступ к двум workspace, переносит cursor одного в другой.",
+      "expectation": "Сервер проверяет привязку cursor, не раскрывает исходное пространство.",
+      "integration_status": "not_run"
+    },
+    {
+      "id": "DR-S02",
+      "owner": "S3-04",
+      "method": "get",
+      "path": "/workspaces/{workspace_id}/sync/changes",
+      "expected_http": 410,
+      "expected_code": "cursor_expired",
+      "setup": "C=3, min_available_sequence=5, head=6.",
+      "expectation": "Bootstrap заменяет только mirror; queued/uncertain outbox и draft сохраняются.",
+      "integration_status": "not_run"
+    },
+    {
+      "id": "DR-S03",
+      "owner": "S3-04",
+      "method": "get",
+      "path": "/workspaces/{workspace_id}/sync/changes",
+      "expected_http": 200,
+      "expected_code": null,
+      "setup": "Fault injection: response содержит group_size=2 и только один ordinal.",
+      "expectation": "Клиент отклоняет страницу, локальные данные и cursor остаются прежними; это не успешное применение 200.",
+      "integration_status": "not_run"
+    },
+    {
+      "id": "DR-S04",
+      "owner": "S3-04",
+      "method": "get",
+      "path": "/workspaces/{workspace_id}/sync/snapshots/{id}/pages",
+      "expected_http": 410,
+      "expected_code": "snapshot_expired",
+      "setup": "Snapshot TTL еще не истек, но journal generation был сброшен.",
+      "expectation": "Старая страница не попадает в новый mirror; новый snapshot id обязателен.",
+      "integration_status": "not_run"
+    },
+    {
+      "id": "DR-S05",
+      "owner": "S3-04",
+      "method": "post",
+      "path": "/workspaces/{workspace_id}/transactions",
+      "expected_http": 409,
+      "expected_code": "sync_generation_conflict",
+      "setup": "После reset старое outbox поколение отправляет команду, отсутствующую в actions.",
+      "expectation": "Не создается ни action, ни движение; автоматическая подстановка нового поколения запрещена.",
+      "integration_status": "not_run"
+    },
+    {
+      "id": "DR-S06",
+      "owner": "S3-04",
+      "method": "post",
+      "path": "/workspaces/{workspace_id}/transactions",
+      "expected_http": 409,
+      "expected_code": "action_result_expired",
+      "setup": "Applied receipt старше 30 суток, прежний key/hash, текущий доступ действителен.",
+      "expectation": "Ответ не повторяет запись; GET actions подтверждает applied, response_body=null.",
+      "integration_status": "not_run"
+    },
+    {
+      "id": "DR-S07",
+      "owner": "S3-04",
+      "method": "get",
+      "path": "/workspaces/{workspace_id}/actions/{id}",
+      "expected_http": 404,
+      "expected_code": "not_found",
+      "setup": "A пытается читать квитанцию другого actor в доступном обоим workspace.",
+      "expectation": "Общий workspace не раскрывает чужие receipts.",
+      "integration_status": "not_run"
+    },
+    {
+      "id": "DR-S08",
+      "owner": "S3-04",
+      "method": "get",
+      "path": "/workspaces/{workspace_id}/sync/changes",
+      "expected_http": 200,
+      "expected_code": null,
+      "setup": "Реальные две DB connections: A держит head lock, B пытается commit; затем A rollback.",
+      "expectation": "B не публикует более поздний sequence до A; rollback не создает дырку или частичную группу.",
+      "integration_status": "not_run"
+    },
+    {
+      "id": "DR-S09",
+      "owner": "S3-04",
+      "method": "get",
+      "path": "/workspaces/{workspace_id}/actions/{id}",
+      "expected_http": 404,
+      "expected_code": "not_found",
+      "setup": "Lookup action выполняется до commit одновременно отправленной команды.",
+      "expectation": "Клиент повторяет исходный key; 404 не порождает новый key.",
+      "integration_status": "not_run"
+    },
+    {
+      "id": "DR-S10",
+      "owner": "S6-03",
+      "method": "get",
+      "path": "/me",
+      "expected_http": 401,
+      "expected_code": "unauthenticated",
+      "setup": "Восстановлены backup sessions, выполнена процедура отзыва перед открытием трафика.",
+      "expectation": "Ни одна восстановленная старая сессия не оживает; generation сменен, действия после RPO разобраны отдельно.",
+      "integration_status": "not_run"
+    },
+    {
+      "id": "DR-F13",
+      "owner": "S3-02",
+      "method": "put",
+      "path": "/workspaces/{workspace_id}/transactions/{id}",
+      "expected_http": 200,
+      "expected_code": null,
+      "setup": "ExpenseReplace меняет только note; category/tag назначения теперь архивны, но UUID и части прежние.",
+      "expectation": "Исторические назначения сохраняются; новые архивные назначения запрещены отдельной негативной проверкой. Остаток и balance_version неизменны.",
+      "integration_status": "not_run"
+    },
+    {
+      "id": "DR-S11",
+      "owner": "S3-04",
+      "method": "get",
+      "path": "/workspaces/{workspace_id}/sync/changes",
+      "expected_http": 400,
+      "expected_code": "cursor_invalid",
+      "setup": "В валидном cursor изменен один байт подписи; membership действителен.",
+      "expectation": "Проверка HMAC отвергает cursor до выдачи групп.",
+      "integration_status": "not_run"
+    }
+  ],
+  "schema_cases": [
+    {
+      "id": "aggregate_above_single_amount_limit",
+      "document": "core",
+      "schema": "AggregateMoney",
+      "data": "18000000000000000",
+      "valid": true
+    },
+    {
+      "id": "same_value_not_single_amount",
+      "document": "core",
+      "schema": "Money",
+      "data": "18000000000000000",
+      "valid": false
+    },
+    {
+      "id": "aggregate_negative",
+      "document": "core",
+      "schema": "AggregateMoney",
+      "data": "-18000000000000000",
+      "valid": true
+    },
+    {
+      "id": "aggregate_no_float",
+      "document": "core",
+      "schema": "AggregateMoney",
+      "data": 18000000000000000,
+      "valid": false
+    },
+    {
+      "id": "ascii_email_mvp",
+      "document": "core",
+      "schema": "Login",
+      "data": {
+        "email": "юзер@example.test",
+        "password": "example-password-123",
+        "device_name": "Веб",
+        "transport": "cookie"
+      },
+      "valid": false
+    },
+    {
+      "id": "literal_password_spaces",
+      "document": "core",
+      "schema": "Register",
+      "data": {
+        "email": "person@example.test",
+        "password": "  password with spaces  ",
+        "device_name": "Веб",
+        "transport": "cookie",
+        "timezone": "Asia/Nicosia"
+      },
+      "valid": true
+    },
+    {
+      "id": "report_multiple_large_flows",
+      "document": "future",
+      "schema": "ReportCurrency",
+      "data": {
+        "currency": "EUR",
+        "income_minor": "18000000000000000",
+        "net_expense_minor": "18000000000000000",
+        "categories": [],
+        "balance_points": []
+      },
+      "valid": true
+    }
+  ],
+  "arithmetic_cases": [
+    {
+      "id": "two_large_flows_each_way",
+      "initial": "0",
+      "movements": [
+        "9000000000000000",
+        "-9000000000000000",
+        "9000000000000000",
+        "-9000000000000000"
+      ],
+      "expected_balance": "0",
+      "expected_income": "18000000000000000",
+      "expected_expense": "18000000000000000"
+    },
+    {
+      "id": "refund_part_limit",
+      "parts": {
+        "food": "4000",
+        "home": "2000"
+      },
+      "refunded": {
+        "food": "3500",
+        "home": "0"
+      },
+      "requested": {
+        "food": "1000",
+        "home": "0"
+      },
+      "expected_remaining": {
+        "food": "500",
+        "home": "2000"
+      },
+      "expected_allowed": false
+    },
+    {
+      "id": "fx_with_third_account_fee",
+      "initial": {
+        "EUR:A": "100000",
+        "USD:B": "0",
+        "GBP:C": "5000"
+      },
+      "movements": [
+        [
+          "EUR:A",
+          "-10000"
+        ],
+        [
+          "USD:B",
+          "11000"
+        ],
+        [
+          "GBP:C",
+          "-200"
+        ]
+      ],
+      "expected_balances": {
+        "EUR:A": "90000",
+        "USD:B": "11000",
+        "GBP:C": "4800"
+      },
+      "expense_minor": {
+        "GBP": "200"
+      },
+      "expected_transfer_income_minor": "0"
+    }
+  ],
+  "generation_cases": [
+    {
+      "id": "normal_new_action",
+      "current_generation": "00000000-0000-4000-8000-000000000900",
+      "requested_generation": "00000000-0000-4000-8000-000000000900",
+      "receipt_present": false,
+      "receipt_hash_matches": false,
+      "expected": "execute"
+    },
+    {
+      "id": "stale_absent_receipt",
+      "current_generation": "00000000-0000-4000-8000-000000000901",
+      "requested_generation": "00000000-0000-4000-8000-000000000900",
+      "receipt_present": false,
+      "receipt_hash_matches": false,
+      "expected": "sync_generation_conflict"
+    },
+    {
+      "id": "old_receipt_known_applied",
+      "current_generation": "00000000-0000-4000-8000-000000000901",
+      "requested_generation": "00000000-0000-4000-8000-000000000900",
+      "receipt_present": true,
+      "receipt_hash_matches": true,
+      "expected": "historical_replay_then_snapshot"
+    },
+    {
+      "id": "modified_generation_changes_hash",
+      "current_generation": "00000000-0000-4000-8000-000000000901",
+      "requested_generation": "00000000-0000-4000-8000-000000000901",
+      "receipt_present": true,
+      "receipt_hash_matches": false,
+      "expected": "idempotency_conflict"
+    }
+  ],
+  "release_dependencies": [
+    {
+      "id": "PUBLIC-REGISTRATION",
+      "owner": "S6-02",
+      "status": "open",
+      "requirement": "Публичная регистрация закрыта до verification-flow и проверки enumeration; локальный API 201/422 не считается защищенным от обнаружения email."
+    },
+    {
+      "id": "RECOVERY-RPO",
+      "owner": "S6-03",
+      "status": "open",
+      "requirement": "Реальный restore, generation rotation, отзыв sessions, фактический RPO и неизвестные actions после восстановления."
+    }
+  ]
+}

@@ -1,0 +1,982 @@
+{
+  "valid": [
+    {
+      "id": "expense_create",
+      "schema": "TransactionCreate",
+      "data": {
+        "id": "00000000-0000-4000-8000-000000000010",
+        "occurred_at": "2026-10-04T09:00:00Z",
+        "occurred_timezone": "Asia/Nicosia",
+        "note": "",
+        "payee": "Магазин",
+        "tag_ids": [],
+        "kind": "expense",
+        "account_id": "00000000-0000-4000-8000-000000000002",
+        "amount_minor": "1234",
+        "allocations": [
+          {
+            "id": "00000000-0000-4000-8000-000000000020",
+            "category_id": null,
+            "amount_minor": "1234"
+          }
+        ]
+      }
+    },
+    {
+      "id": "income_create",
+      "schema": "TransactionCreate",
+      "data": {
+        "id": "00000000-0000-4000-8000-000000000010",
+        "occurred_at": "2026-10-04T09:00:00Z",
+        "occurred_timezone": "Asia/Nicosia",
+        "note": "",
+        "payee": "Магазин",
+        "tag_ids": [],
+        "kind": "income",
+        "account_id": "00000000-0000-4000-8000-000000000002",
+        "amount_minor": "1234",
+        "allocations": [
+          {
+            "id": "00000000-0000-4000-8000-000000000020",
+            "category_id": null,
+            "amount_minor": "1234"
+          }
+        ]
+      }
+    },
+    {
+      "id": "fx_transfer_fee",
+      "schema": "TransactionCreate",
+      "data": {
+        "id": "00000000-0000-4000-8000-000000000010",
+        "occurred_at": "2026-10-04T09:00:00Z",
+        "occurred_timezone": "Asia/Nicosia",
+        "note": "",
+        "payee": "Магазин",
+        "tag_ids": [],
+        "kind": "transfer",
+        "source_account_id": "00000000-0000-4000-8000-000000000002",
+        "target_account_id": "00000000-0000-4000-8000-000000000003",
+        "source_amount_minor": "10000",
+        "target_amount_minor": "11000",
+        "rate": {
+          "numerator": "11",
+          "denominator": "10"
+        },
+        "fee": {
+          "id": "00000000-0000-4000-8000-000000000011",
+          "account_id": "00000000-0000-4000-8000-000000000002",
+          "amount_minor": "200",
+          "allocations": [
+            {
+              "id": "00000000-0000-4000-8000-000000000021",
+              "category_id": null,
+              "amount_minor": "200"
+            }
+          ],
+          "note": "",
+          "tag_ids": []
+        }
+      }
+    },
+    {
+      "id": "refund_create",
+      "schema": "TransactionCreate",
+      "data": {
+        "id": "00000000-0000-4000-8000-000000000010",
+        "occurred_at": "2026-10-04T09:00:00Z",
+        "occurred_timezone": "Asia/Nicosia",
+        "note": "",
+        "payee": "Магазин",
+        "tag_ids": [],
+        "kind": "refund",
+        "account_id": "00000000-0000-4000-8000-000000000002",
+        "amount_minor": "500",
+        "parent_transaction_id": "00000000-0000-4000-8000-000000000010",
+        "expected_parent_version": "1",
+        "expected_transfer_version": null,
+        "allocations": [
+          {
+            "id": "00000000-0000-4000-8000-000000000022",
+            "original_allocation_id": "00000000-0000-4000-8000-000000000020",
+            "amount_minor": "500"
+          }
+        ]
+      }
+    },
+    {
+      "id": "account_create",
+      "schema": "AccountCreate",
+      "data": {
+        "id": "00000000-0000-4000-8000-000000000002",
+        "name": "Основной",
+        "type": "bank",
+        "currency": "EUR",
+        "opened_at": "2026-10-04T09:00:00Z",
+        "occurred_timezone": "Asia/Nicosia",
+        "opening_balance_minor": "100000"
+      }
+    },
+    {
+      "id": "adjustment",
+      "schema": "AdjustmentCreate",
+      "data": {
+        "id": "00000000-0000-4000-8000-000000000012",
+        "expected_balance_version": "2",
+        "target_balance_minor": "95000",
+        "reason": "Сверка наличных",
+        "note": "",
+        "occurred_timezone": "Asia/Nicosia"
+      }
+    },
+    {
+      "id": "login",
+      "schema": "Login",
+      "data": {
+        "email": "person@example.test",
+        "password": "example-password-123",
+        "device_name": "Веб",
+        "transport": "cookie"
+      }
+    },
+    {
+      "id": "registration",
+      "schema": "Register",
+      "data": {
+        "email": "person@example.test",
+        "password": "example-password-123",
+        "device_name": "Веб",
+        "transport": "cookie",
+        "timezone": "Asia/Nicosia"
+      }
+    },
+    {
+      "id": "transaction_read",
+      "schema": "Transaction",
+      "data": {
+        "id": "00000000-0000-4000-8000-000000000010",
+        "workspace_id": "00000000-0000-4000-8000-000000000001",
+        "version": "1",
+        "created_at": "2026-10-04T09:00:00Z",
+        "updated_at": "2026-10-04T09:00:00Z",
+        "deleted_at": null,
+        "kind": "expense",
+        "status": "posted",
+        "occurred_at": "2026-10-04T09:00:00Z",
+        "occurred_timezone": "Asia/Nicosia",
+        "note": "",
+        "payee": "Магазин",
+        "reason": null,
+        "parent_transaction_id": null,
+        "fee_transaction_id": null,
+        "rate": null,
+        "entries": [
+          {
+            "id": "00000000-0000-4000-8000-000000000030",
+            "account_id": "00000000-0000-4000-8000-000000000002",
+            "currency": "EUR",
+            "amount_minor": "-1234"
+          }
+        ],
+        "allocations": [
+          {
+            "id": "00000000-0000-4000-8000-000000000020",
+            "category_id": null,
+            "amount_minor": "1234",
+            "original_allocation_id": null,
+            "remaining_refundable_minor": "1234"
+          }
+        ],
+        "tag_ids": []
+      }
+    },
+    {
+      "id": "account_read",
+      "schema": "Account",
+      "data": {
+        "id": "00000000-0000-4000-8000-000000000002",
+        "workspace_id": "00000000-0000-4000-8000-000000000001",
+        "version": "1",
+        "created_at": "2026-10-04T09:00:00Z",
+        "updated_at": "2026-10-04T09:00:00Z",
+        "deleted_at": null,
+        "name": "Основной",
+        "type": "bank",
+        "currency": "EUR",
+        "opened_at": "2026-10-04T09:00:00Z",
+        "archived_at": null,
+        "balance_version": "2",
+        "posted_balance_minor": "98766",
+        "pending_delta_minor": "0",
+        "projected_balance_minor": "98766"
+      }
+    },
+    {
+      "id": "version_conflict",
+      "schema": "Error",
+      "data": {
+        "request_id": "00000000-0000-4000-8000-000000000090",
+        "code": "version_conflict",
+        "message": "Запись изменена. Загрузите актуальную версию.",
+        "field_errors": [],
+        "current_versions": [
+          {
+            "entity_type": "transaction",
+            "id": "00000000-0000-4000-8000-000000000010",
+            "version": "2",
+            "balance_version": null
+          }
+        ],
+        "retry_after_seconds": null
+      }
+    },
+    {
+      "id": "delete",
+      "schema": "TransactionDelete",
+      "data": {
+        "expected_version": "2",
+        "related_versions": []
+      }
+    },
+    {
+      "id": "mutation",
+      "schema": "MutationResult",
+      "data": {
+        "action_id": "00000000-0000-4000-8000-000000000080",
+        "accounts": [
+          {
+            "id": "00000000-0000-4000-8000-000000000002",
+            "workspace_id": "00000000-0000-4000-8000-000000000001",
+            "version": "1",
+            "created_at": "2026-10-04T09:00:00Z",
+            "updated_at": "2026-10-04T09:00:00Z",
+            "deleted_at": null,
+            "name": "Основной",
+            "type": "bank",
+            "currency": "EUR",
+            "opened_at": "2026-10-04T09:00:00Z",
+            "archived_at": null,
+            "balance_version": "2",
+            "posted_balance_minor": "98766",
+            "pending_delta_minor": "0",
+            "projected_balance_minor": "98766"
+          }
+        ],
+        "transactions": [
+          {
+            "id": "00000000-0000-4000-8000-000000000010",
+            "workspace_id": "00000000-0000-4000-8000-000000000001",
+            "version": "1",
+            "created_at": "2026-10-04T09:00:00Z",
+            "updated_at": "2026-10-04T09:00:00Z",
+            "deleted_at": null,
+            "kind": "expense",
+            "status": "posted",
+            "occurred_at": "2026-10-04T09:00:00Z",
+            "occurred_timezone": "Asia/Nicosia",
+            "note": "",
+            "payee": "Магазин",
+            "reason": null,
+            "parent_transaction_id": null,
+            "fee_transaction_id": null,
+            "rate": null,
+            "entries": [
+              {
+                "id": "00000000-0000-4000-8000-000000000030",
+                "account_id": "00000000-0000-4000-8000-000000000002",
+                "currency": "EUR",
+                "amount_minor": "-1234"
+              }
+            ],
+            "allocations": [
+              {
+                "id": "00000000-0000-4000-8000-000000000020",
+                "category_id": null,
+                "amount_minor": "1234",
+                "original_allocation_id": null,
+                "remaining_refundable_minor": "1234"
+              }
+            ],
+            "tag_ids": []
+          }
+        ],
+        "categories": [],
+        "tags": [],
+        "deleted": [],
+        "sync_group_sequence": "1",
+        "generation_id": "00000000-0000-4000-8000-000000000900"
+      }
+    },
+    {
+      "id": "expense_replace",
+      "schema": "ExpenseReplace",
+      "data": {
+        "occurred_at": "2026-10-04T09:00:00Z",
+        "occurred_timezone": "Asia/Nicosia",
+        "note": "",
+        "payee": "Магазин",
+        "tag_ids": [],
+        "kind": "expense",
+        "account_id": "00000000-0000-4000-8000-000000000002",
+        "amount_minor": "1234",
+        "allocations": [
+          {
+            "id": "00000000-0000-4000-8000-000000000020",
+            "category_id": null,
+            "amount_minor": "1234"
+          }
+        ],
+        "expected_version": "1",
+        "expected_parent_version": null
+      }
+    },
+    {
+      "id": "transfer_replace",
+      "schema": "TransferReplace",
+      "data": {
+        "occurred_at": "2026-10-04T09:00:00Z",
+        "occurred_timezone": "Asia/Nicosia",
+        "note": "",
+        "payee": "Магазин",
+        "tag_ids": [],
+        "kind": "transfer",
+        "source_account_id": "00000000-0000-4000-8000-000000000002",
+        "target_account_id": "00000000-0000-4000-8000-000000000003",
+        "source_amount_minor": "10000",
+        "target_amount_minor": "11000",
+        "rate": {
+          "numerator": "11",
+          "denominator": "10"
+        },
+        "fee": {
+          "id": "00000000-0000-4000-8000-000000000011",
+          "account_id": "00000000-0000-4000-8000-000000000002",
+          "amount_minor": "200",
+          "allocations": [
+            {
+              "id": "00000000-0000-4000-8000-000000000021",
+              "category_id": null,
+              "amount_minor": "200"
+            }
+          ],
+          "note": "",
+          "tag_ids": []
+        },
+        "expected_version": "1",
+        "expected_fee_version": null
+      }
+    },
+    {
+      "id": "refund_replace",
+      "schema": "RefundReplace",
+      "data": {
+        "occurred_at": "2026-10-04T09:00:00Z",
+        "occurred_timezone": "Asia/Nicosia",
+        "note": "",
+        "payee": "Магазин",
+        "tag_ids": [],
+        "kind": "refund",
+        "account_id": "00000000-0000-4000-8000-000000000002",
+        "amount_minor": "500",
+        "parent_transaction_id": "00000000-0000-4000-8000-000000000010",
+        "expected_parent_version": "1",
+        "expected_transfer_version": null,
+        "allocations": [
+          {
+            "id": "00000000-0000-4000-8000-000000000022",
+            "original_allocation_id": "00000000-0000-4000-8000-000000000020",
+            "amount_minor": "500"
+          }
+        ],
+        "expected_version": "1"
+      }
+    },
+    {
+      "id": "cookie_session",
+      "schema": "AuthResult",
+      "data": {
+        "profile": {
+          "id": "00000000-0000-4000-8000-000000000101",
+          "email": "person@example.test",
+          "timezone": "Asia/Nicosia"
+        },
+        "workspace": {
+          "id": "00000000-0000-4000-8000-000000000001",
+          "name": "Личные финансы",
+          "version": "1",
+          "role": "owner",
+          "sync_generation_id": "00000000-0000-4000-8000-000000000900"
+        },
+        "session": {
+          "id": "00000000-0000-4000-8000-000000000100",
+          "device_name": "Веб",
+          "is_current": true,
+          "created_at": "2026-10-04T09:00:00Z",
+          "last_seen_at": "2026-10-04T09:00:00Z",
+          "expires_at": "2026-10-11T09:00:00Z",
+          "absolute_expires_at": "2026-11-03T09:00:00Z"
+        },
+        "transport": "cookie",
+        "csrf_token": "ccccccccccccccccccccccccccccccccccccccccccc"
+      }
+    },
+    {
+      "id": "bearer_session",
+      "schema": "AuthResult",
+      "data": {
+        "profile": {
+          "id": "00000000-0000-4000-8000-000000000101",
+          "email": "person@example.test",
+          "timezone": "Asia/Nicosia"
+        },
+        "workspace": {
+          "id": "00000000-0000-4000-8000-000000000001",
+          "name": "Личные финансы",
+          "version": "1",
+          "role": "owner",
+          "sync_generation_id": "00000000-0000-4000-8000-000000000900"
+        },
+        "session": {
+          "id": "00000000-0000-4000-8000-000000000100",
+          "device_name": "Веб",
+          "is_current": true,
+          "created_at": "2026-10-04T09:00:00Z",
+          "last_seen_at": "2026-10-04T09:00:00Z",
+          "expires_at": "2026-10-11T09:00:00Z",
+          "absolute_expires_at": "2026-11-03T09:00:00Z"
+        },
+        "transport": "bearer",
+        "access_token": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "token_type": "Bearer"
+      }
+    },
+    {
+      "id": "max_money",
+      "schema": "Money",
+      "data": "9000000000000000"
+    },
+    {
+      "id": "min_money",
+      "schema": "Money",
+      "data": "-9000000000000000"
+    }
+  ],
+  "invalid": [
+    {
+      "id": "numeric_money",
+      "schema": "TransactionCreate",
+      "data": {
+        "id": "00000000-0000-4000-8000-000000000010",
+        "occurred_at": "2026-10-04T09:00:00Z",
+        "occurred_timezone": "Asia/Nicosia",
+        "note": "",
+        "payee": "Магазин",
+        "tag_ids": [],
+        "kind": "expense",
+        "account_id": "00000000-0000-4000-8000-000000000002",
+        "amount_minor": 1234,
+        "allocations": [
+          {
+            "id": "00000000-0000-4000-8000-000000000020",
+            "category_id": null,
+            "amount_minor": "1234"
+          }
+        ]
+      }
+    },
+    {
+      "id": "negative_expense",
+      "schema": "TransactionCreate",
+      "data": {
+        "id": "00000000-0000-4000-8000-000000000010",
+        "occurred_at": "2026-10-04T09:00:00Z",
+        "occurred_timezone": "Asia/Nicosia",
+        "note": "",
+        "payee": "Магазин",
+        "tag_ids": [],
+        "kind": "expense",
+        "account_id": "00000000-0000-4000-8000-000000000002",
+        "amount_minor": "-1234",
+        "allocations": [
+          {
+            "id": "00000000-0000-4000-8000-000000000020",
+            "category_id": null,
+            "amount_minor": "1234"
+          }
+        ]
+      }
+    },
+    {
+      "id": "decimal_money",
+      "schema": "TransactionCreate",
+      "data": {
+        "id": "00000000-0000-4000-8000-000000000010",
+        "occurred_at": "2026-10-04T09:00:00Z",
+        "occurred_timezone": "Asia/Nicosia",
+        "note": "",
+        "payee": "Магазин",
+        "tag_ids": [],
+        "kind": "expense",
+        "account_id": "00000000-0000-4000-8000-000000000002",
+        "amount_minor": "12.34",
+        "allocations": [
+          {
+            "id": "00000000-0000-4000-8000-000000000020",
+            "category_id": null,
+            "amount_minor": "1234"
+          }
+        ]
+      }
+    },
+    {
+      "id": "leading_zero",
+      "schema": "TransactionCreate",
+      "data": {
+        "id": "00000000-0000-4000-8000-000000000010",
+        "occurred_at": "2026-10-04T09:00:00Z",
+        "occurred_timezone": "Asia/Nicosia",
+        "note": "",
+        "payee": "Магазин",
+        "tag_ids": [],
+        "kind": "expense",
+        "account_id": "00000000-0000-4000-8000-000000000002",
+        "amount_minor": "01234",
+        "allocations": [
+          {
+            "id": "00000000-0000-4000-8000-000000000020",
+            "category_id": null,
+            "amount_minor": "1234"
+          }
+        ]
+      }
+    },
+    {
+      "id": "zero_expense",
+      "schema": "TransactionCreate",
+      "data": {
+        "id": "00000000-0000-4000-8000-000000000010",
+        "occurred_at": "2026-10-04T09:00:00Z",
+        "occurred_timezone": "Asia/Nicosia",
+        "note": "",
+        "payee": "Магазин",
+        "tag_ids": [],
+        "kind": "expense",
+        "account_id": "00000000-0000-4000-8000-000000000002",
+        "amount_minor": "0",
+        "allocations": [
+          {
+            "id": "00000000-0000-4000-8000-000000000020",
+            "category_id": null,
+            "amount_minor": "1234"
+          }
+        ]
+      }
+    },
+    {
+      "id": "unknown_kind",
+      "schema": "TransactionCreate",
+      "data": {
+        "id": "00000000-0000-4000-8000-000000000010",
+        "occurred_at": "2026-10-04T09:00:00Z",
+        "occurred_timezone": "Asia/Nicosia",
+        "note": "",
+        "payee": "Магазин",
+        "tag_ids": [],
+        "kind": "opening",
+        "account_id": "00000000-0000-4000-8000-000000000002",
+        "amount_minor": "1234",
+        "allocations": [
+          {
+            "id": "00000000-0000-4000-8000-000000000020",
+            "category_id": null,
+            "amount_minor": "1234"
+          }
+        ]
+      }
+    },
+    {
+      "id": "manual_pending",
+      "schema": "TransactionCreate",
+      "data": {
+        "id": "00000000-0000-4000-8000-000000000010",
+        "occurred_at": "2026-10-04T09:00:00Z",
+        "occurred_timezone": "Asia/Nicosia",
+        "note": "",
+        "payee": "Магазин",
+        "tag_ids": [],
+        "kind": "expense",
+        "account_id": "00000000-0000-4000-8000-000000000002",
+        "amount_minor": "1234",
+        "allocations": [
+          {
+            "id": "00000000-0000-4000-8000-000000000020",
+            "category_id": null,
+            "amount_minor": "1234"
+          }
+        ],
+        "status": "pending"
+      }
+    },
+    {
+      "id": "missing_allocations",
+      "schema": "TransactionCreate",
+      "data": {
+        "id": "00000000-0000-4000-8000-000000000010",
+        "occurred_at": "2026-10-04T09:00:00Z",
+        "occurred_timezone": "Asia/Nicosia",
+        "note": "",
+        "payee": "Магазин",
+        "tag_ids": [],
+        "kind": "expense",
+        "account_id": "00000000-0000-4000-8000-000000000002",
+        "amount_minor": "1234"
+      }
+    },
+    {
+      "id": "non_utc_time",
+      "schema": "TransactionCreate",
+      "data": {
+        "id": "00000000-0000-4000-8000-000000000010",
+        "occurred_at": "2026-10-04T09:00:00+03:00",
+        "occurred_timezone": "Asia/Nicosia",
+        "note": "",
+        "payee": "Магазин",
+        "tag_ids": [],
+        "kind": "expense",
+        "account_id": "00000000-0000-4000-8000-000000000002",
+        "amount_minor": "1234",
+        "allocations": [
+          {
+            "id": "00000000-0000-4000-8000-000000000020",
+            "category_id": null,
+            "amount_minor": "1234"
+          }
+        ]
+      }
+    },
+    {
+      "id": "invalid_uuid",
+      "schema": "TransactionCreate",
+      "data": {
+        "id": "not-a-uuid",
+        "occurred_at": "2026-10-04T09:00:00Z",
+        "occurred_timezone": "Asia/Nicosia",
+        "note": "",
+        "payee": "Магазин",
+        "tag_ids": [],
+        "kind": "expense",
+        "account_id": "00000000-0000-4000-8000-000000000002",
+        "amount_minor": "1234",
+        "allocations": [
+          {
+            "id": "00000000-0000-4000-8000-000000000020",
+            "category_id": null,
+            "amount_minor": "1234"
+          }
+        ]
+      }
+    },
+    {
+      "id": "decimal_ratio",
+      "schema": "TransactionCreate",
+      "data": {
+        "id": "00000000-0000-4000-8000-000000000010",
+        "occurred_at": "2026-10-04T09:00:00Z",
+        "occurred_timezone": "Asia/Nicosia",
+        "note": "",
+        "payee": "Магазин",
+        "tag_ids": [],
+        "kind": "transfer",
+        "source_account_id": "00000000-0000-4000-8000-000000000002",
+        "target_account_id": "00000000-0000-4000-8000-000000000003",
+        "source_amount_minor": "10000",
+        "target_amount_minor": "11000",
+        "rate": {
+          "numerator": "1.1",
+          "denominator": "10"
+        },
+        "fee": {
+          "id": "00000000-0000-4000-8000-000000000011",
+          "account_id": "00000000-0000-4000-8000-000000000002",
+          "amount_minor": "200",
+          "allocations": [
+            {
+              "id": "00000000-0000-4000-8000-000000000021",
+              "category_id": null,
+              "amount_minor": "200"
+            }
+          ],
+          "note": "",
+          "tag_ids": []
+        }
+      }
+    },
+    {
+      "id": "numeric_version",
+      "schema": "TransactionCreate",
+      "data": {
+        "id": "00000000-0000-4000-8000-000000000010",
+        "occurred_at": "2026-10-04T09:00:00Z",
+        "occurred_timezone": "Asia/Nicosia",
+        "note": "",
+        "payee": "Магазин",
+        "tag_ids": [],
+        "kind": "refund",
+        "account_id": "00000000-0000-4000-8000-000000000002",
+        "amount_minor": "500",
+        "parent_transaction_id": "00000000-0000-4000-8000-000000000010",
+        "expected_parent_version": 1,
+        "expected_transfer_version": null,
+        "allocations": [
+          {
+            "id": "00000000-0000-4000-8000-000000000022",
+            "original_allocation_id": "00000000-0000-4000-8000-000000000020",
+            "amount_minor": "500"
+          }
+        ]
+      }
+    },
+    {
+      "id": "cookie_leaks_bearer_token",
+      "schema": "AuthResult",
+      "data": {
+        "profile": {
+          "id": "00000000-0000-4000-8000-000000000101",
+          "email": "person@example.test",
+          "timezone": "Asia/Nicosia"
+        },
+        "workspace": {
+          "id": "00000000-0000-4000-8000-000000000001",
+          "name": "Личные финансы",
+          "version": "1",
+          "role": "owner",
+          "sync_generation_id": "00000000-0000-4000-8000-000000000900"
+        },
+        "session": {
+          "id": "00000000-0000-4000-8000-000000000100",
+          "device_name": "Веб",
+          "is_current": true,
+          "created_at": "2026-10-04T09:00:00Z",
+          "last_seen_at": "2026-10-04T09:00:00Z",
+          "expires_at": "2026-10-11T09:00:00Z",
+          "absolute_expires_at": "2026-11-03T09:00:00Z"
+        },
+        "transport": "cookie",
+        "csrf_token": "ccccccccccccccccccccccccccccccccccccccccccc",
+        "access_token": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    },
+    {
+      "id": "money_above_limit",
+      "schema": "Money",
+      "data": "9000000000000001"
+    },
+    {
+      "id": "negative_money_above_limit",
+      "schema": "Money",
+      "data": "-9000000000000001"
+    },
+    {
+      "id": "negative_zero",
+      "schema": "Money",
+      "data": "-0"
+    }
+  ],
+  "events": [
+    {
+      "schema_version": 1,
+      "change_id": "00000000-0000-4000-8000-000000000070",
+      "action_id": "00000000-0000-4000-8000-000000000080",
+      "workspace_id": "00000000-0000-4000-8000-000000000001",
+      "sequence": "1",
+      "created_at": "2026-10-04T09:00:00Z",
+      "operation": "upsert",
+      "entity_type": "transaction",
+      "data": {
+        "id": "00000000-0000-4000-8000-000000000010",
+        "workspace_id": "00000000-0000-4000-8000-000000000001",
+        "version": "1",
+        "created_at": "2026-10-04T09:00:00Z",
+        "updated_at": "2026-10-04T09:00:00Z",
+        "deleted_at": null,
+        "kind": "expense",
+        "status": "posted",
+        "occurred_at": "2026-10-04T09:00:00Z",
+        "occurred_timezone": "Asia/Nicosia",
+        "note": "",
+        "payee": "Магазин",
+        "reason": null,
+        "parent_transaction_id": null,
+        "fee_transaction_id": null,
+        "rate": null,
+        "entries": [
+          {
+            "id": "00000000-0000-4000-8000-000000000030",
+            "account_id": "00000000-0000-4000-8000-000000000002",
+            "currency": "EUR",
+            "amount_minor": "-1234"
+          }
+        ],
+        "allocations": [
+          {
+            "id": "00000000-0000-4000-8000-000000000020",
+            "category_id": null,
+            "amount_minor": "1234",
+            "original_allocation_id": null,
+            "remaining_refundable_minor": "1234"
+          }
+        ],
+        "tag_ids": []
+      },
+      "ordinal": 1,
+      "group_size": 1,
+      "generation_id": "00000000-0000-4000-8000-000000000900"
+    },
+    {
+      "schema_version": 1,
+      "change_id": "00000000-0000-4000-8000-000000000070",
+      "action_id": "00000000-0000-4000-8000-000000000080",
+      "workspace_id": "00000000-0000-4000-8000-000000000001",
+      "sequence": "1",
+      "created_at": "2026-10-04T09:00:00Z",
+      "operation": "upsert",
+      "entity_type": "account",
+      "data": {
+        "id": "00000000-0000-4000-8000-000000000002",
+        "workspace_id": "00000000-0000-4000-8000-000000000001",
+        "version": "1",
+        "created_at": "2026-10-04T09:00:00Z",
+        "updated_at": "2026-10-04T09:00:00Z",
+        "deleted_at": null,
+        "name": "Основной",
+        "type": "bank",
+        "currency": "EUR",
+        "opened_at": "2026-10-04T09:00:00Z",
+        "archived_at": null,
+        "balance_version": "2",
+        "posted_balance_minor": "98766",
+        "pending_delta_minor": "0",
+        "projected_balance_minor": "98766"
+      },
+      "ordinal": 1,
+      "group_size": 1,
+      "generation_id": "00000000-0000-4000-8000-000000000900"
+    },
+    {
+      "schema_version": 1,
+      "change_id": "00000000-0000-4000-8000-000000000070",
+      "action_id": "00000000-0000-4000-8000-000000000080",
+      "workspace_id": "00000000-0000-4000-8000-000000000001",
+      "sequence": "1",
+      "created_at": "2026-10-04T09:00:00Z",
+      "operation": "delete",
+      "entity_type": "transaction",
+      "data": {
+        "entity_type": "transaction",
+        "id": "00000000-0000-4000-8000-000000000010",
+        "workspace_id": "00000000-0000-4000-8000-000000000001",
+        "version": "2",
+        "deleted_at": "2026-10-04T09:00:00Z"
+      },
+      "ordinal": 1,
+      "group_size": 1,
+      "generation_id": "00000000-0000-4000-8000-000000000900"
+    },
+    {
+      "schema_version": 1,
+      "change_id": "00000000-0000-4000-8000-000000000070",
+      "action_id": "00000000-0000-4000-8000-000000000080",
+      "workspace_id": "00000000-0000-4000-8000-000000000001",
+      "sequence": "1",
+      "created_at": "2026-10-04T09:00:00Z",
+      "operation": "upsert",
+      "entity_type": "category",
+      "data": {
+        "id": "00000000-0000-4000-8000-000000000010",
+        "workspace_id": "00000000-0000-4000-8000-000000000001",
+        "version": "1",
+        "created_at": "2026-10-04T09:00:00Z",
+        "updated_at": "2026-10-04T09:00:00Z",
+        "deleted_at": null,
+        "name": "Продукты",
+        "archived_at": null,
+        "parent_id": null
+      },
+      "ordinal": 1,
+      "group_size": 1,
+      "generation_id": "00000000-0000-4000-8000-000000000900"
+    },
+    {
+      "schema_version": 1,
+      "change_id": "00000000-0000-4000-8000-000000000070",
+      "action_id": "00000000-0000-4000-8000-000000000080",
+      "workspace_id": "00000000-0000-4000-8000-000000000001",
+      "sequence": "1",
+      "created_at": "2026-10-04T09:00:00Z",
+      "operation": "upsert",
+      "entity_type": "tag",
+      "data": {
+        "id": "00000000-0000-4000-8000-000000000010",
+        "workspace_id": "00000000-0000-4000-8000-000000000001",
+        "version": "1",
+        "created_at": "2026-10-04T09:00:00Z",
+        "updated_at": "2026-10-04T09:00:00Z",
+        "deleted_at": null,
+        "name": "Покупки",
+        "archived_at": null
+      },
+      "ordinal": 1,
+      "group_size": 1,
+      "generation_id": "00000000-0000-4000-8000-000000000900"
+    }
+  ],
+  "future_valid": [
+    {
+      "id": "budget_create",
+      "schema": "BudgetCreate",
+      "data": {
+        "id": "00000000-0000-4000-8000-000000000110",
+        "category_id": null,
+        "currency": "EUR",
+        "month": "2026-10",
+        "limit_minor": "50000"
+      }
+    },
+    {
+      "id": "import_preview_request",
+      "schema": "ImportCreate",
+      "data": {
+        "id": "00000000-0000-4000-8000-000000000111",
+        "format": "csv",
+        "content_base64": "ZGF0ZSxhbW91bnQK",
+        "mapping": {
+          "account_id": "00000000-0000-4000-8000-000000000002",
+          "date_column": "date",
+          "amount_column": "amount",
+          "payee_column": null,
+          "date_format": "YYYY-MM-DD",
+          "timezone": "Asia/Nicosia",
+          "delimiter": ",",
+          "encoding": "UTF-8",
+          "decimal_separator": ".",
+          "amount_convention": "signed_income_positive"
+        }
+      }
+    },
+    {
+      "id": "import_confirm",
+      "schema": "ImportConfirm",
+      "data": {
+        "expected_version": "1",
+        "decisions": [
+          {
+            "row_number": 2,
+            "action": "create",
+            "transaction_id": null,
+            "expected_transaction_version": null
+          }
+        ]
+      }
+    }
+  ]
+}

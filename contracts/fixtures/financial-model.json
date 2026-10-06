@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "cases": [
+    {"id":"expense","initial":{"EUR:A":"100000"},"movements":[["EUR:A","-1234"]],"expenses":{"EUR:food":["1234"]},"expected_balances":{"EUR:A":"98766"},"expected_expenses":{"EUR:food":"1234"}},
+    {"id":"transfer","initial":{"EUR:A":"100000","EUR:B":"5000"},"movements":[["EUR:A","-10000"],["EUR:B","10000"]],"expenses":{},"expected_balances":{"EUR:A":"90000","EUR:B":"15000"},"expected_expenses":{}},
+    {"id":"fx_fee","initial":{"EUR:A":"100000","USD:B":"0"},"movements":[["EUR:A","-10000"],["USD:B","11000"],["EUR:A","-200"]],"expenses":{"EUR:fee":["200"]},"expected_balances":{"EUR:A":"89800","USD:B":"11000"},"expected_expenses":{"EUR:fee":"200"},"fx":{"source_minor":"10000","source_scale":2,"target_minor":"11000","target_scale":2,"expected_ratio":["11","10"]}},
+    {"id":"split_refund","initial":{"EUR:A":"100000"},"movements":[["EUR:A","-6000"],["EUR:A","1500"]],"expenses":{"EUR:food":["4000","-1500"],"EUR:home":["2000"]},"expected_balances":{"EUR:A":"95500"},"expected_expenses":{"EUR:food":"2500","EUR:home":"2000"}},
+    {"id":"edited_expense","initial":{"EUR:A":"10000"},"movements":[["EUR:A","-1200"]],"expenses":{"EUR:food":["1200"]},"expected_balances":{"EUR:A":"8800"},"expected_expenses":{"EUR:food":"1200"}},
+    {"id":"deleted_expense","initial":{"EUR:A":"10000"},"movements":[],"expenses":{},"expected_balances":{"EUR:A":"10000"},"expected_expenses":{}},
+    {"id":"replayed_action","initial":{"EUR:A":"10000"},"movements":[["EUR:A","-1000"]],"expenses":{"EUR:food":["1000"]},"expected_balances":{"EUR:A":"9000"},"expected_expenses":{"EUR:food":"1000"}},
+    {"id":"distinct_identical_purchases","initial":{"EUR:A":"10000"},"movements":[["EUR:A","-1000"],["EUR:A","-1000"]],"expenses":{"EUR:food":["1000","1000"]},"expected_balances":{"EUR:A":"8000"},"expected_expenses":{"EUR:food":"2000"}},
+    {"id":"adjustment","initial":{"EUR:A":"10000"},"movements":[["EUR:A","-500"]],"expenses":{},"expected_balances":{"EUR:A":"9500"},"expected_expenses":{}},
+    {"id":"negative_opening","initial":{"EUR:A":"-1000"},"movements":[["EUR:A","500"]],"expenses":{},"expected_balances":{"EUR:A":"-500"},"expected_expenses":{}},
+    {"id":"three_decimal_currency","initial":{"KWD:A":"2000"},"movements":[["KWD:A","-1234"]],"expenses":{"KWD:food":["1234"]},"expected_balances":{"KWD:A":"766"},"expected_expenses":{"KWD:food":"1234"}},
+    {"id":"zero_decimal_currency","initial":{"JPY:A":"1000"},"movements":[["JPY:A","-123"]],"expenses":{"JPY:food":["123"]},"expected_balances":{"JPY:A":"877"},"expected_expenses":{"JPY:food":"123"}},
+    {"id":"repeating_fx","initial":{"EUR:A":"300"},"movements":[["EUR:A","-300"],["USD:B","100"]],"expenses":{},"expected_balances":{"EUR:A":"0","USD:B":"100"},"expected_expenses":{},"fx":{"source_minor":"300","source_scale":2,"target_minor":"100","target_scale":2,"expected_ratio":["1","3"]}}
+  ],
+  "rejection_scenarios": [
+    {"id":"split_mismatch","input":"expense=6000; allocations=4000+1999","expected":"validation_error; no movements committed"},
+    {"id":"concurrent_refunds","input":"allocation=4000; existing_refund=1500; concurrent_requests=2000,2000","expected":"at most one new refund commits; the other exceeds remaining 500"},
+    {"id":"stale_adjustment","input":"expected_balance_version=7; actual_balance_version=8","expected":"version_conflict; no adjustment"},
+    {"id":"delete_refunded_expense","input":"expense has active refund","expected":"dependent_transactions; unchanged balances"},
+    {"id":"delete_transfer_with_refunded_fee","input":"transfer fee has active refund","expected":"dependent_transactions; transfer and fee unchanged"},
+    {"id":"cross_workspace_account","input":"entry account belongs to another workspace","expected":"not_found; no data disclosed; no write"},
+    {"id":"currency_precision","input":"EUR 1.001 or JPY 1.1","expected":"validation_error; no rounding"},
+    {"id":"balance_overflow","input":"balance=9000000000000000; income=1","expected":"amount_out_of_range; no write"},
+    {"id":"archived_account_delete","input":"delete expense on archived account","expected":"account_archived; restore account first"},
+    {"id":"changed_replay_payload","input":"same action_id; different amount","expected":"idempotency_conflict; original operation unchanged"}
+  ]
+}

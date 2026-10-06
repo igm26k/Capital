@@ -1,0 +1,5 @@
+# Explicit test-only registration; never include with the local/production project.
+services:
+  api:
+    environment:
+      REGISTRATION_ENABLED: 'true'

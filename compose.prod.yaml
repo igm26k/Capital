@@ -1,0 +1,25 @@
+# Requires deployment-provided certificates; no dev defaults for database TLS.
+x-prod-env: &prod-env
+  APP_ENV: production
+  DATABASE_URL: ${PRODUCTION_DATABASE_URL:?Provide URL with sslmode=verify-full and sslrootcert=/etc/accounting/db-tls/ca.crt}
+  HTTP_ADDR: 0.0.0.0:8080
+  PUBLIC_ORIGIN: ${PRODUCTION_PUBLIC_ORIGIN:?Provide public HTTPS origin}
+  REGISTRATION_ENABLED: 'false'
+services:
+  db:
+    command: [postgres, -c, ssl=on, -c, ssl_cert_file=/etc/postgresql/tls/server.crt, -c, ssl_key_file=/etc/postgresql/tls/server.key]
+    volumes:
+      - ${PRODUCTION_DB_TLS_DIR:?Provide PostgreSQL TLS directory}:/etc/postgresql/tls:ro
+  api:
+    environment: *prod-env
+    volumes: ["${PRODUCTION_DB_CA_DIR:?Provide database CA directory}:/etc/accounting/db-tls:ro"]
+  worker:
+    environment: *prod-env
+    volumes: ["${PRODUCTION_DB_CA_DIR:?Provide database CA directory}:/etc/accounting/db-tls:ro"]
+  migrate:
+    environment: *prod-env
+    volumes: ["${PRODUCTION_DB_CA_DIR:?Provide database CA directory}:/etc/accounting/db-tls:ro"]
+  web:
+    ports: !override ["${PRODUCTION_HTTPS_BIND:?Provide public bind address}:443:443"]
+    volumes:
+      - ${PRODUCTION_WEB_TLS_DIR:?Provide web TLS directory}:/etc/nginx/tls:ro

@@ -1,0 +1,21 @@
+# CommandRunner и квитанции
+
+Runner.Execute выполняет generic PostgreSQL callback без зависимости от ledger. Request содержит session credential, workspace/action/generation UUID, метод/путь, исходный JSON и request_id. HTTP adapter обязан предоставить schema validator и проверку CSRF/Origin; счета, expense/income и категории/теги подключены через domain validators/commands. Ручной HTTP body ограничен 256 KiB, journal group — 1 MiB.
+
+Порядок: users/session guard → Authorize → membership SHARE → head UPDATE → actor-scoped receipt/hash → generation → domain savepoint → callback → группа/события/аудит/head/terminal receipt → commit. Head mutex резервирует право выполнения до commit; незавершенный action не публикуется, поэтому GET может видеть 404 до commit. Успешный результат возвращается только после commit. При uncertain commit возвращается 503; клиент повторяет исходный key.
+
+Rejection только для terminal domain 409/422: rollback до savepoint, сохранение Error receipt без head/group. Остальные ошибки откатывают всю транзакцию. SQL deadlock/serialization из callback повторяются максимум 3 раза; ошибки commit не считаются безопасным подтверждением успеха. Callback не должен выполнять внешние эффекты или управлять commit/rollback.
+
+Canonical hash: method LF normalized UUID path LF lowercased original generation LF canonical UTF-8 JSON. Ключи отсортированы, массивы сохраняют порядок, строки/Unicode не нормализуются, числа только целые. Unknown request fields/доменные ограничения проверяет validator; дубли/UTF-8/surrogates проверяет canonical parser. Деньги остаются строками, JSON payload не преобразуется в float.
+
+Группа содержит до 200 уникальных агрегатов, окончательные upsert/tombstone payload, ordinal/group_size и поколение. Лимит 1 MiB измеряется на сериализованном полном group envelope. Payload проверяется на базовые id/workspace/version/type и строгий JSON; полная схема агрегата и финансовые инварианты — ответственность доменного сервиса. MutationResult и ReceiptEntity формируются из той же группы. Audit содержит только metadata, без заметок/полного payload.
+
+Полный ответ доступен 30 суток: read/replay проверяет deadline независимо от очистки. Worker CompactReceipts раз в минуту блокирует один доступный head через SKIP LOCKED и очищает до 1000 просроченных response_body. Это доверенное внутреннее обслуживание, без HTTP endpoint и без выдачи чужих данных; оно не запрашивает пользовательские locks после head. Hash/status/outcome/generation/entity_refs сохраняются. Old-generation receipt доступна по исходному hash; незарегистрированный old-generation action отвергается. Outcome не захватывает head и ограничивается текущим actor/membership.
+
+Проверки: make command-check — реальная accounting_test/временная схема, replay/rejection/rollback, конкурентный key, head wait/rollback без дырок, deadlock retry, HTTP adapter/CSRF/outcome, budgets/sequence overflow, retention/compaction/reset/access. Oversized byte payload является внутренней fault injection и никогда не публикуется; это не приемка финансовой формы. Unit canonical fixtures используют исходный contracts/fixtures/sync-examples.json из полного checkout.
+
+PullReader.Read выполняет access guard в REPEATABLE READ: users/session/membership SHARE → head/retention → непрерывные полные группы. Cursor HMAC-SHA-256 связан с actor/workspace/generation/protocol и позицией. Страница ограничена 100 группами и 4 MiB (включая JSON envelope и завершающий LF); новый cursor завершает только выданные группы. Пустая страница сохраняет входной token. Нарушение непрерывности или ordinal дает 503 целиком.
+
+Ключи: SYNC_CURSOR_ACTIVE_KEY — ID активного ключа; SYNC_CURSOR_KEYS — JSON map ID → base64 key (минимум 32 случайных байта). Конфигурация копирует key bytes, секреты не выводятся в ошибки. Сохраняйте старые ключи минимум 90 дней; принудительное удаление требует bootstrap. Без ключей финансовый API работает, авторизованный pull возвращает 503. Курсоры не выводятся в application logs.
+
+Snapshot materialization и 90-day journal cleanup — S3-04C. Начальный resume_cursor получается только из snapshot; клиент не подписывает и не собирает позиции. Android Room acceptance выполняется позже. make pull-check проверяет PostgreSQL/TLS и captured responses против OpenAPI.

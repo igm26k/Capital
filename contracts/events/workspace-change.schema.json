@@ -1,0 +1,6 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "WorkspaceChange",
+  "description": "Atomic group member. sequence is the group sequence; ordinal/group_size ensure completeness. Transport semantics: docs/decisions/005-sync-protocol.md.",
+  "$ref": "../openapi.json#/components/schemas/WorkspaceChange"
+}

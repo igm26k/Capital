@@ -1,0 +1,2641 @@
+{
+  "valid": [
+    {
+      "id": "group",
+      "schema": "SyncGroup",
+      "data": {
+        "sequence": "5",
+        "action_id": "00000000-0000-4000-8000-000000000080",
+        "workspace_id": "00000000-0000-4000-8000-000000000001",
+        "changes": [
+          {
+            "schema_version": 1,
+            "change_id": "00000000-0000-4000-8000-000000001051",
+            "action_id": "00000000-0000-4000-8000-000000000080",
+            "workspace_id": "00000000-0000-4000-8000-000000000001",
+            "sequence": "5",
+            "ordinal": 1,
+            "group_size": 2,
+            "created_at": "2026-10-04T09:00:00Z",
+            "operation": "upsert",
+            "entity_type": "account",
+            "data": {
+              "id": "00000000-0000-4000-8000-000000000002",
+              "workspace_id": "00000000-0000-4000-8000-000000000001",
+              "version": "2",
+              "created_at": "2026-10-04T09:00:00Z",
+              "updated_at": "2026-10-04T09:00:00Z",
+              "deleted_at": null,
+              "name": "Основной",
+              "type": "bank",
+              "currency": "EUR",
+              "opened_at": "2026-10-04T09:00:00Z",
+              "archived_at": null,
+              "balance_version": "2",
+              "posted_balance_minor": "98766",
+              "pending_delta_minor": "0",
+              "projected_balance_minor": "98766"
+            },
+            "generation_id": "00000000-0000-4000-8000-000000000900"
+          },
+          {
+            "schema_version": 1,
+            "change_id": "00000000-0000-4000-8000-000000001052",
+            "action_id": "00000000-0000-4000-8000-000000000080",
+            "workspace_id": "00000000-0000-4000-8000-000000000001",
+            "sequence": "5",
+            "ordinal": 2,
+            "group_size": 2,
+            "created_at": "2026-10-04T09:00:00Z",
+            "operation": "upsert",
+            "entity_type": "transaction",
+            "data": {
+              "id": "00000000-0000-4000-8000-000000000010",
+              "workspace_id": "00000000-0000-4000-8000-000000000001",
+              "version": "1",
+              "created_at": "2026-10-04T09:00:00Z",
+              "updated_at": "2026-10-04T09:00:00Z",
+              "deleted_at": null,
+              "kind": "expense",
+              "status": "posted",
+              "occurred_at": "2026-10-04T09:00:00Z",
+              "occurred_timezone": "Asia/Nicosia",
+              "note": "",
+              "payee": "Магазин",
+              "reason": null,
+              "parent_transaction_id": null,
+              "fee_transaction_id": null,
+              "rate": null,
+              "entries": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000030",
+                  "account_id": "00000000-0000-4000-8000-000000000002",
+                  "currency": "EUR",
+                  "amount_minor": "-1234"
+                }
+              ],
+              "allocations": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000020",
+                  "category_id": null,
+                  "amount_minor": "1234",
+                  "original_allocation_id": null,
+                  "remaining_refundable_minor": "1234"
+                }
+              ],
+              "tag_ids": []
+            },
+            "generation_id": "00000000-0000-4000-8000-000000000900"
+          }
+        ],
+        "generation_id": "00000000-0000-4000-8000-000000000900"
+      }
+    },
+    {
+      "id": "changes_page",
+      "schema": "SyncChanges",
+      "data": {
+        "workspace_id": "00000000-0000-4000-8000-000000000001",
+        "groups": [
+          {
+            "sequence": "5",
+            "action_id": "00000000-0000-4000-8000-000000000080",
+            "workspace_id": "00000000-0000-4000-8000-000000000001",
+            "changes": [
+              {
+                "schema_version": 1,
+                "change_id": "00000000-0000-4000-8000-000000001051",
+                "action_id": "00000000-0000-4000-8000-000000000080",
+                "workspace_id": "00000000-0000-4000-8000-000000000001",
+                "sequence": "5",
+                "ordinal": 1,
+                "group_size": 2,
+                "created_at": "2026-10-04T09:00:00Z",
+                "operation": "upsert",
+                "entity_type": "account",
+                "data": {
+                  "id": "00000000-0000-4000-8000-000000000002",
+                  "workspace_id": "00000000-0000-4000-8000-000000000001",
+                  "version": "2",
+                  "created_at": "2026-10-04T09:00:00Z",
+                  "updated_at": "2026-10-04T09:00:00Z",
+                  "deleted_at": null,
+                  "name": "Основной",
+                  "type": "bank",
+                  "currency": "EUR",
+                  "opened_at": "2026-10-04T09:00:00Z",
+                  "archived_at": null,
+                  "balance_version": "2",
+                  "posted_balance_minor": "98766",
+                  "pending_delta_minor": "0",
+                  "projected_balance_minor": "98766"
+                },
+                "generation_id": "00000000-0000-4000-8000-000000000900"
+              },
+              {
+                "schema_version": 1,
+                "change_id": "00000000-0000-4000-8000-000000001052",
+                "action_id": "00000000-0000-4000-8000-000000000080",
+                "workspace_id": "00000000-0000-4000-8000-000000000001",
+                "sequence": "5",
+                "ordinal": 2,
+                "group_size": 2,
+                "created_at": "2026-10-04T09:00:00Z",
+                "operation": "upsert",
+                "entity_type": "transaction",
+                "data": {
+                  "id": "00000000-0000-4000-8000-000000000010",
+                  "workspace_id": "00000000-0000-4000-8000-000000000001",
+                  "version": "1",
+                  "created_at": "2026-10-04T09:00:00Z",
+                  "updated_at": "2026-10-04T09:00:00Z",
+                  "deleted_at": null,
+                  "kind": "expense",
+                  "status": "posted",
+                  "occurred_at": "2026-10-04T09:00:00Z",
+                  "occurred_timezone": "Asia/Nicosia",
+                  "note": "",
+                  "payee": "Магазин",
+                  "reason": null,
+                  "parent_transaction_id": null,
+                  "fee_transaction_id": null,
+                  "rate": null,
+                  "entries": [
+                    {
+                      "id": "00000000-0000-4000-8000-000000000030",
+                      "account_id": "00000000-0000-4000-8000-000000000002",
+                      "currency": "EUR",
+                      "amount_minor": "-1234"
+                    }
+                  ],
+                  "allocations": [
+                    {
+                      "id": "00000000-0000-4000-8000-000000000020",
+                      "category_id": null,
+                      "amount_minor": "1234",
+                      "original_allocation_id": null,
+                      "remaining_refundable_minor": "1234"
+                    }
+                  ],
+                  "tag_ids": []
+                },
+                "generation_id": "00000000-0000-4000-8000-000000000900"
+              }
+            ],
+            "generation_id": "00000000-0000-4000-8000-000000000900"
+          },
+          {
+            "sequence": "6",
+            "action_id": "00000000-0000-4000-8000-000000000081",
+            "workspace_id": "00000000-0000-4000-8000-000000000001",
+            "changes": [
+              {
+                "schema_version": 1,
+                "change_id": "00000000-0000-4000-8000-000000001061",
+                "action_id": "00000000-0000-4000-8000-000000000081",
+                "workspace_id": "00000000-0000-4000-8000-000000000001",
+                "sequence": "6",
+                "ordinal": 1,
+                "group_size": 2,
+                "created_at": "2026-10-04T09:00:00Z",
+                "operation": "upsert",
+                "entity_type": "account",
+                "data": {
+                  "id": "00000000-0000-4000-8000-000000000002",
+                  "workspace_id": "00000000-0000-4000-8000-000000000001",
+                  "version": "3",
+                  "created_at": "2026-10-04T09:00:00Z",
+                  "updated_at": "2026-10-04T09:00:00Z",
+                  "deleted_at": null,
+                  "name": "Основной",
+                  "type": "bank",
+                  "currency": "EUR",
+                  "opened_at": "2026-10-04T09:00:00Z",
+                  "archived_at": null,
+                  "balance_version": "3",
+                  "posted_balance_minor": "100000",
+                  "pending_delta_minor": "0",
+                  "projected_balance_minor": "100000"
+                },
+                "generation_id": "00000000-0000-4000-8000-000000000900"
+              },
+              {
+                "schema_version": 1,
+                "change_id": "00000000-0000-4000-8000-000000001062",
+                "action_id": "00000000-0000-4000-8000-000000000081",
+                "workspace_id": "00000000-0000-4000-8000-000000000001",
+                "sequence": "6",
+                "ordinal": 2,
+                "group_size": 2,
+                "created_at": "2026-10-04T09:00:00Z",
+                "operation": "delete",
+                "entity_type": "transaction",
+                "data": {
+                  "entity_type": "transaction",
+                  "id": "00000000-0000-4000-8000-000000000010",
+                  "workspace_id": "00000000-0000-4000-8000-000000000001",
+                  "version": "2",
+                  "deleted_at": "2026-10-04T09:00:00Z"
+                },
+                "generation_id": "00000000-0000-4000-8000-000000000900"
+              }
+            ],
+            "generation_id": "00000000-0000-4000-8000-000000000900"
+          }
+        ],
+        "next_cursor": "opaque-cursor-after-group-six",
+        "has_more": false,
+        "head_sequence": "6",
+        "min_available_sequence": "5",
+        "generation_id": "00000000-0000-4000-8000-000000000900"
+      }
+    },
+    {
+      "id": "empty_changes",
+      "schema": "SyncChanges",
+      "data": {
+        "workspace_id": "00000000-0000-4000-8000-000000000001",
+        "groups": [],
+        "next_cursor": "opaque-cursor-after-group-six",
+        "has_more": false,
+        "head_sequence": "6",
+        "min_available_sequence": "5",
+        "generation_id": "00000000-0000-4000-8000-000000000900"
+      }
+    },
+    {
+      "id": "snapshot",
+      "schema": "Snapshot",
+      "data": {
+        "id": "00000000-0000-4000-8000-000000000200",
+        "workspace_id": "00000000-0000-4000-8000-000000000001",
+        "base_sequence": "4",
+        "resume_cursor": "opaque-cursor-after-group-four",
+        "created_at": "2026-10-04T09:00:00Z",
+        "expires_at": "2026-10-04T09:15:00Z",
+        "item_count": 2,
+        "first_page_token": "opaque-snapshot-first-page",
+        "generation_id": "00000000-0000-4000-8000-000000000900"
+      }
+    },
+    {
+      "id": "snapshot_first_page",
+      "schema": "SnapshotPage",
+      "data": {
+        "snapshot_id": "00000000-0000-4000-8000-000000000200",
+        "workspace_id": "00000000-0000-4000-8000-000000000001",
+        "base_sequence": "4",
+        "items": [
+          {
+            "entity_type": "account",
+            "data": {
+              "id": "00000000-0000-4000-8000-000000000002",
+              "workspace_id": "00000000-0000-4000-8000-000000000001",
+              "version": "1",
+              "created_at": "2026-10-04T09:00:00Z",
+              "updated_at": "2026-10-04T09:00:00Z",
+              "deleted_at": null,
+              "name": "Основной",
+              "type": "bank",
+              "currency": "EUR",
+              "opened_at": "2026-10-04T09:00:00Z",
+              "archived_at": null,
+              "balance_version": "1",
+              "posted_balance_minor": "100000",
+              "pending_delta_minor": "0",
+              "projected_balance_minor": "100000"
+            }
+          }
+        ],
+        "next_page_token": "opaque-snapshot-second-page",
+        "generation_id": "00000000-0000-4000-8000-000000000900"
+      }
+    },
+    {
+      "id": "snapshot_last_page",
+      "schema": "SnapshotPage",
+      "data": {
+        "snapshot_id": "00000000-0000-4000-8000-000000000200",
+        "workspace_id": "00000000-0000-4000-8000-000000000001",
+        "base_sequence": "4",
+        "items": [
+          {
+            "entity_type": "transaction",
+            "data": {
+              "id": "00000000-0000-4000-8000-000000000009",
+              "workspace_id": "00000000-0000-4000-8000-000000000001",
+              "version": "1",
+              "created_at": "2026-10-04T09:00:00Z",
+              "updated_at": "2026-10-04T09:00:00Z",
+              "deleted_at": null,
+              "kind": "opening",
+              "status": "posted",
+              "occurred_at": "2026-10-04T09:00:00Z",
+              "occurred_timezone": "Asia/Nicosia",
+              "note": "",
+              "payee": "",
+              "reason": null,
+              "parent_transaction_id": null,
+              "fee_transaction_id": null,
+              "rate": null,
+              "entries": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000029",
+                  "account_id": "00000000-0000-4000-8000-000000000002",
+                  "currency": "EUR",
+                  "amount_minor": "100000"
+                }
+              ],
+              "allocations": [],
+              "tag_ids": []
+            }
+          }
+        ],
+        "next_page_token": null,
+        "generation_id": "00000000-0000-4000-8000-000000000900"
+      }
+    },
+    {
+      "id": "applied_receipt",
+      "schema": "ActionOutcome",
+      "data": {
+        "action_id": "00000000-0000-4000-8000-000000000080",
+        "workspace_id": "00000000-0000-4000-8000-000000000001",
+        "state": "applied",
+        "completed_at": "2026-10-04T09:00:00Z",
+        "response_expires_at": "2026-11-03T09:00:00Z",
+        "original_http_status": 201,
+        "group_sequence": "5",
+        "entity_refs": [
+          {
+            "entity_type": "account",
+            "id": "00000000-0000-4000-8000-000000000002",
+            "version": "2"
+          },
+          {
+            "entity_type": "transaction",
+            "id": "00000000-0000-4000-8000-000000000010",
+            "version": "1"
+          }
+        ],
+        "response_body": {
+          "action_id": "00000000-0000-4000-8000-000000000080",
+          "accounts": [
+            {
+              "id": "00000000-0000-4000-8000-000000000002",
+              "workspace_id": "00000000-0000-4000-8000-000000000001",
+              "version": "2",
+              "created_at": "2026-10-04T09:00:00Z",
+              "updated_at": "2026-10-04T09:00:00Z",
+              "deleted_at": null,
+              "name": "Основной",
+              "type": "bank",
+              "currency": "EUR",
+              "opened_at": "2026-10-04T09:00:00Z",
+              "archived_at": null,
+              "balance_version": "2",
+              "posted_balance_minor": "98766",
+              "pending_delta_minor": "0",
+              "projected_balance_minor": "98766"
+            }
+          ],
+          "transactions": [
+            {
+              "id": "00000000-0000-4000-8000-000000000010",
+              "workspace_id": "00000000-0000-4000-8000-000000000001",
+              "version": "1",
+              "created_at": "2026-10-04T09:00:00Z",
+              "updated_at": "2026-10-04T09:00:00Z",
+              "deleted_at": null,
+              "kind": "expense",
+              "status": "posted",
+              "occurred_at": "2026-10-04T09:00:00Z",
+              "occurred_timezone": "Asia/Nicosia",
+              "note": "",
+              "payee": "Магазин",
+              "reason": null,
+              "parent_transaction_id": null,
+              "fee_transaction_id": null,
+              "rate": null,
+              "entries": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000030",
+                  "account_id": "00000000-0000-4000-8000-000000000002",
+                  "currency": "EUR",
+                  "amount_minor": "-1234"
+                }
+              ],
+              "allocations": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000020",
+                  "category_id": null,
+                  "amount_minor": "1234",
+                  "original_allocation_id": null,
+                  "remaining_refundable_minor": "1234"
+                }
+              ],
+              "tag_ids": []
+            }
+          ],
+          "categories": [],
+          "tags": [],
+          "deleted": [],
+          "sync_group_sequence": "5",
+          "generation_id": "00000000-0000-4000-8000-000000000900"
+        },
+        "generation_id": "00000000-0000-4000-8000-000000000900"
+      }
+    },
+    {
+      "id": "expired_receipt",
+      "schema": "ActionOutcome",
+      "data": {
+        "action_id": "00000000-0000-4000-8000-000000000080",
+        "workspace_id": "00000000-0000-4000-8000-000000000001",
+        "state": "applied",
+        "completed_at": "2026-10-04T09:00:00Z",
+        "response_expires_at": "2026-11-03T09:00:00Z",
+        "original_http_status": 201,
+        "group_sequence": "5",
+        "entity_refs": [
+          {
+            "entity_type": "account",
+            "id": "00000000-0000-4000-8000-000000000002",
+            "version": "2"
+          },
+          {
+            "entity_type": "transaction",
+            "id": "00000000-0000-4000-8000-000000000010",
+            "version": "1"
+          }
+        ],
+        "response_body": null,
+        "generation_id": "00000000-0000-4000-8000-000000000900"
+      }
+    },
+    {
+      "id": "rejected_receipt",
+      "schema": "ActionOutcome",
+      "data": {
+        "action_id": "00000000-0000-4000-8000-000000000080",
+        "workspace_id": "00000000-0000-4000-8000-000000000001",
+        "state": "rejected",
+        "completed_at": "2026-10-04T09:00:00Z",
+        "response_expires_at": "2026-11-03T09:00:00Z",
+        "original_http_status": 409,
+        "group_sequence": null,
+        "entity_refs": [],
+        "response_body": {
+          "request_id": "00000000-0000-4000-8000-000000000090",
+          "code": "version_conflict",
+          "message": "Запись изменена. Загрузите актуальную версию.",
+          "field_errors": [],
+          "current_versions": [
+            {
+              "entity_type": "transaction",
+              "id": "00000000-0000-4000-8000-000000000010",
+              "version": "2",
+              "balance_version": null
+            }
+          ],
+          "retry_after_seconds": null
+        },
+        "generation_id": null
+      }
+    },
+    {
+      "id": "expired_cursor_error",
+      "schema": "Error",
+      "data": {
+        "request_id": "00000000-0000-4000-8000-000000000090",
+        "code": "cursor_expired",
+        "message": "Нужен новый снимок.",
+        "field_errors": [],
+        "current_versions": [],
+        "retry_after_seconds": null
+      }
+    }
+  ],
+  "invalid": [
+    {
+      "id": "zero_group_sequence",
+      "schema": "SyncGroup",
+      "data": {
+        "sequence": "0",
+        "action_id": "00000000-0000-4000-8000-000000000080",
+        "workspace_id": "00000000-0000-4000-8000-000000000001",
+        "changes": [
+          {
+            "schema_version": 1,
+            "change_id": "00000000-0000-4000-8000-000000001051",
+            "action_id": "00000000-0000-4000-8000-000000000080",
+            "workspace_id": "00000000-0000-4000-8000-000000000001",
+            "sequence": "5",
+            "ordinal": 1,
+            "group_size": 2,
+            "created_at": "2026-10-04T09:00:00Z",
+            "operation": "upsert",
+            "entity_type": "account",
+            "data": {
+              "id": "00000000-0000-4000-8000-000000000002",
+              "workspace_id": "00000000-0000-4000-8000-000000000001",
+              "version": "1",
+              "created_at": "2026-10-04T09:00:00Z",
+              "updated_at": "2026-10-04T09:00:00Z",
+              "deleted_at": null,
+              "name": "Основной",
+              "type": "bank",
+              "currency": "EUR",
+              "opened_at": "2026-10-04T09:00:00Z",
+              "archived_at": null,
+              "balance_version": "2",
+              "posted_balance_minor": "98766",
+              "pending_delta_minor": "0",
+              "projected_balance_minor": "98766"
+            },
+            "generation_id": "00000000-0000-4000-8000-000000000900"
+          },
+          {
+            "schema_version": 1,
+            "change_id": "00000000-0000-4000-8000-000000001052",
+            "action_id": "00000000-0000-4000-8000-000000000080",
+            "workspace_id": "00000000-0000-4000-8000-000000000001",
+            "sequence": "5",
+            "ordinal": 2,
+            "group_size": 2,
+            "created_at": "2026-10-04T09:00:00Z",
+            "operation": "upsert",
+            "entity_type": "transaction",
+            "data": {
+              "id": "00000000-0000-4000-8000-000000000010",
+              "workspace_id": "00000000-0000-4000-8000-000000000001",
+              "version": "1",
+              "created_at": "2026-10-04T09:00:00Z",
+              "updated_at": "2026-10-04T09:00:00Z",
+              "deleted_at": null,
+              "kind": "expense",
+              "status": "posted",
+              "occurred_at": "2026-10-04T09:00:00Z",
+              "occurred_timezone": "Asia/Nicosia",
+              "note": "",
+              "payee": "Магазин",
+              "reason": null,
+              "parent_transaction_id": null,
+              "fee_transaction_id": null,
+              "rate": null,
+              "entries": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000030",
+                  "account_id": "00000000-0000-4000-8000-000000000002",
+                  "currency": "EUR",
+                  "amount_minor": "-1234"
+                }
+              ],
+              "allocations": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000020",
+                  "category_id": null,
+                  "amount_minor": "1234",
+                  "original_allocation_id": null,
+                  "remaining_refundable_minor": "1234"
+                }
+              ],
+              "tag_ids": []
+            },
+            "generation_id": "00000000-0000-4000-8000-000000000900"
+          }
+        ],
+        "generation_id": "00000000-0000-4000-8000-000000000900"
+      }
+    },
+    {
+      "id": "unknown_group_field",
+      "schema": "SyncGroup",
+      "data": {
+        "sequence": "5",
+        "action_id": "00000000-0000-4000-8000-000000000080",
+        "workspace_id": "00000000-0000-4000-8000-000000000001",
+        "changes": [
+          {
+            "schema_version": 1,
+            "change_id": "00000000-0000-4000-8000-000000001051",
+            "action_id": "00000000-0000-4000-8000-000000000080",
+            "workspace_id": "00000000-0000-4000-8000-000000000001",
+            "sequence": "5",
+            "ordinal": 1,
+            "group_size": 2,
+            "created_at": "2026-10-04T09:00:00Z",
+            "operation": "upsert",
+            "entity_type": "account",
+            "data": {
+              "id": "00000000-0000-4000-8000-000000000002",
+              "workspace_id": "00000000-0000-4000-8000-000000000001",
+              "version": "1",
+              "created_at": "2026-10-04T09:00:00Z",
+              "updated_at": "2026-10-04T09:00:00Z",
+              "deleted_at": null,
+              "name": "Основной",
+              "type": "bank",
+              "currency": "EUR",
+              "opened_at": "2026-10-04T09:00:00Z",
+              "archived_at": null,
+              "balance_version": "2",
+              "posted_balance_minor": "98766",
+              "pending_delta_minor": "0",
+              "projected_balance_minor": "98766"
+            },
+            "generation_id": "00000000-0000-4000-8000-000000000900"
+          },
+          {
+            "schema_version": 1,
+            "change_id": "00000000-0000-4000-8000-000000001052",
+            "action_id": "00000000-0000-4000-8000-000000000080",
+            "workspace_id": "00000000-0000-4000-8000-000000000001",
+            "sequence": "5",
+            "ordinal": 2,
+            "group_size": 2,
+            "created_at": "2026-10-04T09:00:00Z",
+            "operation": "upsert",
+            "entity_type": "transaction",
+            "data": {
+              "id": "00000000-0000-4000-8000-000000000010",
+              "workspace_id": "00000000-0000-4000-8000-000000000001",
+              "version": "1",
+              "created_at": "2026-10-04T09:00:00Z",
+              "updated_at": "2026-10-04T09:00:00Z",
+              "deleted_at": null,
+              "kind": "expense",
+              "status": "posted",
+              "occurred_at": "2026-10-04T09:00:00Z",
+              "occurred_timezone": "Asia/Nicosia",
+              "note": "",
+              "payee": "Магазин",
+              "reason": null,
+              "parent_transaction_id": null,
+              "fee_transaction_id": null,
+              "rate": null,
+              "entries": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000030",
+                  "account_id": "00000000-0000-4000-8000-000000000002",
+                  "currency": "EUR",
+                  "amount_minor": "-1234"
+                }
+              ],
+              "allocations": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000020",
+                  "category_id": null,
+                  "amount_minor": "1234",
+                  "original_allocation_id": null,
+                  "remaining_refundable_minor": "1234"
+                }
+              ],
+              "tag_ids": []
+            },
+            "generation_id": "00000000-0000-4000-8000-000000000900"
+          }
+        ],
+        "partial": true,
+        "generation_id": "00000000-0000-4000-8000-000000000900"
+      }
+    },
+    {
+      "id": "empty_group",
+      "schema": "SyncGroup",
+      "data": {
+        "sequence": "5",
+        "action_id": "00000000-0000-4000-8000-000000000080",
+        "workspace_id": "00000000-0000-4000-8000-000000000001",
+        "changes": [],
+        "generation_id": "00000000-0000-4000-8000-000000000900"
+      }
+    },
+    {
+      "id": "missing_resume_cursor",
+      "schema": "Snapshot",
+      "data": {
+        "id": "00000000-0000-4000-8000-000000000200",
+        "workspace_id": "00000000-0000-4000-8000-000000000001",
+        "base_sequence": "4",
+        "created_at": "2026-10-04T09:00:00Z",
+        "expires_at": "2026-10-04T09:15:00Z",
+        "item_count": 2,
+        "first_page_token": "opaque-snapshot-first-page"
+      }
+    },
+    {
+      "id": "numeric_sequence",
+      "schema": "SyncChanges",
+      "data": {
+        "workspace_id": "00000000-0000-4000-8000-000000000001",
+        "groups": [
+          {
+            "sequence": "5",
+            "action_id": "00000000-0000-4000-8000-000000000080",
+            "workspace_id": "00000000-0000-4000-8000-000000000001",
+            "changes": [
+              {
+                "schema_version": 1,
+                "change_id": "00000000-0000-4000-8000-000000001051",
+                "action_id": "00000000-0000-4000-8000-000000000080",
+                "workspace_id": "00000000-0000-4000-8000-000000000001",
+                "sequence": "5",
+                "ordinal": 1,
+                "group_size": 2,
+                "created_at": "2026-10-04T09:00:00Z",
+                "operation": "upsert",
+                "entity_type": "account",
+                "data": {
+                  "id": "00000000-0000-4000-8000-000000000002",
+                  "workspace_id": "00000000-0000-4000-8000-000000000001",
+                  "version": "1",
+                  "created_at": "2026-10-04T09:00:00Z",
+                  "updated_at": "2026-10-04T09:00:00Z",
+                  "deleted_at": null,
+                  "name": "Основной",
+                  "type": "bank",
+                  "currency": "EUR",
+                  "opened_at": "2026-10-04T09:00:00Z",
+                  "archived_at": null,
+                  "balance_version": "2",
+                  "posted_balance_minor": "98766",
+                  "pending_delta_minor": "0",
+                  "projected_balance_minor": "98766"
+                },
+                "generation_id": "00000000-0000-4000-8000-000000000900"
+              },
+              {
+                "schema_version": 1,
+                "change_id": "00000000-0000-4000-8000-000000001052",
+                "action_id": "00000000-0000-4000-8000-000000000080",
+                "workspace_id": "00000000-0000-4000-8000-000000000001",
+                "sequence": "5",
+                "ordinal": 2,
+                "group_size": 2,
+                "created_at": "2026-10-04T09:00:00Z",
+                "operation": "upsert",
+                "entity_type": "transaction",
+                "data": {
+                  "id": "00000000-0000-4000-8000-000000000010",
+                  "workspace_id": "00000000-0000-4000-8000-000000000001",
+                  "version": "1",
+                  "created_at": "2026-10-04T09:00:00Z",
+                  "updated_at": "2026-10-04T09:00:00Z",
+                  "deleted_at": null,
+                  "kind": "expense",
+                  "status": "posted",
+                  "occurred_at": "2026-10-04T09:00:00Z",
+                  "occurred_timezone": "Asia/Nicosia",
+                  "note": "",
+                  "payee": "Магазин",
+                  "reason": null,
+                  "parent_transaction_id": null,
+                  "fee_transaction_id": null,
+                  "rate": null,
+                  "entries": [
+                    {
+                      "id": "00000000-0000-4000-8000-000000000030",
+                      "account_id": "00000000-0000-4000-8000-000000000002",
+                      "currency": "EUR",
+                      "amount_minor": "-1234"
+                    }
+                  ],
+                  "allocations": [
+                    {
+                      "id": "00000000-0000-4000-8000-000000000020",
+                      "category_id": null,
+                      "amount_minor": "1234",
+                      "original_allocation_id": null,
+                      "remaining_refundable_minor": "1234"
+                    }
+                  ],
+                  "tag_ids": []
+                },
+                "generation_id": "00000000-0000-4000-8000-000000000900"
+              }
+            ],
+            "generation_id": "00000000-0000-4000-8000-000000000900"
+          },
+          {
+            "sequence": "6",
+            "action_id": "00000000-0000-4000-8000-000000000081",
+            "workspace_id": "00000000-0000-4000-8000-000000000001",
+            "changes": [
+              {
+                "schema_version": 1,
+                "change_id": "00000000-0000-4000-8000-000000001061",
+                "action_id": "00000000-0000-4000-8000-000000000081",
+                "workspace_id": "00000000-0000-4000-8000-000000000001",
+                "sequence": "6",
+                "ordinal": 1,
+                "group_size": 2,
+                "created_at": "2026-10-04T09:00:00Z",
+                "operation": "upsert",
+                "entity_type": "account",
+                "data": {
+                  "id": "00000000-0000-4000-8000-000000000002",
+                  "workspace_id": "00000000-0000-4000-8000-000000000001",
+                  "version": "2",
+                  "created_at": "2026-10-04T09:00:00Z",
+                  "updated_at": "2026-10-04T09:00:00Z",
+                  "deleted_at": null,
+                  "name": "Основной",
+                  "type": "bank",
+                  "currency": "EUR",
+                  "opened_at": "2026-10-04T09:00:00Z",
+                  "archived_at": null,
+                  "balance_version": "3",
+                  "posted_balance_minor": "100000",
+                  "pending_delta_minor": "0",
+                  "projected_balance_minor": "100000"
+                },
+                "generation_id": "00000000-0000-4000-8000-000000000900"
+              },
+              {
+                "schema_version": 1,
+                "change_id": "00000000-0000-4000-8000-000000001062",
+                "action_id": "00000000-0000-4000-8000-000000000081",
+                "workspace_id": "00000000-0000-4000-8000-000000000001",
+                "sequence": "6",
+                "ordinal": 2,
+                "group_size": 2,
+                "created_at": "2026-10-04T09:00:00Z",
+                "operation": "delete",
+                "entity_type": "transaction",
+                "data": {
+                  "entity_type": "transaction",
+                  "id": "00000000-0000-4000-8000-000000000010",
+                  "workspace_id": "00000000-0000-4000-8000-000000000001",
+                  "version": "2",
+                  "deleted_at": "2026-10-04T09:00:00Z"
+                },
+                "generation_id": "00000000-0000-4000-8000-000000000900"
+              }
+            ],
+            "generation_id": "00000000-0000-4000-8000-000000000900"
+          }
+        ],
+        "next_cursor": "opaque-cursor-after-group-six",
+        "has_more": false,
+        "head_sequence": 6,
+        "min_available_sequence": "5",
+        "generation_id": "00000000-0000-4000-8000-000000000900"
+      }
+    },
+    {
+      "id": "null_page_cursor",
+      "schema": "SyncChanges",
+      "data": {
+        "workspace_id": "00000000-0000-4000-8000-000000000001",
+        "groups": [
+          {
+            "sequence": "5",
+            "action_id": "00000000-0000-4000-8000-000000000080",
+            "workspace_id": "00000000-0000-4000-8000-000000000001",
+            "changes": [
+              {
+                "schema_version": 1,
+                "change_id": "00000000-0000-4000-8000-000000001051",
+                "action_id": "00000000-0000-4000-8000-000000000080",
+                "workspace_id": "00000000-0000-4000-8000-000000000001",
+                "sequence": "5",
+                "ordinal": 1,
+                "group_size": 2,
+                "created_at": "2026-10-04T09:00:00Z",
+                "operation": "upsert",
+                "entity_type": "account",
+                "data": {
+                  "id": "00000000-0000-4000-8000-000000000002",
+                  "workspace_id": "00000000-0000-4000-8000-000000000001",
+                  "version": "1",
+                  "created_at": "2026-10-04T09:00:00Z",
+                  "updated_at": "2026-10-04T09:00:00Z",
+                  "deleted_at": null,
+                  "name": "Основной",
+                  "type": "bank",
+                  "currency": "EUR",
+                  "opened_at": "2026-10-04T09:00:00Z",
+                  "archived_at": null,
+                  "balance_version": "2",
+                  "posted_balance_minor": "98766",
+                  "pending_delta_minor": "0",
+                  "projected_balance_minor": "98766"
+                },
+                "generation_id": "00000000-0000-4000-8000-000000000900"
+              },
+              {
+                "schema_version": 1,
+                "change_id": "00000000-0000-4000-8000-000000001052",
+                "action_id": "00000000-0000-4000-8000-000000000080",
+                "workspace_id": "00000000-0000-4000-8000-000000000001",
+                "sequence": "5",
+                "ordinal": 2,
+                "group_size": 2,
+                "created_at": "2026-10-04T09:00:00Z",
+                "operation": "upsert",
+                "entity_type": "transaction",
+                "data": {
+                  "id": "00000000-0000-4000-8000-000000000010",
+                  "workspace_id": "00000000-0000-4000-8000-000000000001",
+                  "version": "1",
+                  "created_at": "2026-10-04T09:00:00Z",
+                  "updated_at": "2026-10-04T09:00:00Z",
+                  "deleted_at": null,
+                  "kind": "expense",
+                  "status": "posted",
+                  "occurred_at": "2026-10-04T09:00:00Z",
+                  "occurred_timezone": "Asia/Nicosia",
+                  "note": "",
+                  "payee": "Магазин",
+                  "reason": null,
+                  "parent_transaction_id": null,
+                  "fee_transaction_id": null,
+                  "rate": null,
+                  "entries": [
+                    {
+                      "id": "00000000-0000-4000-8000-000000000030",
+                      "account_id": "00000000-0000-4000-8000-000000000002",
+                      "currency": "EUR",
+                      "amount_minor": "-1234"
+                    }
+                  ],
+                  "allocations": [
+                    {
+                      "id": "00000000-0000-4000-8000-000000000020",
+                      "category_id": null,
+                      "amount_minor": "1234",
+                      "original_allocation_id": null,
+                      "remaining_refundable_minor": "1234"
+                    }
+                  ],
+                  "tag_ids": []
+                },
+                "generation_id": "00000000-0000-4000-8000-000000000900"
+              }
+            ],
+            "generation_id": "00000000-0000-4000-8000-000000000900"
+          },
+          {
+            "sequence": "6",
+            "action_id": "00000000-0000-4000-8000-000000000081",
+            "workspace_id": "00000000-0000-4000-8000-000000000001",
+            "changes": [
+              {
+                "schema_version": 1,
+                "change_id": "00000000-0000-4000-8000-000000001061",
+                "action_id": "00000000-0000-4000-8000-000000000081",
+                "workspace_id": "00000000-0000-4000-8000-000000000001",
+                "sequence": "6",
+                "ordinal": 1,
+                "group_size": 2,
+                "created_at": "2026-10-04T09:00:00Z",
+                "operation": "upsert",
+                "entity_type": "account",
+                "data": {
+                  "id": "00000000-0000-4000-8000-000000000002",
+                  "workspace_id": "00000000-0000-4000-8000-000000000001",
+                  "version": "2",
+                  "created_at": "2026-10-04T09:00:00Z",
+                  "updated_at": "2026-10-04T09:00:00Z",
+                  "deleted_at": null,
+                  "name": "Основной",
+                  "type": "bank",
+                  "currency": "EUR",
+                  "opened_at": "2026-10-04T09:00:00Z",
+                  "archived_at": null,
+                  "balance_version": "3",
+                  "posted_balance_minor": "100000",
+                  "pending_delta_minor": "0",
+                  "projected_balance_minor": "100000"
+                },
+                "generation_id": "00000000-0000-4000-8000-000000000900"
+              },
+              {
+                "schema_version": 1,
+                "change_id": "00000000-0000-4000-8000-000000001062",
+                "action_id": "00000000-0000-4000-8000-000000000081",
+                "workspace_id": "00000000-0000-4000-8000-000000000001",
+                "sequence": "6",
+                "ordinal": 2,
+                "group_size": 2,
+                "created_at": "2026-10-04T09:00:00Z",
+                "operation": "delete",
+                "entity_type": "transaction",
+                "data": {
+                  "entity_type": "transaction",
+                  "id": "00000000-0000-4000-8000-000000000010",
+                  "workspace_id": "00000000-0000-4000-8000-000000000001",
+                  "version": "2",
+                  "deleted_at": "2026-10-04T09:00:00Z"
+                },
+                "generation_id": "00000000-0000-4000-8000-000000000900"
+              }
+            ],
+            "generation_id": "00000000-0000-4000-8000-000000000900"
+          }
+        ],
+        "next_cursor": null,
+        "has_more": false,
+        "head_sequence": "6",
+        "min_available_sequence": "5",
+        "generation_id": "00000000-0000-4000-8000-000000000900"
+      }
+    }
+  ],
+  "semantic_invalid": [
+    {
+      "id": "incomplete_group",
+      "kind": "group",
+      "data": {
+        "sequence": "5",
+        "action_id": "00000000-0000-4000-8000-000000000080",
+        "workspace_id": "00000000-0000-4000-8000-000000000001",
+        "changes": [
+          {
+            "schema_version": 1,
+            "change_id": "00000000-0000-4000-8000-000000001051",
+            "action_id": "00000000-0000-4000-8000-000000000080",
+            "workspace_id": "00000000-0000-4000-8000-000000000001",
+            "sequence": "5",
+            "ordinal": 1,
+            "group_size": 2,
+            "created_at": "2026-10-04T09:00:00Z",
+            "operation": "upsert",
+            "entity_type": "account",
+            "data": {
+              "id": "00000000-0000-4000-8000-000000000002",
+              "workspace_id": "00000000-0000-4000-8000-000000000001",
+              "version": "1",
+              "created_at": "2026-10-04T09:00:00Z",
+              "updated_at": "2026-10-04T09:00:00Z",
+              "deleted_at": null,
+              "name": "Основной",
+              "type": "bank",
+              "currency": "EUR",
+              "opened_at": "2026-10-04T09:00:00Z",
+              "archived_at": null,
+              "balance_version": "2",
+              "posted_balance_minor": "98766",
+              "pending_delta_minor": "0",
+              "projected_balance_minor": "98766"
+            },
+            "generation_id": "00000000-0000-4000-8000-000000000900"
+          }
+        ],
+        "generation_id": "00000000-0000-4000-8000-000000000900"
+      }
+    },
+    {
+      "id": "duplicate_ordinal",
+      "kind": "group",
+      "data": {
+        "sequence": "5",
+        "action_id": "00000000-0000-4000-8000-000000000080",
+        "workspace_id": "00000000-0000-4000-8000-000000000001",
+        "changes": [
+          {
+            "schema_version": 1,
+            "change_id": "00000000-0000-4000-8000-000000001051",
+            "action_id": "00000000-0000-4000-8000-000000000080",
+            "workspace_id": "00000000-0000-4000-8000-000000000001",
+            "sequence": "5",
+            "ordinal": 1,
+            "group_size": 2,
+            "created_at": "2026-10-04T09:00:00Z",
+            "operation": "upsert",
+            "entity_type": "account",
+            "data": {
+              "id": "00000000-0000-4000-8000-000000000002",
+              "workspace_id": "00000000-0000-4000-8000-000000000001",
+              "version": "1",
+              "created_at": "2026-10-04T09:00:00Z",
+              "updated_at": "2026-10-04T09:00:00Z",
+              "deleted_at": null,
+              "name": "Основной",
+              "type": "bank",
+              "currency": "EUR",
+              "opened_at": "2026-10-04T09:00:00Z",
+              "archived_at": null,
+              "balance_version": "2",
+              "posted_balance_minor": "98766",
+              "pending_delta_minor": "0",
+              "projected_balance_minor": "98766"
+            },
+            "generation_id": "00000000-0000-4000-8000-000000000900"
+          },
+          {
+            "schema_version": 1,
+            "change_id": "00000000-0000-4000-8000-000000001052",
+            "action_id": "00000000-0000-4000-8000-000000000080",
+            "workspace_id": "00000000-0000-4000-8000-000000000001",
+            "sequence": "5",
+            "ordinal": 1,
+            "group_size": 2,
+            "created_at": "2026-10-04T09:00:00Z",
+            "operation": "upsert",
+            "entity_type": "transaction",
+            "data": {
+              "id": "00000000-0000-4000-8000-000000000010",
+              "workspace_id": "00000000-0000-4000-8000-000000000001",
+              "version": "1",
+              "created_at": "2026-10-04T09:00:00Z",
+              "updated_at": "2026-10-04T09:00:00Z",
+              "deleted_at": null,
+              "kind": "expense",
+              "status": "posted",
+              "occurred_at": "2026-10-04T09:00:00Z",
+              "occurred_timezone": "Asia/Nicosia",
+              "note": "",
+              "payee": "Магазин",
+              "reason": null,
+              "parent_transaction_id": null,
+              "fee_transaction_id": null,
+              "rate": null,
+              "entries": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000030",
+                  "account_id": "00000000-0000-4000-8000-000000000002",
+                  "currency": "EUR",
+                  "amount_minor": "-1234"
+                }
+              ],
+              "allocations": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000020",
+                  "category_id": null,
+                  "amount_minor": "1234",
+                  "original_allocation_id": null,
+                  "remaining_refundable_minor": "1234"
+                }
+              ],
+              "tag_ids": []
+            },
+            "generation_id": "00000000-0000-4000-8000-000000000900"
+          }
+        ],
+        "generation_id": "00000000-0000-4000-8000-000000000900"
+      }
+    },
+    {
+      "id": "cross_workspace_payload",
+      "kind": "group",
+      "data": {
+        "sequence": "5",
+        "action_id": "00000000-0000-4000-8000-000000000080",
+        "workspace_id": "00000000-0000-4000-8000-000000000001",
+        "changes": [
+          {
+            "schema_version": 1,
+            "change_id": "00000000-0000-4000-8000-000000001051",
+            "action_id": "00000000-0000-4000-8000-000000000080",
+            "workspace_id": "00000000-0000-4000-8000-000000000001",
+            "sequence": "5",
+            "ordinal": 1,
+            "group_size": 2,
+            "created_at": "2026-10-04T09:00:00Z",
+            "operation": "upsert",
+            "entity_type": "account",
+            "data": {
+              "id": "00000000-0000-4000-8000-000000000002",
+              "workspace_id": "00000000-0000-4000-8000-000000000999",
+              "version": "1",
+              "created_at": "2026-10-04T09:00:00Z",
+              "updated_at": "2026-10-04T09:00:00Z",
+              "deleted_at": null,
+              "name": "Основной",
+              "type": "bank",
+              "currency": "EUR",
+              "opened_at": "2026-10-04T09:00:00Z",
+              "archived_at": null,
+              "balance_version": "2",
+              "posted_balance_minor": "98766",
+              "pending_delta_minor": "0",
+              "projected_balance_minor": "98766"
+            },
+            "generation_id": "00000000-0000-4000-8000-000000000900"
+          },
+          {
+            "schema_version": 1,
+            "change_id": "00000000-0000-4000-8000-000000001052",
+            "action_id": "00000000-0000-4000-8000-000000000080",
+            "workspace_id": "00000000-0000-4000-8000-000000000001",
+            "sequence": "5",
+            "ordinal": 2,
+            "group_size": 2,
+            "created_at": "2026-10-04T09:00:00Z",
+            "operation": "upsert",
+            "entity_type": "transaction",
+            "data": {
+              "id": "00000000-0000-4000-8000-000000000010",
+              "workspace_id": "00000000-0000-4000-8000-000000000001",
+              "version": "1",
+              "created_at": "2026-10-04T09:00:00Z",
+              "updated_at": "2026-10-04T09:00:00Z",
+              "deleted_at": null,
+              "kind": "expense",
+              "status": "posted",
+              "occurred_at": "2026-10-04T09:00:00Z",
+              "occurred_timezone": "Asia/Nicosia",
+              "note": "",
+              "payee": "Магазин",
+              "reason": null,
+              "parent_transaction_id": null,
+              "fee_transaction_id": null,
+              "rate": null,
+              "entries": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000030",
+                  "account_id": "00000000-0000-4000-8000-000000000002",
+                  "currency": "EUR",
+                  "amount_minor": "-1234"
+                }
+              ],
+              "allocations": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000020",
+                  "category_id": null,
+                  "amount_minor": "1234",
+                  "original_allocation_id": null,
+                  "remaining_refundable_minor": "1234"
+                }
+              ],
+              "tag_ids": []
+            },
+            "generation_id": "00000000-0000-4000-8000-000000000900"
+          }
+        ],
+        "generation_id": "00000000-0000-4000-8000-000000000900"
+      }
+    },
+    {
+      "id": "mixed_action",
+      "kind": "group",
+      "data": {
+        "sequence": "5",
+        "action_id": "00000000-0000-4000-8000-000000000080",
+        "workspace_id": "00000000-0000-4000-8000-000000000001",
+        "changes": [
+          {
+            "schema_version": 1,
+            "change_id": "00000000-0000-4000-8000-000000001051",
+            "action_id": "00000000-0000-4000-8000-000000000080",
+            "workspace_id": "00000000-0000-4000-8000-000000000001",
+            "sequence": "5",
+            "ordinal": 1,
+            "group_size": 2,
+            "created_at": "2026-10-04T09:00:00Z",
+            "operation": "upsert",
+            "entity_type": "account",
+            "data": {
+              "id": "00000000-0000-4000-8000-000000000002",
+              "workspace_id": "00000000-0000-4000-8000-000000000001",
+              "version": "1",
+              "created_at": "2026-10-04T09:00:00Z",
+              "updated_at": "2026-10-04T09:00:00Z",
+              "deleted_at": null,
+              "name": "Основной",
+              "type": "bank",
+              "currency": "EUR",
+              "opened_at": "2026-10-04T09:00:00Z",
+              "archived_at": null,
+              "balance_version": "2",
+              "posted_balance_minor": "98766",
+              "pending_delta_minor": "0",
+              "projected_balance_minor": "98766"
+            },
+            "generation_id": "00000000-0000-4000-8000-000000000900"
+          },
+          {
+            "schema_version": 1,
+            "change_id": "00000000-0000-4000-8000-000000001052",
+            "action_id": "00000000-0000-4000-8000-000000000999",
+            "workspace_id": "00000000-0000-4000-8000-000000000001",
+            "sequence": "5",
+            "ordinal": 2,
+            "group_size": 2,
+            "created_at": "2026-10-04T09:00:00Z",
+            "operation": "upsert",
+            "entity_type": "transaction",
+            "data": {
+              "id": "00000000-0000-4000-8000-000000000010",
+              "workspace_id": "00000000-0000-4000-8000-000000000001",
+              "version": "1",
+              "created_at": "2026-10-04T09:00:00Z",
+              "updated_at": "2026-10-04T09:00:00Z",
+              "deleted_at": null,
+              "kind": "expense",
+              "status": "posted",
+              "occurred_at": "2026-10-04T09:00:00Z",
+              "occurred_timezone": "Asia/Nicosia",
+              "note": "",
+              "payee": "Магазин",
+              "reason": null,
+              "parent_transaction_id": null,
+              "fee_transaction_id": null,
+              "rate": null,
+              "entries": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000030",
+                  "account_id": "00000000-0000-4000-8000-000000000002",
+                  "currency": "EUR",
+                  "amount_minor": "-1234"
+                }
+              ],
+              "allocations": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000020",
+                  "category_id": null,
+                  "amount_minor": "1234",
+                  "original_allocation_id": null,
+                  "remaining_refundable_minor": "1234"
+                }
+              ],
+              "tag_ids": []
+            },
+            "generation_id": "00000000-0000-4000-8000-000000000900"
+          }
+        ],
+        "generation_id": "00000000-0000-4000-8000-000000000900"
+      }
+    },
+    {
+      "id": "mixed_sequence",
+      "kind": "group",
+      "data": {
+        "sequence": "5",
+        "action_id": "00000000-0000-4000-8000-000000000080",
+        "workspace_id": "00000000-0000-4000-8000-000000000001",
+        "changes": [
+          {
+            "schema_version": 1,
+            "change_id": "00000000-0000-4000-8000-000000001051",
+            "action_id": "00000000-0000-4000-8000-000000000080",
+            "workspace_id": "00000000-0000-4000-8000-000000000001",
+            "sequence": "5",
+            "ordinal": 1,
+            "group_size": 2,
+            "created_at": "2026-10-04T09:00:00Z",
+            "operation": "upsert",
+            "entity_type": "account",
+            "data": {
+              "id": "00000000-0000-4000-8000-000000000002",
+              "workspace_id": "00000000-0000-4000-8000-000000000001",
+              "version": "1",
+              "created_at": "2026-10-04T09:00:00Z",
+              "updated_at": "2026-10-04T09:00:00Z",
+              "deleted_at": null,
+              "name": "Основной",
+              "type": "bank",
+              "currency": "EUR",
+              "opened_at": "2026-10-04T09:00:00Z",
+              "archived_at": null,
+              "balance_version": "2",
+              "posted_balance_minor": "98766",
+              "pending_delta_minor": "0",
+              "projected_balance_minor": "98766"
+            },
+            "generation_id": "00000000-0000-4000-8000-000000000900"
+          },
+          {
+            "schema_version": 1,
+            "change_id": "00000000-0000-4000-8000-000000001052",
+            "action_id": "00000000-0000-4000-8000-000000000080",
+            "workspace_id": "00000000-0000-4000-8000-000000000001",
+            "sequence": "6",
+            "ordinal": 2,
+            "group_size": 2,
+            "created_at": "2026-10-04T09:00:00Z",
+            "operation": "upsert",
+            "entity_type": "transaction",
+            "data": {
+              "id": "00000000-0000-4000-8000-000000000010",
+              "workspace_id": "00000000-0000-4000-8000-000000000001",
+              "version": "1",
+              "created_at": "2026-10-04T09:00:00Z",
+              "updated_at": "2026-10-04T09:00:00Z",
+              "deleted_at": null,
+              "kind": "expense",
+              "status": "posted",
+              "occurred_at": "2026-10-04T09:00:00Z",
+              "occurred_timezone": "Asia/Nicosia",
+              "note": "",
+              "payee": "Магазин",
+              "reason": null,
+              "parent_transaction_id": null,
+              "fee_transaction_id": null,
+              "rate": null,
+              "entries": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000030",
+                  "account_id": "00000000-0000-4000-8000-000000000002",
+                  "currency": "EUR",
+                  "amount_minor": "-1234"
+                }
+              ],
+              "allocations": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000020",
+                  "category_id": null,
+                  "amount_minor": "1234",
+                  "original_allocation_id": null,
+                  "remaining_refundable_minor": "1234"
+                }
+              ],
+              "tag_ids": []
+            },
+            "generation_id": "00000000-0000-4000-8000-000000000900"
+          }
+        ],
+        "generation_id": "00000000-0000-4000-8000-000000000900"
+      }
+    },
+    {
+      "id": "duplicate_entity",
+      "kind": "group",
+      "data": {
+        "sequence": "5",
+        "action_id": "00000000-0000-4000-8000-000000000080",
+        "workspace_id": "00000000-0000-4000-8000-000000000001",
+        "changes": [
+          {
+            "schema_version": 1,
+            "change_id": "00000000-0000-4000-8000-000000001051",
+            "action_id": "00000000-0000-4000-8000-000000000080",
+            "workspace_id": "00000000-0000-4000-8000-000000000001",
+            "sequence": "5",
+            "ordinal": 1,
+            "group_size": 2,
+            "created_at": "2026-10-04T09:00:00Z",
+            "operation": "upsert",
+            "entity_type": "account",
+            "data": {
+              "id": "00000000-0000-4000-8000-000000000002",
+              "workspace_id": "00000000-0000-4000-8000-000000000001",
+              "version": "1",
+              "created_at": "2026-10-04T09:00:00Z",
+              "updated_at": "2026-10-04T09:00:00Z",
+              "deleted_at": null,
+              "name": "Основной",
+              "type": "bank",
+              "currency": "EUR",
+              "opened_at": "2026-10-04T09:00:00Z",
+              "archived_at": null,
+              "balance_version": "2",
+              "posted_balance_minor": "98766",
+              "pending_delta_minor": "0",
+              "projected_balance_minor": "98766"
+            },
+            "generation_id": "00000000-0000-4000-8000-000000000900"
+          },
+          {
+            "schema_version": 1,
+            "change_id": "00000000-0000-4000-8000-000000001052",
+            "action_id": "00000000-0000-4000-8000-000000000080",
+            "workspace_id": "00000000-0000-4000-8000-000000000001",
+            "sequence": "5",
+            "ordinal": 2,
+            "group_size": 2,
+            "created_at": "2026-10-04T09:00:00Z",
+            "operation": "upsert",
+            "entity_type": "account",
+            "data": {
+              "id": "00000000-0000-4000-8000-000000000002",
+              "workspace_id": "00000000-0000-4000-8000-000000000001",
+              "version": "1",
+              "created_at": "2026-10-04T09:00:00Z",
+              "updated_at": "2026-10-04T09:00:00Z",
+              "deleted_at": null,
+              "name": "Основной",
+              "type": "bank",
+              "currency": "EUR",
+              "opened_at": "2026-10-04T09:00:00Z",
+              "archived_at": null,
+              "balance_version": "2",
+              "posted_balance_minor": "98766",
+              "pending_delta_minor": "0",
+              "projected_balance_minor": "98766"
+            },
+            "generation_id": "00000000-0000-4000-8000-000000000900"
+          }
+        ],
+        "generation_id": "00000000-0000-4000-8000-000000000900"
+      }
+    },
+    {
+      "id": "rejected_has_group",
+      "kind": "receipt",
+      "data": {
+        "action_id": "00000000-0000-4000-8000-000000000080",
+        "workspace_id": "00000000-0000-4000-8000-000000000001",
+        "state": "rejected",
+        "completed_at": "2026-10-04T09:00:00Z",
+        "response_expires_at": "2026-11-03T09:00:00Z",
+        "original_http_status": 409,
+        "group_sequence": "5",
+        "entity_refs": [],
+        "response_body": {
+          "request_id": "00000000-0000-4000-8000-000000000090",
+          "code": "version_conflict",
+          "message": "Запись изменена. Загрузите актуальную версию.",
+          "field_errors": [],
+          "current_versions": [
+            {
+              "entity_type": "transaction",
+              "id": "00000000-0000-4000-8000-000000000010",
+              "version": "2",
+              "balance_version": null
+            }
+          ],
+          "retry_after_seconds": null
+        },
+        "generation_id": null
+      }
+    },
+    {
+      "id": "page_sequence_gap",
+      "kind": "page",
+      "data": {
+        "workspace_id": "00000000-0000-4000-8000-000000000001",
+        "groups": [
+          {
+            "sequence": "5",
+            "action_id": "00000000-0000-4000-8000-000000000080",
+            "workspace_id": "00000000-0000-4000-8000-000000000001",
+            "changes": [
+              {
+                "schema_version": 1,
+                "change_id": "00000000-0000-4000-8000-000000001051",
+                "action_id": "00000000-0000-4000-8000-000000000080",
+                "workspace_id": "00000000-0000-4000-8000-000000000001",
+                "sequence": "5",
+                "ordinal": 1,
+                "group_size": 2,
+                "created_at": "2026-10-04T09:00:00Z",
+                "operation": "upsert",
+                "entity_type": "account",
+                "data": {
+                  "id": "00000000-0000-4000-8000-000000000002",
+                  "workspace_id": "00000000-0000-4000-8000-000000000001",
+                  "version": "1",
+                  "created_at": "2026-10-04T09:00:00Z",
+                  "updated_at": "2026-10-04T09:00:00Z",
+                  "deleted_at": null,
+                  "name": "Основной",
+                  "type": "bank",
+                  "currency": "EUR",
+                  "opened_at": "2026-10-04T09:00:00Z",
+                  "archived_at": null,
+                  "balance_version": "2",
+                  "posted_balance_minor": "98766",
+                  "pending_delta_minor": "0",
+                  "projected_balance_minor": "98766"
+                },
+                "generation_id": "00000000-0000-4000-8000-000000000900"
+              },
+              {
+                "schema_version": 1,
+                "change_id": "00000000-0000-4000-8000-000000001052",
+                "action_id": "00000000-0000-4000-8000-000000000080",
+                "workspace_id": "00000000-0000-4000-8000-000000000001",
+                "sequence": "5",
+                "ordinal": 2,
+                "group_size": 2,
+                "created_at": "2026-10-04T09:00:00Z",
+                "operation": "upsert",
+                "entity_type": "transaction",
+                "data": {
+                  "id": "00000000-0000-4000-8000-000000000010",
+                  "workspace_id": "00000000-0000-4000-8000-000000000001",
+                  "version": "1",
+                  "created_at": "2026-10-04T09:00:00Z",
+                  "updated_at": "2026-10-04T09:00:00Z",
+                  "deleted_at": null,
+                  "kind": "expense",
+                  "status": "posted",
+                  "occurred_at": "2026-10-04T09:00:00Z",
+                  "occurred_timezone": "Asia/Nicosia",
+                  "note": "",
+                  "payee": "Магазин",
+                  "reason": null,
+                  "parent_transaction_id": null,
+                  "fee_transaction_id": null,
+                  "rate": null,
+                  "entries": [
+                    {
+                      "id": "00000000-0000-4000-8000-000000000030",
+                      "account_id": "00000000-0000-4000-8000-000000000002",
+                      "currency": "EUR",
+                      "amount_minor": "-1234"
+                    }
+                  ],
+                  "allocations": [
+                    {
+                      "id": "00000000-0000-4000-8000-000000000020",
+                      "category_id": null,
+                      "amount_minor": "1234",
+                      "original_allocation_id": null,
+                      "remaining_refundable_minor": "1234"
+                    }
+                  ],
+                  "tag_ids": []
+                },
+                "generation_id": "00000000-0000-4000-8000-000000000900"
+              }
+            ],
+            "generation_id": "00000000-0000-4000-8000-000000000900"
+          },
+          {
+            "sequence": "7",
+            "action_id": "00000000-0000-4000-8000-000000000081",
+            "workspace_id": "00000000-0000-4000-8000-000000000001",
+            "changes": [
+              {
+                "schema_version": 1,
+                "change_id": "00000000-0000-4000-8000-000000001061",
+                "action_id": "00000000-0000-4000-8000-000000000081",
+                "workspace_id": "00000000-0000-4000-8000-000000000001",
+                "sequence": "6",
+                "ordinal": 1,
+                "group_size": 2,
+                "created_at": "2026-10-04T09:00:00Z",
+                "operation": "upsert",
+                "entity_type": "account",
+                "data": {
+                  "id": "00000000-0000-4000-8000-000000000002",
+                  "workspace_id": "00000000-0000-4000-8000-000000000001",
+                  "version": "2",
+                  "created_at": "2026-10-04T09:00:00Z",
+                  "updated_at": "2026-10-04T09:00:00Z",
+                  "deleted_at": null,
+                  "name": "Основной",
+                  "type": "bank",
+                  "currency": "EUR",
+                  "opened_at": "2026-10-04T09:00:00Z",
+                  "archived_at": null,
+                  "balance_version": "3",
+                  "posted_balance_minor": "100000",
+                  "pending_delta_minor": "0",
+                  "projected_balance_minor": "100000"
+                },
+                "generation_id": "00000000-0000-4000-8000-000000000900"
+              },
+              {
+                "schema_version": 1,
+                "change_id": "00000000-0000-4000-8000-000000001062",
+                "action_id": "00000000-0000-4000-8000-000000000081",
+                "workspace_id": "00000000-0000-4000-8000-000000000001",
+                "sequence": "6",
+                "ordinal": 2,
+                "group_size": 2,
+                "created_at": "2026-10-04T09:00:00Z",
+                "operation": "delete",
+                "entity_type": "transaction",
+                "data": {
+                  "entity_type": "transaction",
+                  "id": "00000000-0000-4000-8000-000000000010",
+                  "workspace_id": "00000000-0000-4000-8000-000000000001",
+                  "version": "2",
+                  "deleted_at": "2026-10-04T09:00:00Z"
+                },
+                "generation_id": "00000000-0000-4000-8000-000000000900"
+              }
+            ],
+            "generation_id": "00000000-0000-4000-8000-000000000900"
+          }
+        ],
+        "next_cursor": "opaque-cursor-after-group-six",
+        "has_more": false,
+        "head_sequence": "6",
+        "min_available_sequence": "5",
+        "generation_id": "00000000-0000-4000-8000-000000000900"
+      },
+      "input_sequence": "4"
+    },
+    {
+      "id": "wrong_has_more",
+      "kind": "page",
+      "data": {
+        "workspace_id": "00000000-0000-4000-8000-000000000001",
+        "groups": [
+          {
+            "sequence": "5",
+            "action_id": "00000000-0000-4000-8000-000000000080",
+            "workspace_id": "00000000-0000-4000-8000-000000000001",
+            "changes": [
+              {
+                "schema_version": 1,
+                "change_id": "00000000-0000-4000-8000-000000001051",
+                "action_id": "00000000-0000-4000-8000-000000000080",
+                "workspace_id": "00000000-0000-4000-8000-000000000001",
+                "sequence": "5",
+                "ordinal": 1,
+                "group_size": 2,
+                "created_at": "2026-10-04T09:00:00Z",
+                "operation": "upsert",
+                "entity_type": "account",
+                "data": {
+                  "id": "00000000-0000-4000-8000-000000000002",
+                  "workspace_id": "00000000-0000-4000-8000-000000000001",
+                  "version": "1",
+                  "created_at": "2026-10-04T09:00:00Z",
+                  "updated_at": "2026-10-04T09:00:00Z",
+                  "deleted_at": null,
+                  "name": "Основной",
+                  "type": "bank",
+                  "currency": "EUR",
+                  "opened_at": "2026-10-04T09:00:00Z",
+                  "archived_at": null,
+                  "balance_version": "2",
+                  "posted_balance_minor": "98766",
+                  "pending_delta_minor": "0",
+                  "projected_balance_minor": "98766"
+                },
+                "generation_id": "00000000-0000-4000-8000-000000000900"
+              },
+              {
+                "schema_version": 1,
+                "change_id": "00000000-0000-4000-8000-000000001052",
+                "action_id": "00000000-0000-4000-8000-000000000080",
+                "workspace_id": "00000000-0000-4000-8000-000000000001",
+                "sequence": "5",
+                "ordinal": 2,
+                "group_size": 2,
+                "created_at": "2026-10-04T09:00:00Z",
+                "operation": "upsert",
+                "entity_type": "transaction",
+                "data": {
+                  "id": "00000000-0000-4000-8000-000000000010",
+                  "workspace_id": "00000000-0000-4000-8000-000000000001",
+                  "version": "1",
+                  "created_at": "2026-10-04T09:00:00Z",
+                  "updated_at": "2026-10-04T09:00:00Z",
+                  "deleted_at": null,
+                  "kind": "expense",
+                  "status": "posted",
+                  "occurred_at": "2026-10-04T09:00:00Z",
+                  "occurred_timezone": "Asia/Nicosia",
+                  "note": "",
+                  "payee": "Магазин",
+                  "reason": null,
+                  "parent_transaction_id": null,
+                  "fee_transaction_id": null,
+                  "rate": null,
+                  "entries": [
+                    {
+                      "id": "00000000-0000-4000-8000-000000000030",
+                      "account_id": "00000000-0000-4000-8000-000000000002",
+                      "currency": "EUR",
+                      "amount_minor": "-1234"
+                    }
+                  ],
+                  "allocations": [
+                    {
+                      "id": "00000000-0000-4000-8000-000000000020",
+                      "category_id": null,
+                      "amount_minor": "1234",
+                      "original_allocation_id": null,
+                      "remaining_refundable_minor": "1234"
+                    }
+                  ],
+                  "tag_ids": []
+                },
+                "generation_id": "00000000-0000-4000-8000-000000000900"
+              }
+            ],
+            "generation_id": "00000000-0000-4000-8000-000000000900"
+          },
+          {
+            "sequence": "6",
+            "action_id": "00000000-0000-4000-8000-000000000081",
+            "workspace_id": "00000000-0000-4000-8000-000000000001",
+            "changes": [
+              {
+                "schema_version": 1,
+                "change_id": "00000000-0000-4000-8000-000000001061",
+                "action_id": "00000000-0000-4000-8000-000000000081",
+                "workspace_id": "00000000-0000-4000-8000-000000000001",
+                "sequence": "6",
+                "ordinal": 1,
+                "group_size": 2,
+                "created_at": "2026-10-04T09:00:00Z",
+                "operation": "upsert",
+                "entity_type": "account",
+                "data": {
+                  "id": "00000000-0000-4000-8000-000000000002",
+                  "workspace_id": "00000000-0000-4000-8000-000000000001",
+                  "version": "2",
+                  "created_at": "2026-10-04T09:00:00Z",
+                  "updated_at": "2026-10-04T09:00:00Z",
+                  "deleted_at": null,
+                  "name": "Основной",
+                  "type": "bank",
+                  "currency": "EUR",
+                  "opened_at": "2026-10-04T09:00:00Z",
+                  "archived_at": null,
+                  "balance_version": "3",
+                  "posted_balance_minor": "100000",
+                  "pending_delta_minor": "0",
+                  "projected_balance_minor": "100000"
+                },
+                "generation_id": "00000000-0000-4000-8000-000000000900"
+              },
+              {
+                "schema_version": 1,
+                "change_id": "00000000-0000-4000-8000-000000001062",
+                "action_id": "00000000-0000-4000-8000-000000000081",
+                "workspace_id": "00000000-0000-4000-8000-000000000001",
+                "sequence": "6",
+                "ordinal": 2,
+                "group_size": 2,
+                "created_at": "2026-10-04T09:00:00Z",
+                "operation": "delete",
+                "entity_type": "transaction",
+                "data": {
+                  "entity_type": "transaction",
+                  "id": "00000000-0000-4000-8000-000000000010",
+                  "workspace_id": "00000000-0000-4000-8000-000000000001",
+                  "version": "2",
+                  "deleted_at": "2026-10-04T09:00:00Z"
+                },
+                "generation_id": "00000000-0000-4000-8000-000000000900"
+              }
+            ],
+            "generation_id": "00000000-0000-4000-8000-000000000900"
+          }
+        ],
+        "next_cursor": "opaque-cursor-after-group-six",
+        "has_more": true,
+        "head_sequence": "6",
+        "min_available_sequence": "5",
+        "generation_id": "00000000-0000-4000-8000-000000000900"
+      },
+      "input_sequence": "4"
+    },
+    {
+      "id": "snapshot_page_mixed_base",
+      "kind": "snapshot",
+      "data": {
+        "metadata": {
+          "id": "00000000-0000-4000-8000-000000000200",
+          "workspace_id": "00000000-0000-4000-8000-000000000001",
+          "base_sequence": "4",
+          "resume_cursor": "opaque-cursor-after-group-four",
+          "created_at": "2026-10-04T09:00:00Z",
+          "expires_at": "2026-10-04T09:15:00Z",
+          "item_count": 2,
+          "first_page_token": "opaque-snapshot-first-page",
+          "generation_id": "00000000-0000-4000-8000-000000000900"
+        },
+        "pages": [
+          {
+            "snapshot_id": "00000000-0000-4000-8000-000000000200",
+            "workspace_id": "00000000-0000-4000-8000-000000000001",
+            "base_sequence": "4",
+            "items": [
+              {
+                "entity_type": "account",
+                "data": {
+                  "id": "00000000-0000-4000-8000-000000000002",
+                  "workspace_id": "00000000-0000-4000-8000-000000000001",
+                  "version": "1",
+                  "created_at": "2026-10-04T09:00:00Z",
+                  "updated_at": "2026-10-04T09:00:00Z",
+                  "deleted_at": null,
+                  "name": "Основной",
+                  "type": "bank",
+                  "currency": "EUR",
+                  "opened_at": "2026-10-04T09:00:00Z",
+                  "archived_at": null,
+                  "balance_version": "1",
+                  "posted_balance_minor": "100000",
+                  "pending_delta_minor": "0",
+                  "projected_balance_minor": "100000"
+                }
+              }
+            ],
+            "next_page_token": "opaque-snapshot-second-page",
+            "generation_id": "00000000-0000-4000-8000-000000000900"
+          },
+          {
+            "snapshot_id": "00000000-0000-4000-8000-000000000200",
+            "workspace_id": "00000000-0000-4000-8000-000000000001",
+            "base_sequence": "5",
+            "items": [
+              {
+                "entity_type": "transaction",
+                "data": {
+                  "id": "00000000-0000-4000-8000-000000000009",
+                  "workspace_id": "00000000-0000-4000-8000-000000000001",
+                  "version": "1",
+                  "created_at": "2026-10-04T09:00:00Z",
+                  "updated_at": "2026-10-04T09:00:00Z",
+                  "deleted_at": null,
+                  "kind": "opening",
+                  "status": "posted",
+                  "occurred_at": "2026-10-04T09:00:00Z",
+                  "occurred_timezone": "Asia/Nicosia",
+                  "note": "",
+                  "payee": "",
+                  "reason": null,
+                  "parent_transaction_id": null,
+                  "fee_transaction_id": null,
+                  "rate": null,
+                  "entries": [
+                    {
+                      "id": "00000000-0000-4000-8000-000000000029",
+                      "account_id": "00000000-0000-4000-8000-000000000002",
+                      "currency": "EUR",
+                      "amount_minor": "100000"
+                    }
+                  ],
+                  "allocations": [],
+                  "tag_ids": []
+                }
+              }
+            ],
+            "next_page_token": null,
+            "generation_id": "00000000-0000-4000-8000-000000000900"
+          }
+        ]
+      }
+    },
+    {
+      "id": "snapshot_missing_last_page",
+      "kind": "snapshot",
+      "data": {
+        "metadata": {
+          "id": "00000000-0000-4000-8000-000000000200",
+          "workspace_id": "00000000-0000-4000-8000-000000000001",
+          "base_sequence": "4",
+          "resume_cursor": "opaque-cursor-after-group-four",
+          "created_at": "2026-10-04T09:00:00Z",
+          "expires_at": "2026-10-04T09:15:00Z",
+          "item_count": 2,
+          "first_page_token": "opaque-snapshot-first-page",
+          "generation_id": "00000000-0000-4000-8000-000000000900"
+        },
+        "pages": [
+          {
+            "snapshot_id": "00000000-0000-4000-8000-000000000200",
+            "workspace_id": "00000000-0000-4000-8000-000000000001",
+            "base_sequence": "4",
+            "items": [
+              {
+                "entity_type": "account",
+                "data": {
+                  "id": "00000000-0000-4000-8000-000000000002",
+                  "workspace_id": "00000000-0000-4000-8000-000000000001",
+                  "version": "1",
+                  "created_at": "2026-10-04T09:00:00Z",
+                  "updated_at": "2026-10-04T09:00:00Z",
+                  "deleted_at": null,
+                  "name": "Основной",
+                  "type": "bank",
+                  "currency": "EUR",
+                  "opened_at": "2026-10-04T09:00:00Z",
+                  "archived_at": null,
+                  "balance_version": "1",
+                  "posted_balance_minor": "100000",
+                  "pending_delta_minor": "0",
+                  "projected_balance_minor": "100000"
+                }
+              }
+            ],
+            "next_page_token": "opaque-snapshot-second-page",
+            "generation_id": "00000000-0000-4000-8000-000000000900"
+          }
+        ]
+      }
+    },
+    {
+      "id": "snapshot_duplicate_entity",
+      "kind": "snapshot",
+      "data": {
+        "metadata": {
+          "id": "00000000-0000-4000-8000-000000000200",
+          "workspace_id": "00000000-0000-4000-8000-000000000001",
+          "base_sequence": "4",
+          "resume_cursor": "opaque-cursor-after-group-four",
+          "created_at": "2026-10-04T09:00:00Z",
+          "expires_at": "2026-10-04T09:15:00Z",
+          "item_count": 2,
+          "first_page_token": "opaque-snapshot-first-page",
+          "generation_id": "00000000-0000-4000-8000-000000000900"
+        },
+        "pages": [
+          {
+            "snapshot_id": "00000000-0000-4000-8000-000000000200",
+            "workspace_id": "00000000-0000-4000-8000-000000000001",
+            "base_sequence": "4",
+            "items": [
+              {
+                "entity_type": "account",
+                "data": {
+                  "id": "00000000-0000-4000-8000-000000000002",
+                  "workspace_id": "00000000-0000-4000-8000-000000000001",
+                  "version": "1",
+                  "created_at": "2026-10-04T09:00:00Z",
+                  "updated_at": "2026-10-04T09:00:00Z",
+                  "deleted_at": null,
+                  "name": "Основной",
+                  "type": "bank",
+                  "currency": "EUR",
+                  "opened_at": "2026-10-04T09:00:00Z",
+                  "archived_at": null,
+                  "balance_version": "1",
+                  "posted_balance_minor": "100000",
+                  "pending_delta_minor": "0",
+                  "projected_balance_minor": "100000"
+                }
+              }
+            ],
+            "next_page_token": "opaque-snapshot-second-page",
+            "generation_id": "00000000-0000-4000-8000-000000000900"
+          },
+          {
+            "snapshot_id": "00000000-0000-4000-8000-000000000200",
+            "workspace_id": "00000000-0000-4000-8000-000000000001",
+            "base_sequence": "4",
+            "items": [
+              {
+                "entity_type": "account",
+                "data": {
+                  "id": "00000000-0000-4000-8000-000000000002",
+                  "workspace_id": "00000000-0000-4000-8000-000000000001",
+                  "version": "1",
+                  "created_at": "2026-10-04T09:00:00Z",
+                  "updated_at": "2026-10-04T09:00:00Z",
+                  "deleted_at": null,
+                  "name": "Основной",
+                  "type": "bank",
+                  "currency": "EUR",
+                  "opened_at": "2026-10-04T09:00:00Z",
+                  "archived_at": null,
+                  "balance_version": "1",
+                  "posted_balance_minor": "100000",
+                  "pending_delta_minor": "0",
+                  "projected_balance_minor": "100000"
+                }
+              }
+            ],
+            "next_page_token": null,
+            "generation_id": "00000000-0000-4000-8000-000000000900"
+          }
+        ]
+      }
+    },
+    {
+      "id": "mixed_generation",
+      "kind": "group",
+      "data": {
+        "sequence": "5",
+        "action_id": "00000000-0000-4000-8000-000000000080",
+        "workspace_id": "00000000-0000-4000-8000-000000000001",
+        "changes": [
+          {
+            "schema_version": 1,
+            "change_id": "00000000-0000-4000-8000-000000001051",
+            "action_id": "00000000-0000-4000-8000-000000000080",
+            "workspace_id": "00000000-0000-4000-8000-000000000001",
+            "sequence": "5",
+            "ordinal": 1,
+            "group_size": 2,
+            "created_at": "2026-10-04T09:00:00Z",
+            "operation": "upsert",
+            "entity_type": "account",
+            "data": {
+              "id": "00000000-0000-4000-8000-000000000002",
+              "workspace_id": "00000000-0000-4000-8000-000000000001",
+              "version": "2",
+              "created_at": "2026-10-04T09:00:00Z",
+              "updated_at": "2026-10-04T09:00:00Z",
+              "deleted_at": null,
+              "name": "Основной",
+              "type": "bank",
+              "currency": "EUR",
+              "opened_at": "2026-10-04T09:00:00Z",
+              "archived_at": null,
+              "balance_version": "2",
+              "posted_balance_minor": "98766",
+              "pending_delta_minor": "0",
+              "projected_balance_minor": "98766"
+            },
+            "generation_id": "00000000-0000-4000-8000-000000000901"
+          },
+          {
+            "schema_version": 1,
+            "change_id": "00000000-0000-4000-8000-000000001052",
+            "action_id": "00000000-0000-4000-8000-000000000080",
+            "workspace_id": "00000000-0000-4000-8000-000000000001",
+            "sequence": "5",
+            "ordinal": 2,
+            "group_size": 2,
+            "created_at": "2026-10-04T09:00:00Z",
+            "operation": "upsert",
+            "entity_type": "transaction",
+            "data": {
+              "id": "00000000-0000-4000-8000-000000000010",
+              "workspace_id": "00000000-0000-4000-8000-000000000001",
+              "version": "1",
+              "created_at": "2026-10-04T09:00:00Z",
+              "updated_at": "2026-10-04T09:00:00Z",
+              "deleted_at": null,
+              "kind": "expense",
+              "status": "posted",
+              "occurred_at": "2026-10-04T09:00:00Z",
+              "occurred_timezone": "Asia/Nicosia",
+              "note": "",
+              "payee": "Магазин",
+              "reason": null,
+              "parent_transaction_id": null,
+              "fee_transaction_id": null,
+              "rate": null,
+              "entries": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000030",
+                  "account_id": "00000000-0000-4000-8000-000000000002",
+                  "currency": "EUR",
+                  "amount_minor": "-1234"
+                }
+              ],
+              "allocations": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000020",
+                  "category_id": null,
+                  "amount_minor": "1234",
+                  "original_allocation_id": null,
+                  "remaining_refundable_minor": "1234"
+                }
+              ],
+              "tag_ids": []
+            },
+            "generation_id": "00000000-0000-4000-8000-000000000900"
+          }
+        ],
+        "generation_id": "00000000-0000-4000-8000-000000000900"
+      }
+    }
+  ],
+  "valid_page_input_sequence": "4",
+  "valid_snapshot": {
+    "metadata": {
+      "id": "00000000-0000-4000-8000-000000000200",
+      "workspace_id": "00000000-0000-4000-8000-000000000001",
+      "base_sequence": "4",
+      "resume_cursor": "opaque-cursor-after-group-four",
+      "created_at": "2026-10-04T09:00:00Z",
+      "expires_at": "2026-10-04T09:15:00Z",
+      "item_count": 2,
+      "first_page_token": "opaque-snapshot-first-page",
+      "generation_id": "00000000-0000-4000-8000-000000000900"
+    },
+    "pages": [
+      {
+        "snapshot_id": "00000000-0000-4000-8000-000000000200",
+        "workspace_id": "00000000-0000-4000-8000-000000000001",
+        "base_sequence": "4",
+        "items": [
+          {
+            "entity_type": "account",
+            "data": {
+              "id": "00000000-0000-4000-8000-000000000002",
+              "workspace_id": "00000000-0000-4000-8000-000000000001",
+              "version": "1",
+              "created_at": "2026-10-04T09:00:00Z",
+              "updated_at": "2026-10-04T09:00:00Z",
+              "deleted_at": null,
+              "name": "Основной",
+              "type": "bank",
+              "currency": "EUR",
+              "opened_at": "2026-10-04T09:00:00Z",
+              "archived_at": null,
+              "balance_version": "1",
+              "posted_balance_minor": "100000",
+              "pending_delta_minor": "0",
+              "projected_balance_minor": "100000"
+            }
+          }
+        ],
+        "next_page_token": "opaque-snapshot-second-page",
+        "generation_id": "00000000-0000-4000-8000-000000000900"
+      },
+      {
+        "snapshot_id": "00000000-0000-4000-8000-000000000200",
+        "workspace_id": "00000000-0000-4000-8000-000000000001",
+        "base_sequence": "4",
+        "items": [
+          {
+            "entity_type": "transaction",
+            "data": {
+              "id": "00000000-0000-4000-8000-000000000009",
+              "workspace_id": "00000000-0000-4000-8000-000000000001",
+              "version": "1",
+              "created_at": "2026-10-04T09:00:00Z",
+              "updated_at": "2026-10-04T09:00:00Z",
+              "deleted_at": null,
+              "kind": "opening",
+              "status": "posted",
+              "occurred_at": "2026-10-04T09:00:00Z",
+              "occurred_timezone": "Asia/Nicosia",
+              "note": "",
+              "payee": "",
+              "reason": null,
+              "parent_transaction_id": null,
+              "fee_transaction_id": null,
+              "rate": null,
+              "entries": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000029",
+                  "account_id": "00000000-0000-4000-8000-000000000002",
+                  "currency": "EUR",
+                  "amount_minor": "100000"
+                }
+              ],
+              "allocations": [],
+              "tag_ids": []
+            }
+          }
+        ],
+        "next_page_token": null,
+        "generation_id": "00000000-0000-4000-8000-000000000900"
+      }
+    ]
+  },
+  "retention_cases": [
+    {
+      "id": "empty_workspace",
+      "cursor": 0,
+      "minimum": 1,
+      "head": 0,
+      "expected": "ok"
+    },
+    {
+      "id": "exact_boundary",
+      "cursor": 4,
+      "minimum": 5,
+      "head": 6,
+      "expected": "ok"
+    },
+    {
+      "id": "expired_boundary",
+      "cursor": 3,
+      "minimum": 5,
+      "head": 6,
+      "expected": "cursor_expired"
+    },
+    {
+      "id": "caught_up",
+      "cursor": 6,
+      "minimum": 7,
+      "head": 6,
+      "expected": "ok"
+    },
+    {
+      "id": "future_cursor",
+      "cursor": 7,
+      "minimum": 5,
+      "head": 6,
+      "expected": "cursor_invalid"
+    }
+  ],
+  "commit_traces": [
+    {
+      "id": "serial_commits",
+      "steps": [
+        [
+          "acquire",
+          "A"
+        ],
+        [
+          "blocked",
+          "B"
+        ],
+        [
+          "commit",
+          "A"
+        ],
+        [
+          "acquire",
+          "B"
+        ],
+        [
+          "commit",
+          "B"
+        ]
+      ],
+      "expected_sequences": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "rollback_does_not_skip",
+      "steps": [
+        [
+          "acquire",
+          "A"
+        ],
+        [
+          "blocked",
+          "B"
+        ],
+        [
+          "abort",
+          "A"
+        ],
+        [
+          "acquire",
+          "B"
+        ],
+        [
+          "commit",
+          "B"
+        ]
+      ],
+      "expected_sequences": [
+        1
+      ]
+    },
+    {
+      "id": "domain_reject_has_no_group",
+      "steps": [
+        [
+          "acquire",
+          "A"
+        ],
+        [
+          "reject",
+          "A"
+        ],
+        [
+          "acquire",
+          "B"
+        ],
+        [
+          "commit",
+          "B"
+        ]
+      ],
+      "expected_sequences": [
+        1
+      ]
+    }
+  ],
+  "unsafe_commit_order": {
+    "allocated": {
+      "A": 1,
+      "B": 2
+    },
+    "commit_order": [
+      "B",
+      "A"
+    ],
+    "expected_safe": false
+  },
+  "receipt_cases": [
+    {
+      "id": "lost_response_within_retention",
+      "authorized": true,
+      "same_actor": true,
+      "same_hash": true,
+      "exists": true,
+      "days": 1,
+      "state": "applied",
+      "expected": "replay_applied"
+    },
+    {
+      "id": "deadline_exact",
+      "authorized": true,
+      "same_actor": true,
+      "same_hash": true,
+      "exists": true,
+      "days": 30,
+      "state": "applied",
+      "expected": "action_result_expired"
+    },
+    {
+      "id": "long_offline",
+      "authorized": true,
+      "same_actor": true,
+      "same_hash": true,
+      "exists": true,
+      "days": 120,
+      "state": "applied",
+      "expected": "action_result_expired"
+    },
+    {
+      "id": "changed_payload_after_expiry",
+      "authorized": true,
+      "same_actor": true,
+      "same_hash": false,
+      "exists": true,
+      "days": 120,
+      "state": "applied",
+      "expected": "idempotency_conflict"
+    },
+    {
+      "id": "terminal_conflict_replayed",
+      "authorized": true,
+      "same_actor": true,
+      "same_hash": true,
+      "exists": true,
+      "days": 1,
+      "state": "rejected",
+      "expected": "replay_rejected"
+    },
+    {
+      "id": "revoked_access",
+      "authorized": false,
+      "same_actor": true,
+      "same_hash": true,
+      "exists": true,
+      "days": 1,
+      "state": "applied",
+      "expected": "not_found"
+    },
+    {
+      "id": "foreign_receipt_read",
+      "authorized": true,
+      "same_actor": false,
+      "same_hash": true,
+      "exists": true,
+      "days": 1,
+      "state": "applied",
+      "expected": "not_found"
+    },
+    {
+      "id": "no_completed_receipt",
+      "authorized": true,
+      "same_actor": true,
+      "same_hash": true,
+      "exists": false,
+      "days": 1,
+      "state": "applied",
+      "expected": "not_found"
+    }
+  ],
+  "page_sizes": {
+    "limit": 2,
+    "byte_budget": 8,
+    "group_sizes": [
+      3,
+      4,
+      3
+    ],
+    "expected_first_indices": [
+      0,
+      1
+    ],
+    "expected_last_sequence": 2
+  },
+  "bootstrap_recovery": {
+    "old_mirror": {
+      "server-deleted": {
+        "version": "1"
+      },
+      "account": {
+        "version": "1"
+      }
+    },
+    "snapshot_mirror": {
+      "account": {
+        "version": "3"
+      }
+    },
+    "outbox": [
+      {
+        "action_id": "local-create",
+        "state": "queued",
+        "body": {
+          "id": "new-local-operation",
+          "amount_minor": "1000"
+        }
+      },
+      {
+        "action_id": "lost-response",
+        "state": "uncertain",
+        "body": {
+          "id": "server-deleted"
+        }
+      }
+    ],
+    "expected_mirror_keys": [
+      "account"
+    ],
+    "expected_outbox_ids": [
+      "local-create",
+      "lost-response"
+    ],
+    "base_sequence": 4,
+    "later_groups": [
+      5,
+      6
+    ],
+    "expected_pull_sequences": [
+      5,
+      6
+    ]
+  },
+  "canonical_cases": [
+    {
+      "id": "key_order_and_whitespace",
+      "method": "POST",
+      "path": "/api/v1/workspaces/w/transactions",
+      "left": "{\"note\":\"<>& Продукты\",\"amount_minor\":\"1234\"}",
+      "right": "{ \"amount_minor\": \"1234\", \"note\": \"<>& Продукты\" }",
+      "expected_same": true,
+      "left_generation": "00000000-0000-4000-8000-000000000900",
+      "right_generation": "00000000-0000-4000-8000-000000000900"
+    },
+    {
+      "id": "array_order_matters",
+      "method": "POST",
+      "path": "/api/v1/workspaces/w/transactions",
+      "left": "{\"tag_ids\":[\"a\",\"b\"]}",
+      "right": "{\"tag_ids\":[\"b\",\"a\"]}",
+      "expected_same": false,
+      "left_generation": "00000000-0000-4000-8000-000000000900",
+      "right_generation": "00000000-0000-4000-8000-000000000900"
+    },
+    {
+      "id": "text_not_normalized",
+      "method": "POST",
+      "path": "/api/v1/workspaces/w/transactions",
+      "left": "{\"note\":\"é\"}",
+      "right": "{\"note\":\"é\"}",
+      "expected_same": false,
+      "left_generation": "00000000-0000-4000-8000-000000000900",
+      "right_generation": "00000000-0000-4000-8000-000000000900"
+    },
+    {
+      "id": "generation_is_in_hash",
+      "method": "POST",
+      "path": "/api/v1/workspaces/w/transactions",
+      "left": "{\"amount_minor\":\"1000\"}",
+      "right": "{\"amount_minor\":\"1000\"}",
+      "left_generation": "00000000-0000-4000-8000-000000000900",
+      "right_generation": "00000000-0000-4000-8000-000000000901",
+      "expected_same": false
+    }
+  ],
+  "duplicate_keys_json": "{\"amount_minor\":\"1000\",\"amount_minor\":\"2000\"}",
+  "version_cases": [
+    {
+      "id": "stale_response",
+      "current_version": "3",
+      "incoming_version": "2",
+      "same_payload": false,
+      "expected": "ignore"
+    },
+    {
+      "id": "identical_replay",
+      "current_version": "3",
+      "incoming_version": "3",
+      "same_payload": true,
+      "expected": "unchanged"
+    },
+    {
+      "id": "same_version_different_data",
+      "current_version": "3",
+      "incoming_version": "3",
+      "same_payload": false,
+      "expected": "protocol_error"
+    },
+    {
+      "id": "new_version",
+      "current_version": "3",
+      "incoming_version": "4",
+      "same_payload": false,
+      "expected": "apply"
+    },
+    {
+      "id": "upsert_after_newer_tombstone",
+      "current_version": "3",
+      "incoming_version": "1",
+      "same_payload": false,
+      "current_deleted": true,
+      "expected": "ignore"
+    }
+  ],
+  "overlay_cases": [
+    {
+      "id": "receipt_newer_than_snapshot",
+      "mirror_sequence": 4,
+      "applied_sequence": 5,
+      "expected": "retain_overlay"
+    },
+    {
+      "id": "group_applied",
+      "mirror_sequence": 5,
+      "applied_sequence": 5,
+      "expected": "clear_overlay"
+    },
+    {
+      "id": "new_snapshot_contains_later_state",
+      "mirror_sequence": 6,
+      "applied_sequence": 5,
+      "expected": "clear_overlay"
+    }
+  ]
+}
