@@ -203,6 +203,26 @@ test('FX transfer and third-currency fee commit once after lost response', async
   await expect(page.locator('.accounts li').filter({ hasText: 'Комиссии' })).toContainText('100,000 KWD');
   const withoutFee = await (await context.request.get(`${root}/transactions/${transfers[0].id}`)).json();
   expect(withoutFee.fee_transaction_id).toBeNull();
+  await page.getByRole('button', { name: `Изменить операцию ${transfers[0].id}`, exact: true }).click();
+  await transferEditor.getByLabel('Добавить комиссию', { exact: true }).check();
+  await transferEditor.getByLabel('Счет комиссии', { exact: true }).selectOption({ label: 'Комиссии · KWD' });
+  await transferEditor.getByLabel('Комиссия, KWD', { exact: true }).fill('0,100');
+  await transferEditor.getByRole('button', { name: 'Сохранить изменения перевода', exact: true }).click();
+  await expect(transferEditor).toHaveCount(0);
+  await expect(page.locator('.accounts li').filter({ hasText: 'Комиссии' })).toContainText('99,900 KWD');
+  const withNewFee = await (await context.request.get(`${root}/transactions/${transfers[0].id}`)).json();
+  expect(withNewFee.fee_transaction_id).not.toBe(fees[0].id);
+  await page.getByRole('button', { name: `Удалить операцию ${transfers[0].id}`, exact: true }).click();
+  const deletion = page.getByRole('heading', { name: 'Удаление операции', exact: true }).locator('..');
+  await expect(deletion).toContainText('Комиссия будет удалена вместе с переводом');
+  await deletion.getByRole('button', { name: 'Подтвердить удаление операции', exact: true }).click();
+  await expect(deletion).toHaveCount(0);
+  for (const [name, balance] of [['Евро', '100,00 EUR'], ['Доллары', '100,00 USD'], ['Комиссии', '100,000 KWD']]) {
+    await expect(page.locator('.accounts li').filter({ hasText: name })).toContainText(balance);
+  }
+  expect((await context.request.get(`${root}/transactions/${transfers[0].id}`)).status()).toBe(404);
+  expect((await context.request.get(`${root}/transactions/${withNewFee.fee_transaction_id}`)).status()).toBe(404);
+
 
 });
 
@@ -500,6 +520,40 @@ test('partial refund inherits archived categories, retries once and retains part
   expect(after.allocations.map((p: {id: string}) => p.id).sort()).toEqual(refund.allocations.map((p: {id: string}) => p.id).sort());
   const parent = await (await context.request.get(`${root}/transactions/${expense.id}`)).json();
   expect(parent.allocations.reduce((sum: bigint, p: {remaining_refundable_minor: string}) => sum + BigInt(p.remaining_refundable_minor), 0n)).toBe(700n);
+  await page.getByRole('button', { name: 'Удалить операцию Исходная покупка', exact: true }).click();
+  const deletion = page.getByRole('heading', { name: 'Удаление операции', exact: true }).locator('..');
+  await deletion.getByRole('button', { name: 'Подтвердить удаление операции', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('Конфликт');
+  expect((await context.request.get(`${root}/transactions/${expense.id}`)).status()).toBe(200);
+  await expect(page.locator('.accounts')).toContainText('93,00 EUR');
+  await deletion.getByRole('button', { name: 'Отменить удаление', exact: true }).click();
+  const deletions: {key: string | undefined; body: string | null}[] = [];
+  let deleteDropped = false, deleteReplayed = false;
+  await page.route('**/api/v1/workspaces/*/transactions/*', async route => {
+    if (route.request().method() !== 'DELETE') { await route.continue(); return; }
+    deletions.push({key: route.request().headers()['idempotency-key'], body: route.request().postData()});
+    const response = await route.fetch(); expect(response.status()).toBe(200);
+    if (!deleteDropped) { deleteDropped = true; await route.abort('connectionfailed'); }
+    else { deleteReplayed = response.headers()['idempotency-replayed'] === 'true'; await route.fulfill({response}); }
+  });
+  await page.getByRole('button', { name: 'Удалить операцию Частичный возврат', exact: true }).click();
+  await deletion.getByRole('button', { name: 'Подтвердить удаление операции', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('Операция могла сохраниться');
+  await page.reload();
+  await page.getByRole('button', { name: 'Повторить ту же команду', exact: true }).click();
+  await expect.poll(() => deleteReplayed).toBe(true);
+  await expect(page.getByRole('heading', { name: 'Команда ожидает подтверждения' })).toHaveCount(0);
+  expect(deletions).toHaveLength(2); expect(deletions[1]).toEqual(deletions[0]);
+  await expect(page.locator('.accounts')).toContainText('90,00 EUR');
+  expect((await context.request.get(`${root}/transactions/${refund.id}`)).status()).toBe(404);
+  const released = await (await context.request.get(`${root}/transactions/${expense.id}`)).json();
+  expect(released.allocations.reduce((sum: bigint, p: {remaining_refundable_minor: string}) => sum + BigInt(p.remaining_refundable_minor), 0n)).toBe(1000n);
+  await page.unroute('**/api/v1/workspaces/*/transactions/*');
+  await page.getByRole('button', { name: 'Удалить операцию Исходная покупка', exact: true }).click();
+  await deletion.getByRole('button', { name: 'Подтвердить удаление операции', exact: true }).click();
+  await expect(deletion).toHaveCount(0);
+  await expect(page.locator('.accounts')).toContainText('100,00 EUR');
+
 });
 
 test('adjustment rejects stale balance and retries the same target after reload', async ({ page, context }) => {

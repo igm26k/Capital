@@ -7,17 +7,18 @@ import { AccountForm } from './features/accounts/AccountForm';
 import { TransferForm } from './features/transactions/TransferForm';
 import { TransactionForm } from './features/transactions/TransactionForm';
 import { ClassificationManager } from './features/classification/ClassificationManager';
+import { DeleteTransaction, type Deletion } from './features/transactions/DeleteTransaction';
 import { AdjustmentForm } from './features/transactions/AdjustmentForm';
 import { RefundForm } from './features/transactions/RefundForm';
 import { TransactionConflict, type ProposedTransaction, type TransactionComparison } from './features/transactions/TransactionConflict';
 import { TransactionHistory } from './features/transactions/TransactionHistory';
 // A single unfinished command survives reload in this tab. No credentials are persisted.
-type Command = { owner: string; session: string; workspace: string; generation: string; key: string; path: string; body: string; method?: 'POST' | 'PUT' };
+type Command = { owner: string; session: string; workspace: string; generation: string; key: string; path: string; body: string; method?: 'POST' | 'PUT' | 'DELETE' };
 const storageKey = 'accounting.pending.v1';
 function restore(auth: Auth): Command | null {
   try {
     const value = JSON.parse(sessionStorage.getItem(storageKey) ?? 'null') as Command | null;
-    if (value?.owner === auth.profile.id && value.session === auth.session.id && value.workspace === auth.workspace.id && typeof value.body === 'string' && typeof value.key === 'string' && typeof value.generation === 'string' && (!value.method || ['POST', 'PUT'].includes(value.method)) && new RegExp(`^/workspaces/${value.workspace}/(?:(?:accounts|transactions|categories|tags)(?:/[0-9a-f-]{36})?|accounts/[0-9a-f-]{36}/adjustments)$`).test(value.path)) return value;
+    if (value?.owner === auth.profile.id && value.session === auth.session.id && value.workspace === auth.workspace.id && typeof value.body === 'string' && typeof value.key === 'string' && typeof value.generation === 'string' && (!value.method || ['POST', 'PUT', 'DELETE'].includes(value.method)) && new RegExp(`^/workspaces/${value.workspace}/(?:(?:accounts|transactions|categories|tags)(?:/[0-9a-f-]{36})?|accounts/[0-9a-f-]{36}/adjustments)$`).test(value.path)) return value;
     sessionStorage.removeItem(storageKey);
   } catch { /* Storage unavailable: retries remain available while this page is open. */ }
   return null;
@@ -28,13 +29,14 @@ export function App() {
   const [needsRefresh, setNeedsRefresh] = useState(false);
   const [auth, setAuth] = useState<Auth | null>(null), [starting, setStarting] = useState(true), [startupError, setStartupError] = useState('');
   const [accounts, setAccounts] = useState<Account[]>([]), [historyRevision, setHistoryRevision] = useState(0);
+  const [deleting, setDeleting] = useState<Deletion | null>(null);
   const [refundParent, setRefundParent] = useState<Transaction | null>(null), [refundTransferVersion, setRefundTransferVersion] = useState<string | null>(null);
   const [conflict, setConflict] = useState<TransactionComparison | null>(null);
   const [editingFee, setEditingFee] = useState<Transaction | null>(null), [editingParentVersion, setEditingParentVersion] = useState<string | null>(null);
   const [editing, setEditing] = useState<Transaction | null>(null);
   const [categories, setCategories] = useState<Category[]>([]), [tags, setTags] = useState<Tag[]>([]);
   const [pending, setPending] = useState<Command | null>(null), [busy, setBusy] = useState(false), [loading, setLoading] = useState(false), [message, setMessage] = useState(''), [error, setError] = useState(''), [online, setOnline] = useState(navigator.onLine), [formVersion, setFormVersion] = useState(0);
-  function authenticated(value: Auth) { activeSession.current = value.session.id; setAccounts([]); setCategories([]); setTags([]); setEditing(null); setRefundParent(null); setConflict(null); setAuth(value); setPending(restore(value)); setError(''); setMessage(''); }
+  function authenticated(value: Auth) { activeSession.current = value.session.id; setAccounts([]); setCategories([]); setTags([]); setEditing(null); setRefundParent(null); setDeleting(null); setConflict(null); setAuth(value); setPending(restore(value)); setError(''); setMessage(''); }
   async function session() {
     setStarting(true); setStartupError('');
     try { authenticated(await request<Auth>('/auth/session')); }
@@ -63,7 +65,7 @@ export function App() {
     setBusy(true); setError(''); setMessage('');
     try {
       await request(command.path, { method: command.method ?? 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': auth.csrf_token, 'X-Sync-Generation': command.generation, 'Idempotency-Key': command.key }, body: command.body });
-      persist(null); setPending(null); setEditing(null); setRefundParent(null); setConflict(null); setFormVersion(v => v + 1); setMessage('Сохранено.');
+      persist(null); setPending(null); setEditing(null); setRefundParent(null); setDeleting(null); setConflict(null); setFormVersion(v => v + 1); setMessage('Сохранено.');
       try { await refresh(auth); } catch (error) { setError('Операция сохранена, но обновить список не удалось. Нажмите «Обновить».'); showError(error); }
     } catch (error) {
       if (error instanceof RequestError && ['action_result_expired', 'idempotency_conflict'].includes(error.code)) {
@@ -86,7 +88,7 @@ export function App() {
       } else setError('Ответ не получен. Операция могла сохраниться. Повторите ту же команду кнопкой ниже; изменение не будет применено дважды.');
     } finally { setBusy(false); }
   }
-  function create(path: string, body: object, method: 'POST' | 'PUT' = 'POST') {
+  function create(path: string, body: object, method: 'POST' | 'PUT' | 'DELETE' = 'POST') {
     if (!auth || pending || busy || needsRefresh) return;
     const command: Command = { owner: auth.profile.id, session: auth.session.id, workspace: auth.workspace.id, generation: auth.workspace.sync_generation_id, key: crypto.randomUUID(), path: `/workspaces/${auth.workspace.id}/${path}`, method, body: JSON.stringify(body) };
     persist(command); setPending(command); void execute(command);
@@ -99,7 +101,22 @@ export function App() {
       const related = value.fee_transaction_id || value.parent_transaction_id;
       const dependency = related ? await request<Transaction>(`/workspaces/${auth.workspace.id}/transactions/${related}`) : null;
       const transfer = value.kind === 'refund' && dependency?.parent_transaction_id ? await request<Transaction>(`/workspaces/${auth.workspace.id}/transactions/${dependency.parent_transaction_id}`) : null;
-      if (activeSession.current === auth.session.id) { setRefundParent(value.kind === 'refund' ? dependency : null); setRefundTransferVersion(transfer?.version ?? null); setEditing(value); setConflict(null); setEditingFee(value.fee_transaction_id ? dependency : null); setEditingParentVersion(value.parent_transaction_id ? dependency?.version ?? null : null); }
+      if (activeSession.current === auth.session.id) { setDeleting(null); setRefundParent(value.kind === 'refund' ? dependency : null); setRefundTransferVersion(transfer?.version ?? null); setEditing(value); setConflict(null); setEditingFee(value.fee_transaction_id ? dependency : null); setEditingParentVersion(value.parent_transaction_id ? dependency?.version ?? null : null); }
+    } catch (error) { showError(error); } finally { setLoading(false); }
+  }
+  async function deleteTransaction(id: string) {
+    if (!auth || busy || pending) return;
+    setLoading(true); setError('');
+    try {
+      const path = `/workspaces/${auth.workspace.id}/transactions/`;
+      const transaction = await request<Transaction>(path + id);
+      const related: Transaction[] = [];
+      if (transaction.fee_transaction_id) related.push(await request<Transaction>(path + transaction.fee_transaction_id));
+      if (transaction.parent_transaction_id) {
+        const parent = await request<Transaction>(path + transaction.parent_transaction_id); related.push(parent);
+        if (transaction.kind === 'refund' && parent.parent_transaction_id) related.push(await request<Transaction>(path + parent.parent_transaction_id));
+      }
+      if (activeSession.current === auth.session.id) { setEditing(null); setRefundParent(null); setConflict(null); setDeleting({ transaction, related }); }
     } catch (error) { showError(error); } finally { setLoading(false); }
   }
   async function newRefund(id: string) {
@@ -108,7 +125,7 @@ export function App() {
     try {
       const parent = await request<Transaction>(`/workspaces/${auth.workspace.id}/transactions/${id}`);
       const transfer = parent.parent_transaction_id ? await request<Transaction>(`/workspaces/${auth.workspace.id}/transactions/${parent.parent_transaction_id}`) : null;
-      if (activeSession.current === auth.session.id) { setEditing(null); setConflict(null); setRefundParent(parent); setRefundTransferVersion(transfer?.version ?? null); }
+      if (activeSession.current === auth.session.id) { setDeleting(null); setEditing(null); setConflict(null); setRefundParent(parent); setRefundTransferVersion(transfer?.version ?? null); }
     } catch (error) { showError(error); } finally { setLoading(false); }
   }
   async function revokeSession(id: string, current: boolean) {
@@ -134,6 +151,7 @@ export function App() {
     <AccountManager key={`accounts-${formVersion}`} accounts={accounts} disabled={busy || loading || !!pending || needsRefresh || !online} loading={loading} submit={create} fail={setError} />
     <div className="forms"><AccountForm key={`account-${formVersion}`} disabled={busy || loading || !!pending || needsRefresh || !online} submit={body => create('accounts', body)} fail={setError} /><TransactionForm key={`transaction-${formVersion}`} accounts={accounts.filter(a => !a.archived_at)} categories={categories} tags={tags} disabled={busy || loading || !!pending || needsRefresh || !online} submit={body => create('transactions', body)} fail={setError} /></div>
     <TransferForm key={`transfer-${formVersion}`} accounts={accounts.filter(a => !a.archived_at)} categories={categories} disabled={busy || loading || !!pending || needsRefresh || !online} submit={body => create('transactions', body)} fail={setError} />
+    {deleting && <DeleteTransaction value={deleting} accounts={accounts} disabled={busy || loading || !!pending || needsRefresh || !online} confirm={() => create(`transactions/${deleting.transaction.id}`, { expected_version: deleting.transaction.version, related_versions: deleting.related.map(t => ({ id: t.id, version: t.version })) }, 'DELETE')} cancel={() => setDeleting(null)} />}
     {conflict && <TransactionConflict value={conflict} accounts={accounts} categories={categories} tags={tags} disabled={busy || loading || !!pending || !online} reload={() => void editTransaction(conflict.current.id)} dismiss={() => setConflict(null)} />}
     {editing && ['expense', 'income'].includes(editing.kind) && <TransactionForm key={`edit-${editing.id}-${editing.version}`} initial={editing} parentVersion={editingParentVersion} accounts={accounts} categories={categories} tags={tags} disabled={busy || loading || !!pending || needsRefresh || !online} submit={body => create(`transactions/${editing.id}`, body, 'PUT')} fail={setError} cancel={() => setEditing(null)} />}
     {editing?.kind === 'transfer' && <TransferForm key={`edit-transfer-${editing.id}-${editing.version}`} initial={editing} initialFee={editingFee} accounts={accounts} categories={categories} disabled={busy || loading || !!pending || needsRefresh || !online} submit={body => create(`transactions/${editing.id}`, body, 'PUT')} fail={setError} cancel={() => setEditing(null)} />}
@@ -141,7 +159,7 @@ export function App() {
     <AdjustmentForm key={`adjustment-${formVersion}`} accounts={accounts.filter(a => !a.archived_at)} disabled={busy || loading || !!pending || needsRefresh || !online} submit={create} fail={setError} />
     {editing?.kind === 'adjustment' && <AdjustmentForm key={`edit-adjustment-${editing.id}-${editing.version}`} accounts={accounts} initial={editing} disabled={busy || loading || !!pending || needsRefresh || !online} submit={create} fail={setError} cancel={() => setEditing(null)} />}
     <ClassificationManager key={`classification-${formVersion}`} categories={categories} tags={tags} disabled={busy || loading || !!pending || needsRefresh || !online} submit={create} fail={setError} />
-    <TransactionHistory key={`${auth.session.id}-${auth.workspace.id}`} workspace={auth.workspace.id} revision={historyRevision} accounts={accounts} categories={categories} tags={tags} disabled={busy || loading || !!pending || needsRefresh || !online} edit={id => void editTransaction(id)} refund={id => void newRefund(id)} fail={showError} />
+    <TransactionHistory key={`${auth.session.id}-${auth.workspace.id}`} workspace={auth.workspace.id} revision={historyRevision} accounts={accounts} categories={categories} tags={tags} disabled={busy || loading || !!pending || needsRefresh || !online} edit={id => void editTransaction(id)} refund={id => void newRefund(id)} remove={id => void deleteTransaction(id)} fail={showError} />
     <SessionManager key={auth.session.id} disabled={busy || loading || !!pending || !online} revoke={revokeSession} fail={showError} />
     </>}
   </main>;

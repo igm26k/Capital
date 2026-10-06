@@ -359,3 +359,7 @@ Version conflict показывает отправленную правку и �
 ## S3-06B: корректировки подтвержденного остатка (2026-10-06)
 
 Корректировка создается с target balance/reason/expected balance version, после создания редактируется только note. Сборки PASS; **10/10 Chrome E2E PASS**. Конкурентный доход защищен от stale adjustment, exact replay после reload дает один delta −21, note edit сохраняет финансовые поля. Далее — удаление и bulk, пакет in_progress.
+
+## S3-06B: удаление операций и зависимостей (2026-10-06)
+
+DELETE использует актуальные root/related versions, показывает движения и каскадную fee перед явным подтверждением; pending DELETE переживает reload с исходным key/body. Сборки PASS; **10/10 Chrome E2E PASS**. Active refund блокирует expense deletion; удаление refund повторяется безопасно, освобождает лимит и позволяет удалить expense. Transfer+fee deletion возвращает исходные остатки трех счетов и 404 обоих aggregates. Далее — atomic bulk и полнота metadata editor, пакет in_progress.
