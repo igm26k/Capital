@@ -325,3 +325,47 @@ test('account archive keeps history and balances, restore enables new writes', a
   await page.getByRole('button', { name: 'Сохранить операцию', exact: true }).click();
   await expect(page.locator('.accounts')).toContainText('89,00 EUR');
 });
+
+test('device revoke retries after lost response and invalidates the other cookie', async ({ page, context, browser }) => {
+  const email = `devices-${crypto.randomUUID()}@example.test`, password = 'synthetic-browser-password-2026';
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Создать профиль', exact: true }).click();
+  await page.getByLabel('Электронная почта').fill(email);
+  await page.getByLabel('Пароль', { exact: true }).fill(password);
+  await page.getByRole('button', { name: 'Зарегистрироваться', exact: true }).click();
+  await expect(page.getByText('Текущее устройство', { exact: true })).toBeVisible();
+  const other = await browser.newContext({ ignoreHTTPSErrors: true });
+  try {
+    const device = '<img src=x onerror="window.accountingXss=true">';
+    const login = await other.request.post('https://localhost:8444/api/v1/auth/login', { headers: { Origin: 'https://localhost:8444' }, data: { email, password, device_name: device, transport: 'cookie' } });
+    expect(login.status()).toBe(200);
+    const auth = await login.json();
+    expect((await other.request.get('https://localhost:8444/api/v1/currencies')).status()).toBe(200);
+    await page.getByRole('button', { name: 'Обновить устройства', exact: true }).click();
+    const row = page.getByTestId(`session-${auth.session.id}`);
+    await expect(row).toContainText(device);
+    await expect(page.locator('img')).toHaveCount(0);
+    let dropped = false;
+    const ids: string[] = [];
+    await page.route('**/api/v1/sessions/*', async route => {
+      if (route.request().method() !== 'DELETE') { await route.continue(); return; }
+      ids.push(route.request().url());
+      const response = await route.fetch();
+      expect(response.status()).toBe(200);
+      if (!dropped) { dropped = true; await route.abort('connectionfailed'); }
+      else await route.fulfill({ response });
+    });
+    await row.getByRole('button', { name: `Отключить устройство ${device}`, exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Повторить отзыв устройства', exact: true })).toBeVisible();
+    expect((await other.request.get('https://localhost:8444/api/v1/currencies')).status()).toBe(401);
+    await page.getByRole('button', { name: 'Повторить отзыв устройства', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Повторить отзыв устройства', exact: true })).toHaveCount(0);
+    await expect(row).toHaveCount(0);
+    expect(ids).toHaveLength(2); expect(ids[1]).toBe(ids[0]);
+    expect((await context.request.get('/api/v1/auth/session')).status()).toBe(200);
+    await page.unroute('**/api/v1/sessions/*');
+    await page.getByRole('button', { name: 'Отключить устройство Веб-браузер (текущее)', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Войти', exact: true })).toBeVisible();
+    expect((await context.request.get('/api/v1/auth/session')).status()).toBe(401);
+  } finally { await other.close(); }
+});

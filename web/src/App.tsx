@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { request, listAll, RequestError, type Category, type Tag, type Auth, type Account, type Transaction, type List, type Workspace } from './api/client';
+import { SessionManager } from './features/auth/SessionManager';
 import { AuthForm } from './features/auth/AuthForm';
 import { AccountManager } from './features/accounts/AccountManager';
 import { AccountForm } from './features/accounts/AccountForm';
@@ -87,6 +88,14 @@ export function App() {
       if (activeSession.current === auth.session.id) { setEditing(value); setEditingFee(value.fee_transaction_id ? dependency : null); setEditingParentVersion(value.parent_transaction_id ? dependency?.version ?? null : null); }
     } catch (error) { showError(error); } finally { setLoading(false); }
   }
+  async function revokeSession(id: string, current: boolean) {
+    if (!auth || busy || pending) throw new Error('Дождитесь завершения команды.');
+    setBusy(true);
+    try {
+      await request(`/sessions/${id}`, { method: 'DELETE', headers: { 'X-CSRF-Token': auth.csrf_token } });
+      if (current) { activeSession.current = null; setAuth(null); setAccounts([]); setTransactions([]); setCategories([]); setTags([]); setEditing(null); persist(null); }
+    } finally { setBusy(false); }
+  }
   async function logout() {
     if (!auth || pending) return;
     setBusy(true);
@@ -106,6 +115,7 @@ export function App() {
     {editing?.kind === 'transfer' && <TransferForm key={`edit-transfer-${editing.id}-${editing.version}`} initial={editing} initialFee={editingFee} accounts={accounts} categories={categories} disabled={busy || loading || !!pending || needsRefresh || !online} submit={body => create(`transactions/${editing.id}`, body, 'PUT')} fail={setError} cancel={() => setEditing(null)} />}
     <ClassificationManager key={`classification-${formVersion}`} categories={categories} tags={tags} disabled={busy || loading || !!pending || needsRefresh || !online} submit={create} fail={setError} />
     <section><h2>Последние операции</h2><p className="hint">Показаны до 100 последних операций. Полная история и синхронизация будут добавлены на следующем этапе.</p>{transactions.length ? <ul className="history">{transactions.map(transaction => <li key={transaction.id} data-testid={`transaction-${transaction.id}`}><div><strong>{transaction.kind === 'expense' && transaction.parent_transaction_id ? 'Комиссия перевода' : ({ opening: 'Начальный остаток', expense: 'Расход', income: 'Доход', transfer: 'Перевод', refund: 'Возврат', adjustment: 'Корректировка' } as Record<string, string>)[transaction.kind] ?? transaction.kind}</strong>{['expense', 'income', 'transfer'].includes(transaction.kind) && <button className="secondary" disabled={busy || loading || !!pending || needsRefresh || !online} onClick={() => void editTransaction(transaction.id)} aria-label={`Изменить операцию ${transaction.payee || transaction.note || transaction.id}`}>Изменить</button>}{transaction.payee && <p>{transaction.payee}</p>}{transaction.note && <p>{transaction.note}</p>}{transaction.allocations.map(part => <p className="hint" key={part.id}>{part.category_id ? categories.find(item => item.id === part.category_id) ? categoryLabel(categories.find(item => item.id === part.category_id)!, categories) : 'Категория недоступна' : 'Без категории'} · {money(part.amount_minor, transaction.entries[0]?.currency ?? 'EUR')}</p>)}{transaction.tag_ids.length > 0 && <p className="hint">Теги: {transaction.tag_ids.map(id => tags.find(item => item.id === id)?.name ?? 'Недоступный тег').join(', ')}</p>}</div><div>{transaction.entries.map((entry, index) => <p key={index}>{accounts.find(account => account.id === entry.account_id)?.name ?? 'Счет недоступен'} · {money(entry.amount_minor, entry.currency)}</p>)}</div></li>)}</ul> : <p>Операций пока нет.</p>}</section>
+    <SessionManager key={auth.session.id} disabled={busy || loading || !!pending || !online} revoke={revokeSession} fail={showError} />
     </>}
   </main>;
 }
