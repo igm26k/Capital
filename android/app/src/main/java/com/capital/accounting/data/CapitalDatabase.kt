@@ -20,7 +20,17 @@ interface SettingsDao {
     suspend fun save(settings: ConnectionSettings)
 }
 
-@Database(entities = [ConnectionSettings::class], version = 1, exportSchema = true)
+@Database(entities = [ConnectionSettings::class, FinancialCommand::class], version = 2, exportSchema = true)
 abstract class CapitalDatabase : RoomDatabase() {
     abstract fun settings(): SettingsDao
+    abstract fun commands(): CommandDao
+
+    companion object {
+        val MIGRATION_1_2 = object : androidx.room.migration.Migration(1, 2) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS financial_commands (commandId TEXT NOT NULL PRIMARY KEY, origin TEXT NOT NULL, ownerId TEXT NOT NULL, workspaceId TEXT NOT NULL, sessionId TEXT NOT NULL, generationId TEXT NOT NULL, path TEXT NOT NULL, method TEXT NOT NULL, body TEXT NOT NULL, state TEXT NOT NULL, result TEXT, errorCode TEXT)")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_financial_commands_origin_ownerId_workspaceId ON financial_commands (origin, ownerId, workspaceId)")
+            }
+        }
+    }
 }

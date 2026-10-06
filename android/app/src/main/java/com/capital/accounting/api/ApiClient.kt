@@ -34,7 +34,7 @@ class ApiClient(origin: String) {
             .header("Accept", "application/json").header("Cache-Control", "no-store")
         if (session != null) request.header("Authorization", "Bearer ${session.token}")
         if (commandId != null) request.header("Idempotency-Key", commandId).header("X-Sync-Generation", generationId!!)
-        request.method(method, if (method == "GET" || method == "DELETE") null else (body ?: "").toRequestBody("application/json; charset=utf-8".toMediaType()))
+        request.method(method, if (method == "GET" || (method == "DELETE" && body == null)) null else (body ?: "").toRequestBody("application/json; charset=utf-8".toMediaType()))
         val call = client.newCall(request.build())
         return suspendCancellableCoroutine { continuation ->
             continuation.invokeOnCancellation { call.cancel() }
