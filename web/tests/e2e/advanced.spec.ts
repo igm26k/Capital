@@ -281,3 +281,47 @@ test('expense editor preserves parts, retries PUT and rejects stale versions', a
   await expect(page.locator('.accounts')).toContainText('95,00 EUR');
 
 });
+
+test('account archive keeps history and balances, restore enables new writes', async ({ page, context }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Создать профиль', exact: true }).click();
+  await page.getByLabel('Электронная почта').fill(`archive-${crypto.randomUUID()}@example.test`);
+  await page.getByLabel('Пароль', { exact: true }).fill('synthetic-browser-password-2026');
+  await page.getByRole('button', { name: 'Зарегистрироваться', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Выйти', exact: true })).toBeVisible();
+  await page.getByLabel('Название счета').fill('Сохраняемый');
+  await page.getByLabel('Начальный остаток, EUR').fill('100');
+  await page.getByRole('button', { name: 'Создать счет', exact: true }).click();
+  await expect(page.locator('.accounts')).toContainText('100,00 EUR');
+  await page.getByLabel('Сумма', { exact: true }).fill('10');
+  await page.getByLabel('Примечание', { exact: true }).fill('Исторический расход');
+  await page.getByRole('button', { name: 'Сохранить операцию', exact: true }).click();
+  await expect(page.locator('.accounts')).toContainText('90,00 EUR');
+  const auth = await (await context.request.get('/api/v1/auth/session')).json();
+  const root = `/api/v1/workspaces/${auth.workspace.id}`;
+  const before = (await (await context.request.get(`${root}/accounts`)).json()).items[0];
+  await page.getByRole('button', { name: 'Изменить счет Сохраняемый', exact: true }).click();
+  await page.getByLabel('Новое название счета').fill('Архивный');
+  await page.getByLabel('Тип выбранного счета', { exact: true }).selectOption('cash');
+  await page.getByLabel('Счет в архиве', { exact: true }).check();
+  await page.getByRole('button', { name: 'Сохранить счет', exact: true }).click();
+  await expect(page.locator('.accounts')).toContainText('Архивный · В архиве');
+  await expect(page.locator('.accounts')).toContainText('90,00 EUR');
+  await expect(page.getByRole('heading', { name: 'Новая операция' }).locator('..').getByRole('option', { name: 'Архивный · EUR', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Сохранить операцию', exact: true })).toBeDisabled();
+  await expect(page.locator('.history')).toContainText('Исторический расход');
+  await expect(page.locator('.history')).toContainText('Архивный · −10,00 EUR');
+  const archived = await (await context.request.get(`${root}/accounts/${before.id}`)).json();
+  expect(archived.archived_at).not.toBeNull(); expect(archived.type).toBe('cash');
+  expect(archived.balance_version).toBe(before.balance_version);
+  expect(archived.posted_balance_minor).toBe(before.posted_balance_minor);
+  await page.reload();
+  await page.getByRole('button', { name: 'Изменить счет Архивный', exact: true }).click();
+  await page.getByLabel('Счет в архиве', { exact: true }).uncheck();
+  await page.getByRole('button', { name: 'Сохранить счет', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Сохранить операцию', exact: true })).toBeEnabled();
+  await expect(page.locator('.accounts')).not.toContainText('В архиве');
+  await page.getByLabel('Сумма', { exact: true }).fill('1');
+  await page.getByRole('button', { name: 'Сохранить операцию', exact: true }).click();
+  await expect(page.locator('.accounts')).toContainText('89,00 EUR');
+});

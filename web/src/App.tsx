@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { request, listAll, RequestError, type Category, type Tag, type Auth, type Account, type Transaction, type List, type Workspace } from './api/client';
 import { AuthForm } from './features/auth/AuthForm';
+import { AccountManager } from './features/accounts/AccountManager';
 import { AccountForm } from './features/accounts/AccountForm';
 import { TransferForm } from './features/transactions/TransferForm';
 import { TransactionForm } from './features/transactions/TransactionForm';
@@ -98,7 +99,7 @@ export function App() {
     <div className="workspace"><h2>{auth.workspace.name}</h2><button className="secondary" disabled={busy || loading || !online} onClick={() => { setError(''); void refresh(auth).catch(showError); }}>{loading ? 'Загрузка…' : 'Обновить'}</button></div>
     {message && <p role="status" className="notice success">{message}</p>}{error && <p role="alert" className="notice">{error}</p>}
     {pending && <section className="notice"><h2>Команда ожидает подтверждения</h2><p>Проверьте результат повтором той же команды. Ее данные и ключ сохранены в этой вкладке.</p><button disabled={busy || !online} onClick={() => void execute(pending)}>{busy ? 'Сохраняем…' : 'Повторить ту же команду'}</button></section>}
-    <section><h2>Счета</h2>{accounts.length ? <ul className="accounts">{accounts.map(account => <li key={account.id}><span>{account.name}</span><strong data-testid={`balance-${account.id}`}>{money(account.posted_balance_minor, account.currency)}</strong></li>)}</ul> : <p>{loading ? 'Загружаем счета…' : 'Создайте первый счет с начальным остатком.'}</p>}</section>
+    <AccountManager key={`accounts-${formVersion}`} accounts={accounts} disabled={busy || loading || !!pending || needsRefresh || !online} loading={loading} submit={create} fail={setError} />
     <div className="forms"><AccountForm key={`account-${formVersion}`} disabled={busy || loading || !!pending || needsRefresh || !online} submit={body => create('accounts', body)} fail={setError} /><TransactionForm key={`transaction-${formVersion}`} accounts={accounts.filter(a => !a.archived_at)} categories={categories} tags={tags} disabled={busy || loading || !!pending || needsRefresh || !online} submit={body => create('transactions', body)} fail={setError} /></div>
     <TransferForm key={`transfer-${formVersion}`} accounts={accounts.filter(a => !a.archived_at)} categories={categories} disabled={busy || loading || !!pending || needsRefresh || !online} submit={body => create('transactions', body)} fail={setError} />
     {editing && ['expense', 'income'].includes(editing.kind) && <TransactionForm key={`edit-${editing.id}-${editing.version}`} initial={editing} parentVersion={editingParentVersion} accounts={accounts} categories={categories} tags={tags} disabled={busy || loading || !!pending || needsRefresh || !online} submit={body => create(`transactions/${editing.id}`, body, 'PUT')} fail={setError} cancel={() => setEditing(null)} />}

@@ -335,3 +335,7 @@ S3-06B остается in_progress: переводы/комиссии/возв�
 ## S3-06B: редактирование переводов и комиссий (2026-10-06)
 
 Transfer PUT использует observed root/fee versions, сохраняет currencies/entry UUIDs и existing fee UUID/parts. Поддержаны добавление/изменение/удаление fee вместе с переводом и отдельный fee PUT с parent version. Fee поддерживает 1–100 точных частей. `make web-check`/npm build — PASS; Chrome на настоящем TLS API/PostgreSQL — **5/5 PASS**, включая transfer+fee финансовую правку, части комиссии, standalone fee parent bump, удаление fee и income edit. Остальные регрессии PASS. Далее — редактор и архив счетов; S3-06B остается in_progress.
+
+## S3-06B: редактор и архив счетов (2026-10-06)
+
+Добавлены versioned rename/type/archive/restore. Архив сохраняет видимый остаток и историю, новые операции используют только активные счета. Сборки PASS; Chrome на настоящем API/PostgreSQL — **6/6 PASS**, включая сохранение balance_version при архивировании и новую запись после восстановления. Следующий шаг — устройства и отзыв; пакет in_progress.
