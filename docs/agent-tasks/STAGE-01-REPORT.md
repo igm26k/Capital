@@ -375,3 +375,7 @@ History позволяет выбрать до 100 подходящих standalo
 ## S3-06B: сравнение массового конфликта (2026-10-06)
 
 Bulk version conflict показывает desired и current category/tags всех item; refresh снимает старый выбор без auto-resubmit. Сборки PASS; **12/12 Chrome E2E PASS**, включая полный atomic conflict/review/refresh/replay flow. Далее — оставшаяся расширенная приемка и resource conflict UX, пакет in_progress.
+
+## S3-06B: конфликты справочников и узкий экран (2026-10-06)
+
+Account/category/tag PUT conflicts показывают обе стороны и сохраняют форму; explicit refresh сбрасывает только редакторы справочников. Responsive таблицы и длинные строки проверены на 390px без horizontal overflow. Сборки PASS; **13/13 Chrome E2E PASS**, включая real account/tag conflicts и текстовое SVG-like name без выполнения. Далее — финальные расширенные financial/browser сценарии и S3-07B.
