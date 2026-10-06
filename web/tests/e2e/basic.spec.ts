@@ -98,7 +98,7 @@ test('real cookie session, ledger, lost-response retry, container restart and te
   });
   await page.getByLabel('Сумма', { exact: true }).fill('1,00');
   await page.getByRole('button', { name: 'Сохранить операцию', exact: true }).click();
-  await expect(page.getByRole('alert')).toContainText('Поколение данных изменилось');
+  await expect(page.getByRole('alert')).toContainText('Данные восстановлены или изменены на сервере');
   await expect(page.getByRole('button', { name: 'Создать счет', exact: true })).toBeDisabled();
   await page.getByRole('button', { name: 'Обновить', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Создать счет', exact: true })).toBeEnabled();
