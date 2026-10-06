@@ -369,3 +369,56 @@ test('device revoke retries after lost response and invalidates the other cookie
     expect((await context.request.get('/api/v1/auth/session')).status()).toBe(401);
   } finally { await other.close(); }
 });
+
+test('history pages and combined filters read the real ledger', async ({ page, context }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Создать профиль', exact: true }).click();
+  await page.getByLabel('Электронная почта').fill(`history-${crypto.randomUUID()}@example.test`);
+  await page.getByLabel('Пароль', { exact: true }).fill('synthetic-browser-password-2026');
+  await page.getByRole('button', { name: 'Зарегистрироваться', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Выйти', exact: true })).toBeVisible();
+  await page.getByLabel('Название счета').fill('История');
+  await page.getByLabel('Начальный остаток, EUR').fill('100');
+  await page.getByRole('button', { name: 'Создать счет', exact: true }).click();
+  await expect(page.locator('.accounts')).toContainText('100,00 EUR');
+  await page.getByLabel('Название категории', { exact: true }).fill('Покупки');
+  await page.getByRole('button', { name: 'Создать категорию', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Изменить категорию Покупки', exact: true })).toBeVisible();
+  await page.getByLabel('Название тега', { exact: true }).fill('Четные');
+  await page.getByRole('button', { name: 'Создать тег', exact: true }).click();
+  await expect(page.getByLabel('Четные', { exact: true })).toBeVisible();
+  const auth = await (await context.request.get('/api/v1/auth/session')).json();
+  const root = `/api/v1/workspaces/${auth.workspace.id}`;
+  const account = (await (await context.request.get(`${root}/accounts`)).json()).items[0];
+  const category = (await (await context.request.get(`${root}/categories`)).json()).items[0];
+  const tag = (await (await context.request.get(`${root}/tags`)).json()).items[0];
+  for (let i = 0; i < 12; i++) {
+    const response = await context.request.post(`${root}/transactions`, { headers: { Origin: 'https://localhost:8444', 'X-CSRF-Token': auth.csrf_token, 'X-Sync-Generation': auth.workspace.sync_generation_id, 'Idempotency-Key': crypto.randomUUID() }, data: { id: crypto.randomUUID(), kind: 'expense', account_id: account.id, amount_minor: '100', occurred_at: new Date().toISOString(), occurred_timezone: 'UTC', note: `Покупка ${i + 1}`, payee: '', tag_ids: i % 2 === 0 ? [tag.id] : [], allocations: [{ id: crypto.randomUUID(), category_id: category.id, amount_minor: '100' }] } });
+    expect(response.status()).toBe(201);
+  }
+  await page.getByRole('button', { name: 'Обновить', exact: true }).click();
+  await expect(page.locator('.accounts')).toContainText('88,00 EUR');
+  const history = page.getByRole('heading', { name: 'История операций', exact: true }).locator('..');
+  await history.getByLabel('Тип в истории', { exact: true }).selectOption('expense');
+  await history.getByLabel('Поиск в истории', { exact: true }).fill('Покупка');
+  await history.getByLabel('Операций на странице', { exact: true }).selectOption('10');
+  await history.getByRole('button', { name: 'Применить фильтры', exact: true }).click();
+  await expect(history.locator('.history > li')).toHaveCount(10);
+  await history.getByRole('button', { name: 'Загрузить еще операции', exact: true }).click();
+  await expect(history.locator('.history > li')).toHaveCount(12);
+  expect(new Set(await history.locator('.history > li').evaluateAll(rows => rows.map(row => row.getAttribute('data-testid')))).size).toBe(12);
+  await expect(history.getByRole('button', { name: 'Загрузить еще операции', exact: true })).toHaveCount(0);
+  await history.getByLabel('Счет истории', { exact: true }).selectOption(account.id);
+  await history.getByLabel('Категория истории', { exact: true }).selectOption(category.id);
+  await history.getByLabel('Тег истории', { exact: true }).selectOption(tag.id);
+  const today = await page.evaluate(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; });
+  await history.getByLabel('С даты', { exact: true }).fill(today);
+  await history.getByLabel('По дату включительно', { exact: true }).fill(today);
+  await history.getByRole('button', { name: 'Применить фильтры', exact: true }).click();
+  await expect(history.locator('.history > li')).toHaveCount(6);
+  await history.getByLabel('Статус в истории', { exact: true }).selectOption('pending');
+  await history.getByRole('button', { name: 'Применить фильтры', exact: true }).click();
+  await expect(history.getByText('Операций по выбранным условиям нет.', { exact: true })).toBeVisible();
+  await history.getByRole('button', { name: 'Сбросить фильтры', exact: true }).click();
+  await expect(history.locator('.history > li')).toHaveCount(13);
+});
