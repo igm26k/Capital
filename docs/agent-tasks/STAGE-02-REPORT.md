@@ -2,7 +2,7 @@
 
 Дата: 2026-10-06. Статус: in_progress.
 
-Сервер/веб приняты в S3-07B. APP-01 завершена. В APP-02 принято локальное Keystore/AES-GCM хранение bearer session; реальные вход/renew/revoke и финансовые экраны еще реализуются. S3-05 не начат. Банковские источники остаются финальным этапом.
+Сервер/веб приняты в S3-07B. APP-01 завершена. В APP-02 приняты Keystore/AES-GCM, реальные login/register/restore/renew/logout, process restart и durable logout intent (6/6 device tests). Devices/финансовые экраны еще реализуются. S3-05 не начат. Банковские источники остаются финальным этапом.
 
 ## APP-01 принята — 2026-10-06
 
@@ -15,3 +15,11 @@
 CredentialVault сохраняет token и идентификаторы principal/session/workspace/generation через AES256-GCM/AtomicFile/noBackupFilesDir; HTTPS origin включен в AAD. Ключ AndroidKeyStore non-exportable, reader не генерирует новый ключ при потере и сохраняет damaged evidence. Crypto/IO вне main thread, string output редактирован. Manifest/extraction rules задают исключения backup/device-transfer.
 
 `make android-check android-device-check` с JDK25 — PASS: APK, 2/2 unit, lint без ошибок и **4/4 device tests** на API36, включая genuine Keystore, ciphertext/tag/origin tampering, absent key и interrupted atomic replacement. Lint теперь 10 warnings (версии/иконка), предупреждение extraction rules устранено. Runtime backup/physical device transfer и реальная серверная auth с восстановлением процесса пока не проверены; следующий шаг — bearer HTTP и auth UI. APP-02 остается in_progress.
+
+## APP-02: real HTTPS auth принята — 2026-10-06
+
+Реализованы формы регистрации/входа, серверная проверка сохраненной сессии, renew и logout с durable encrypted intent. Пароль передается буквально и очищается из UI; DTOs генерируются и проверяются по OpenAPI. Network client блокирует token другого origin, cookie/redirect/auto-retry отключены, ошибки JSON не выводят bearer body. Debug localhost CA генерируется из публичного сертификата только в debug variant, release XML остается system-only.
+
+Штатный `make android-auth-e2e` (JDK25/SDK/API36, DOCKER_BUILD_NETWORK=host) — PASS: сборки/debug/release, 2/2 unit, lint, **6/6 real instrumentation**, actual API/PostgreSQL/TLS. Force-stop/start восстанавливает тот же server session; отключение API оставляет durable logout intent, он переживает process restart, после явного повтора сервер отзывает session и app удаляет credential. SQL: revoked_at и ровно 2 sessions (registration + отдельный UI login), без создания sessions при renew/restore. Compiled release resource table/XML подтверждает system CA only и отсутствие debug trust. Ограниченные runtime artifacts не содержат token/password.
+
+APP-02 остается in_progress: devices/revoke и финансовый Android UI еще не приняты; S3-05 mirror/outbox/staging и APP-03 полная Android→server→web финансовая приемка остаются следующими пакетами.

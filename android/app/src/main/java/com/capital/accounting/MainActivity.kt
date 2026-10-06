@@ -5,48 +5,61 @@ import androidx.activity.ComponentActivity
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import com.capital.accounting.data.ConnectionSettings
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.launch
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.capital.accounting.auth.AuthViewModel
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        val settings = (application as CapitalApplication).database.settings()
         setContent {
+            val model: AuthViewModel = viewModel()
+            val state = model.state
+            var origin by remember(state.origin) { mutableStateOf(state.origin) }
+            var email by remember { mutableStateOf("") }
+            var password by remember { mutableStateOf("") }
+            var device by remember { mutableStateOf("Android") }
+            LaunchedEffect(state.auth) { if (state.auth != null) password = "" }
             MaterialTheme(colorScheme = if (isSystemInDarkTheme()) darkColorScheme() else lightColorScheme()) {
-                var origin by remember { mutableStateOf("") }
-                var message by remember { mutableStateOf("") }
-                var ready by remember { mutableStateOf(false) }
-                val scope = rememberCoroutineScope()
-                LaunchedEffect(Unit) { origin = settings.get()?.origin ?: ""; ready = true }
                 Surface(Modifier.fillMaxSize()) {
                     Column(Modifier.safeDrawingPadding().imePadding().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                         Text("Capital", style = MaterialTheme.typography.headlineLarge)
                         Text("Ручной учет финансов")
-                        OutlinedTextField(origin, { origin = it; message = "" }, label = { Text("Адрес сервера") }, singleLine = true, modifier = Modifier.fillMaxWidth(), enabled = ready)
-                        Button(enabled = ready, onClick = {
-                            scope.launch {
-                                ready = false
-                                try {
-                                    val normalized = normalizedOrigin(origin)
-                                    settings.save(ConnectionSettings(origin = normalized))
-                                    origin = normalized
-                                    message = "Адрес сохранен"
-                                } catch (e: CancellationException) { throw e }
-                                catch (_: Exception) { message = "Не удалось сохранить адрес. Проверьте HTTPS-адрес сервера." }
-                                finally { ready = true }
+                        if (state.message.isNotEmpty()) Text(state.message)
+                        if (state.busy) CircularProgressIndicator()
+                        if (state.logoutPending) {
+                            Button(enabled = !state.busy, onClick = model::logout) { Text("Повторить выход") }
+                        } else if (state.auth != null) {
+                            Text("Вы вошли: ${state.auth.profile.email}")
+                            Text("Пространство: ${state.auth.workspace.name}")
+                            Text("Устройство: ${state.auth.session.device_name}")
+                            Text("Сессия действует до: ${state.auth.session.expires_at}")
+                            if (!state.persisted) Button(enabled = !state.busy, onClick = model::persist) { Text("Повторить сохранение сессии") }
+                            Button(enabled = !state.busy, onClick = model::renew) { Text("Продлить сессию") }
+                            Button(enabled = !state.busy, onClick = model::logout) { Text("Выйти") }
+                        } else {
+                            OutlinedTextField(origin, { origin = it }, label = { Text("Адрес сервера") }, singleLine = true, modifier = Modifier.fillMaxWidth(), enabled = !state.busy)
+                            Button(enabled = !state.busy, onClick = { model.saveOrigin(origin) }) { Text("Сохранить адрес") }
+                            if (state.restorePending) Button(enabled = !state.busy, onClick = model::restore) { Text("Проверить сохраненную сессию") }
+                            if (state.origin.isNotEmpty()) {
+                                Text("Сервер: ${state.origin}")
+                                OutlinedTextField(email, { email = it }, label = { Text("Email") }, singleLine = true, modifier = Modifier.fillMaxWidth(), enabled = !state.busy)
+                                OutlinedTextField(password, { password = it }, label = { Text("Пароль") }, visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, autoCorrectEnabled = false), singleLine = true, modifier = Modifier.fillMaxWidth(), enabled = !state.busy)
+                                OutlinedTextField(device, { device = it }, label = { Text("Название устройства") }, singleLine = true, modifier = Modifier.fillMaxWidth(), enabled = !state.busy)
+                                Button(enabled = !state.busy && origin == state.origin && email.isNotBlank() && password.isNotEmpty() && device.isNotBlank(), onClick = { model.authenticate(email, password, device, false); password = "" }) { Text("Войти") }
+                                Button(enabled = !state.busy && origin == state.origin && email.isNotBlank() && password.isNotEmpty() && device.isNotBlank(), onClick = { model.authenticate(email, password, device, true); password = "" }) { Text("Зарегистрироваться") }
                             }
-                        }) { Text("Сохранить адрес") }
-                        if (message.isNotEmpty()) Text(message)
+                        }
                     }
                 }
             }

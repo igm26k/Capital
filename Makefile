@@ -84,6 +84,11 @@ access-check:
 
 .PHONY: android-check android-device-check
 android-check:
+	python3 scripts/generate-android-contracts.py --check
 	cd android && ./gradlew assembleDebug testDebugUnitTest lintDebug
 android-device-check:
 	cd android && ./gradlew connectedDebugAndroidTest
+
+.PHONY: android-auth-e2e
+android-auth-e2e:
+	./scripts/android-auth-e2e.sh

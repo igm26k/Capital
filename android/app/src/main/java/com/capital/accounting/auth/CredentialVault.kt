@@ -26,6 +26,7 @@ class StoredSession(
     val workspaceId: String,
     val generationId: String,
     val sessionId: String,
+    val logoutPending: Boolean = false,
 ) {
     init {
         require(normalizedOrigin(origin) == origin)
@@ -58,7 +59,7 @@ class CredentialVault internal constructor(context: Context, storageName: String
             cipher.updateAAD(aad(session.origin))
             val plain = JSONObject().put("token", session.token).put("owner_id", session.ownerId)
                 .put("workspace_id", session.workspaceId).put("generation_id", session.generationId)
-                .put("session_id", session.sessionId).toString().toByteArray(Charsets.UTF_8)
+                .put("session_id", session.sessionId).put("logout_pending", session.logoutPending).toString().toByteArray(Charsets.UTF_8)
             val encrypted = try { cipher.doFinal(plain) } finally { plain.fill(0) }
             val packet = JSONObject().put("format", 1).put("origin", session.origin)
                 .put("iv", encode(cipher.iv)).put("ciphertext", encode(encrypted))
@@ -101,7 +102,7 @@ class CredentialVault internal constructor(context: Context, storageName: String
                     val body = JSONObject(String(plain, Charsets.UTF_8))
                     VaultRead.Available(StoredSession(expected, body.getString("token"),
                         body.getString("owner_id"), body.getString("workspace_id"),
-                        body.getString("generation_id"), body.getString("session_id")))
+                        body.getString("generation_id"), body.getString("session_id"), body.optBoolean("logout_pending", false)))
                 } finally { plain.fill(0) }
             } catch (_: Exception) { VaultRead.Invalid }
         }
