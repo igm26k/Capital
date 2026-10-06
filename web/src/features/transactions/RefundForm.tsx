@@ -2,7 +2,8 @@ import { useState, type FormEvent } from 'react';
 import type { Account, Category, Tag, Transaction } from '../../api/client';
 import { decimal, minor, money } from '../../shared/money';
 import { categoryLabel } from '../../shared/categories';
-import { timezone } from '../auth/AuthForm';
+import { occurrence } from '../../shared/time';
+import { OccurrenceFields } from '../../shared/OccurrenceFields';
 type Props = { parent: Transaction; transferVersion: string | null; initial?: Transaction; accounts: Account[]; categories: Category[]; tags: Tag[]; disabled: boolean; submit: (body: object) => void; fail: (message: string) => void; cancel: () => void };
 export function RefundForm({ parent, transferVersion, initial, accounts, categories, tags, disabled, submit, fail, cancel }: Props) {
   const currency = parent.entries[0].currency;
@@ -27,12 +28,13 @@ export function RefundForm({ parent, transferVersion, initial, accounts, categor
       const total = positive.reduce((sum, p) => sum + BigInt(p.amount_minor), 0n);
       if (total <= 0n) throw new Error('Укажите положительную сумму хотя бы одной части возврата.');
       if (total > 9000000000000000n) throw new Error('Сумма выходит за допустимый диапазон.');
-      submit({ ...(initial ? { expected_version: initial.version } : { id: crypto.randomUUID() }), kind: 'refund', account_id: account.id, amount_minor: total.toString(), parent_transaction_id: parent.id, expected_parent_version: parent.version, expected_transfer_version: transferVersion, allocations: positive, occurred_at: initial?.occurred_at ?? new Date().toISOString(), occurred_timezone: initial?.occurred_timezone ?? timezone(), note: data.get('refund_note'), payee: data.get('refund_payee'), tag_ids: data.getAll('refund_tag') });
+      submit({ ...(initial ? { expected_version: initial.version } : { id: crypto.randomUUID() }), kind: 'refund', account_id: account.id, amount_minor: total.toString(), parent_transaction_id: parent.id, expected_parent_version: parent.version, expected_transfer_version: transferVersion, allocations: positive, ...occurrence(data, initial), note: data.get('refund_note'), payee: data.get('refund_payee'), tag_ids: data.getAll('refund_tag') });
     } catch (error) { fail((error as Error).message); }
   }
   return <section><h2>{initial ? 'Изменить возврат' : 'Новый возврат'}</h2><p>Исходный расход: {parent.payee || parent.note || new Date(parent.occurred_at).toLocaleString('ru-RU')}. Категории наследуются от его частей.</p><form onSubmit={save}><fieldset disabled={disabled || !account}>
     <label>Счет возврата<select aria-label="Счет возврата" value={account?.id ?? ''} onChange={event => setAccountID(event.target.value)}>{eligible.map(a => <option key={a.id} value={a.id}>{a.name} · {a.currency}</option>)}</select></label>
     {parts.map((part, index) => { const category = categories.find(c => c.id === part.original.category_id); return <div className="allocation" key={part.id}><p>{category ? categoryLabel(category, categories) : 'Без категории'} · Доступно: {money(part.maximum, currency)}</p><label>Возврат части {index + 1}<input value={part.amount} inputMode="decimal" placeholder="0" onChange={event => setParts(items => items.map(p => p.id === part.id ? { ...p, amount: event.target.value } : p))} /></label></div>; })}
+    <OccurrenceFields label="Дата возврата" initial={initial?.occurred_at} />
     <label>Получатель возврата<input name="refund_payee" maxLength={200} defaultValue={initial?.payee} /></label><label>Описание возврата<textarea aria-label="Описание возврата" name="refund_note" maxLength={2000} defaultValue={initial?.note} /></label>
     {tags.some(t => !t.archived_at || initial?.tag_ids.includes(t.id)) && <fieldset className="tag-options"><legend>Теги возврата</legend>{tags.filter(t => !t.archived_at || initial?.tag_ids.includes(t.id)).map(t => <label className="check" key={t.id}><input type="checkbox" name="refund_tag" value={t.id} defaultChecked={initial?.tag_ids.includes(t.id)} />{t.name}</label>)}</fieldset>}
     <button>{initial ? 'Сохранить изменения возврата' : 'Сохранить возврат'}</button><button type="button" className="secondary" onClick={cancel}>Отменить возврат</button>

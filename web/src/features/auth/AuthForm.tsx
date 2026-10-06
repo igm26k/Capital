@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { request, RequestError, type Auth } from '../../api/client';
-export const timezone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+import { timezone } from '../../shared/time';
+export { timezone };
 export function AuthForm({ onAuth }: { onAuth: (auth: Auth) => void }) {
   const [register, setRegister] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState('');
   async function submit(event: FormEvent<HTMLFormElement>) {

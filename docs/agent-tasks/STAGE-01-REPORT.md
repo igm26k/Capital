@@ -367,3 +367,7 @@ DELETE использует актуальные root/related versions, пока
 ## S3-06B: атомарная массовая классификация (2026-10-06)
 
 History позволяет выбрать до 100 подходящих standalone expense/income и одной командой заменить category/tags с observed versions. Сборки PASS; **11/11 Chrome E2E PASS**. Конкурентная правка одного item отклоняет весь package без частичных изменений; exact replay успешного package после reload не увеличивает versions повторно и не меняет balance_version. Далее — даты и полнота transfer/fee metadata, расширенная финальная приемка. Пакет in_progress.
+
+## S3-06B: даты и metadata переводов/комиссий (2026-10-06)
+
+Добавлены даты открытия и операций, transfer payee/tags, fee note/tags. Неизмененный instant/timezone сохраняется буквально, standalone fee date управляется переводом. Сборки PASS; **12/12 Chrome E2E PASS**. Исторические EUR→KWD transfer/fee сохраняют archived category/tag, точные timestamps и balance versions при note-only PUT; FX rate=617/1500. Расширенные date-edit/microsecond/fee-refund/transfer-conflict сценарии остаются следующей приемкой; пакет пока in_progress.
