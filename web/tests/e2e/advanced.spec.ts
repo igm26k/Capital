@@ -267,6 +267,12 @@ test('expense editor preserves parts, retries PUT and rejects stale versions', a
   const final = await (await context.request.get(`${root}/transactions/${before.id}`)).json();
   expect(final.note).toBe('Правка другого устройства');
   await expect(editor.getByLabel('Примечание', { exact: true })).toHaveValue('Моя устаревшая правка');
+  const comparison = page.getByRole('heading', { name: 'Конфликт операции', exact: true }).locator('..');
+  await expect(comparison).toContainText('Моя устаревшая правка');
+  await expect(comparison).toContainText('Правка другого устройства');
+  await comparison.getByRole('button', { name: 'Загрузить серверную версию в редактор', exact: true }).click();
+  await expect(comparison).toHaveCount(0);
+  await expect(editor.getByLabel('Примечание', { exact: true })).toHaveValue('Правка другого устройства');
   await editor.getByRole('button', { name: 'Отменить редактирование', exact: true }).click();
   const creator = page.getByRole('heading', { name: 'Новая операция', exact: true }).locator('..');
   await creator.getByLabel('Тип операции', { exact: true }).selectOption('income');

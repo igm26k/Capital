@@ -7,6 +7,7 @@ import { AccountForm } from './features/accounts/AccountForm';
 import { TransferForm } from './features/transactions/TransferForm';
 import { TransactionForm } from './features/transactions/TransactionForm';
 import { ClassificationManager } from './features/classification/ClassificationManager';
+import { TransactionConflict, type ProposedTransaction, type TransactionComparison } from './features/transactions/TransactionConflict';
 import { TransactionHistory } from './features/transactions/TransactionHistory';
 // A single unfinished command survives reload in this tab. No credentials are persisted.
 type Command = { owner: string; session: string; workspace: string; generation: string; key: string; path: string; body: string; method?: 'POST' | 'PUT' };
@@ -25,11 +26,12 @@ export function App() {
   const [needsRefresh, setNeedsRefresh] = useState(false);
   const [auth, setAuth] = useState<Auth | null>(null), [starting, setStarting] = useState(true), [startupError, setStartupError] = useState('');
   const [accounts, setAccounts] = useState<Account[]>([]), [historyRevision, setHistoryRevision] = useState(0);
+  const [conflict, setConflict] = useState<TransactionComparison | null>(null);
   const [editingFee, setEditingFee] = useState<Transaction | null>(null), [editingParentVersion, setEditingParentVersion] = useState<string | null>(null);
   const [editing, setEditing] = useState<Transaction | null>(null);
   const [categories, setCategories] = useState<Category[]>([]), [tags, setTags] = useState<Tag[]>([]);
   const [pending, setPending] = useState<Command | null>(null), [busy, setBusy] = useState(false), [loading, setLoading] = useState(false), [message, setMessage] = useState(''), [error, setError] = useState(''), [online, setOnline] = useState(navigator.onLine), [formVersion, setFormVersion] = useState(0);
-  function authenticated(value: Auth) { activeSession.current = value.session.id; setAccounts([]); setCategories([]); setTags([]); setEditing(null); setAuth(value); setPending(restore(value)); setError(''); setMessage(''); }
+  function authenticated(value: Auth) { activeSession.current = value.session.id; setAccounts([]); setCategories([]); setTags([]); setEditing(null); setConflict(null); setAuth(value); setPending(restore(value)); setError(''); setMessage(''); }
   async function session() {
     setStarting(true); setStartupError('');
     try { authenticated(await request<Auth>('/auth/session')); }
@@ -58,7 +60,7 @@ export function App() {
     setBusy(true); setError(''); setMessage('');
     try {
       await request(command.path, { method: command.method ?? 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': auth.csrf_token, 'X-Sync-Generation': command.generation, 'Idempotency-Key': command.key }, body: command.body });
-      persist(null); setPending(null); setEditing(null); setFormVersion(v => v + 1); setMessage('Сохранено.');
+      persist(null); setPending(null); setEditing(null); setConflict(null); setFormVersion(v => v + 1); setMessage('Сохранено.');
       try { await refresh(auth); } catch (error) { setError('Операция сохранена, но обновить список не удалось. Нажмите «Обновить».'); showError(error); }
     } catch (error) {
       if (error instanceof RequestError && ['action_result_expired', 'idempotency_conflict'].includes(error.code)) {
@@ -67,7 +69,16 @@ export function App() {
         // Explicit rejection is final. Never regenerate a key automatically.
         persist(null); setPending(null);
         if (error.code === 'sync_generation_conflict') { setNeedsRefresh(true); setError('Данные восстановлены или изменены на сервере. Обновите список и проверьте данные перед новой операцией.'); }
-        else if (error.status === 409) setError(`Конфликт: ${error.message}. Обновите данные перед повторным вводом.`);
+        else if (error.status === 409) {
+          setError(`Конфликт: ${error.message}. Обновите данные перед повторным вводом.`);
+          if (error.code === 'version_conflict' && command.method === 'PUT' && command.path.includes('/transactions/')) {
+            try {
+              const current = await request<Transaction>(command.path);
+              const fee = current.fee_transaction_id ? await request<Transaction>(`/workspaces/${command.workspace}/transactions/${current.fee_transaction_id}`) : null;
+              if (activeSession.current === command.session) setConflict({ proposed: JSON.parse(command.body) as ProposedTransaction, current, fee });
+            } catch { setError('Конфликт: правка отклонена. Не удалось загрузить данные для сравнения; введенная форма сохранена.'); }
+          }
+        }
         else showError(error);
       } else setError('Ответ не получен. Операция могла сохраниться. Повторите ту же команду кнопкой ниже; изменение не будет применено дважды.');
     } finally { setBusy(false); }
@@ -84,7 +95,7 @@ export function App() {
       const value = await request<Transaction>(`/workspaces/${auth.workspace.id}/transactions/${id}`);
       const related = value.fee_transaction_id || value.parent_transaction_id;
       const dependency = related ? await request<Transaction>(`/workspaces/${auth.workspace.id}/transactions/${related}`) : null;
-      if (activeSession.current === auth.session.id) { setEditing(value); setEditingFee(value.fee_transaction_id ? dependency : null); setEditingParentVersion(value.parent_transaction_id ? dependency?.version ?? null : null); }
+      if (activeSession.current === auth.session.id) { setEditing(value); setConflict(null); setEditingFee(value.fee_transaction_id ? dependency : null); setEditingParentVersion(value.parent_transaction_id ? dependency?.version ?? null : null); }
     } catch (error) { showError(error); } finally { setLoading(false); }
   }
   async function revokeSession(id: string, current: boolean) {
@@ -110,6 +121,7 @@ export function App() {
     <AccountManager key={`accounts-${formVersion}`} accounts={accounts} disabled={busy || loading || !!pending || needsRefresh || !online} loading={loading} submit={create} fail={setError} />
     <div className="forms"><AccountForm key={`account-${formVersion}`} disabled={busy || loading || !!pending || needsRefresh || !online} submit={body => create('accounts', body)} fail={setError} /><TransactionForm key={`transaction-${formVersion}`} accounts={accounts.filter(a => !a.archived_at)} categories={categories} tags={tags} disabled={busy || loading || !!pending || needsRefresh || !online} submit={body => create('transactions', body)} fail={setError} /></div>
     <TransferForm key={`transfer-${formVersion}`} accounts={accounts.filter(a => !a.archived_at)} categories={categories} disabled={busy || loading || !!pending || needsRefresh || !online} submit={body => create('transactions', body)} fail={setError} />
+    {conflict && <TransactionConflict value={conflict} accounts={accounts} categories={categories} tags={tags} disabled={busy || loading || !!pending || !online} reload={() => void editTransaction(conflict.current.id)} dismiss={() => setConflict(null)} />}
     {editing && ['expense', 'income'].includes(editing.kind) && <TransactionForm key={`edit-${editing.id}-${editing.version}`} initial={editing} parentVersion={editingParentVersion} accounts={accounts} categories={categories} tags={tags} disabled={busy || loading || !!pending || needsRefresh || !online} submit={body => create(`transactions/${editing.id}`, body, 'PUT')} fail={setError} cancel={() => setEditing(null)} />}
     {editing?.kind === 'transfer' && <TransferForm key={`edit-transfer-${editing.id}-${editing.version}`} initial={editing} initialFee={editingFee} accounts={accounts} categories={categories} disabled={busy || loading || !!pending || needsRefresh || !online} submit={body => create(`transactions/${editing.id}`, body, 'PUT')} fail={setError} cancel={() => setEditing(null)} />}
     <ClassificationManager key={`classification-${formVersion}`} categories={categories} tags={tags} disabled={busy || loading || !!pending || needsRefresh || !online} submit={create} fail={setError} />
