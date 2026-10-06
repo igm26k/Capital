@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Generate Android auth DTOs from the shared OpenAPI; --check prevents drift."""
+"""Generate Android API DTOs from the shared OpenAPI; --check prevents drift."""
 import json
 import sys
 from pathlib import Path
 root = Path(__file__).resolve().parents[1]
 schemas = json.loads((root / 'contracts/openapi.json').read_text())['components']['schemas']
-names = ['Profile', 'Workspace', 'Session', 'BearerAuth', 'Login', 'Register', 'Acknowledgement', 'SessionList']
+names = ['Profile', 'Workspace', 'Session', 'BearerAuth', 'Login', 'Register', 'Acknowledgement', 'SessionList', 'Account', 'AccountCreate', 'AccountUpdate', 'AccountList', 'MutationResult', 'Transaction', 'Category', 'Tag', 'Tombstone', 'Rate', 'Entry', 'Allocation']
 def kotlin_type(schema):
     if 'anyOf' in schema:
         values = [x for x in schema['anyOf'] if x.get('type') != 'null']
@@ -40,7 +40,7 @@ content = '\n'.join(lines)
 path = root / 'android/app/src/main/java/com/capital/accounting/api/ApiModels.kt'
 if '--check' in sys.argv:
     assert path.read_text() == content, 'Android DTOs differ from OpenAPI; regenerate'
-    print('PASS Android auth DTOs match shared OpenAPI')
+    print('PASS Android API DTOs match shared OpenAPI')
 else:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content)

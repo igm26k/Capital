@@ -29,3 +29,9 @@ APP-02 остается in_progress: devices/revoke и финансовый Andr
 Android показывает все страницы активных устройств и текущую сессию. Отзыв сохраняет encrypted target UUID до DELETE, переживает offline/process restart и требует явного повтора. Реальный `make android-auth-e2e`: **7/7 instrumentation**, unit/build/lint и release trust PASS. limit=1 проверяет pagination; cross-user revoke дает 404, другой bearer после отзыва получает 401 при сохраненной текущей сессии, повтор DELETE идемпотентен; self-revoke возвращает вход. Runtime API outage/cold restart/retry подтвержден SQL для выбранного другого UUID, затем logout drill отзывает текущую сессию и удаляет vault. Артефакты без token/password — ops/.runtime/checks/android-devices-instrumentation.txt и android-auth-runtime.json.
 
 APP-02 in_progress: финансовые экраны еще не приняты; далее счета, операции, классификация/фильтры, затем S3-05 и APP-03.
+
+## APP-02: финансовый transport и счета API — 2026-10-06
+
+Общий MutationResult/Account DTOs генерируются из OpenAPI; суммы и версии строковые. Парные headers command/generation передаются без auto-retry. BigInteger Money проверяет валютные масштабы, синтаксис и лимит без плавающей точки. Полный `make android-auth-e2e`: 4/4 unit, **8/8 instrumentation** и debug/release/lint PASS. Android через actual API/PostgreSQL создает KWD 123456 minor с единственной opening операцией; idempotent replay структурно равен, история и остаток подтверждают отсутствие дубля. Архив/восстановление и rename/type не меняют balance_version/остаток, stale version и invalid generation дают 409. Остальные auth/device runtime drills и compiled release trust проходят.
+
+Экраны финансового учета еще отсутствуют: этот шаг принимает только контракт и сетевой слой. Следующий шаг — сохранение неизвестного результата команды до отправки и экран счетов; APP-02/S3-05/APP-03 не завершены.

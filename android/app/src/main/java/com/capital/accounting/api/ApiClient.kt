@@ -22,12 +22,18 @@ class ApiFailure(val status: Int, val code: String) : IOException("HTTP $status"
 
 class ApiClient(origin: String) {
     val origin = normalizedOrigin(origin)
-    suspend fun request(path: String, method: String = "GET", body: String? = null, session: StoredSession? = null): String {
+    suspend fun request(path: String, method: String = "GET", body: String? = null, session: StoredSession? = null, commandId: String? = null, generationId: String? = null): String {
         require(path.startsWith('/') && !path.startsWith("//") && !path.contains('\\'))
         require(session == null || session.origin == origin)
+        require((commandId == null) == (generationId == null))
+        if (commandId != null) {
+            require(session != null && method != "GET")
+            listOf(commandId, generationId!!).forEach { require(java.util.UUID.fromString(it).toString() == it) }
+        }
         val request = Request.Builder().url("$origin/api/v1$path")
             .header("Accept", "application/json").header("Cache-Control", "no-store")
         if (session != null) request.header("Authorization", "Bearer ${session.token}")
+        if (commandId != null) request.header("Idempotency-Key", commandId).header("X-Sync-Generation", generationId!!)
         request.method(method, if (method == "GET" || method == "DELETE") null else (body ?: "").toRequestBody("application/json; charset=utf-8".toMediaType()))
         val call = client.newCall(request.build())
         return suspendCancellableCoroutine { continuation ->

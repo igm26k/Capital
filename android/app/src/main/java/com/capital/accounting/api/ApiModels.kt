@@ -99,3 +99,179 @@ data class SessionList(
 ) {
     override fun toString() = "SessionList([redacted])"
 }
+
+@Serializable
+data class Account(
+    val id: String,
+    val workspace_id: String,
+    val version: String,
+    val created_at: String,
+    val updated_at: String,
+    val deleted_at: String?,
+    val name: String,
+    val type: String,
+    val currency: String,
+    val opened_at: String,
+    val archived_at: String?,
+    val balance_version: String,
+    val posted_balance_minor: String,
+    val pending_delta_minor: String,
+    val projected_balance_minor: String,
+) {
+    init {
+        require(type in setOf("cash", "bank", "card")) { "Invalid Account.type" }
+    }
+    override fun toString() = "Account([redacted])"
+}
+
+@Serializable
+data class AccountCreate(
+    val id: String,
+    val name: String,
+    val type: String,
+    val currency: String,
+    val opened_at: String,
+    val occurred_timezone: String,
+    val opening_balance_minor: String,
+) {
+    init {
+        require(type in setOf("cash", "bank", "card")) { "Invalid AccountCreate.type" }
+    }
+    override fun toString() = "AccountCreate([redacted])"
+}
+
+@Serializable
+data class AccountUpdate(
+    val expected_version: String,
+    val name: String,
+    val type: String,
+    val archived: Boolean,
+) {
+    init {
+        require(type in setOf("cash", "bank", "card")) { "Invalid AccountUpdate.type" }
+    }
+    override fun toString() = "AccountUpdate([redacted])"
+}
+
+@Serializable
+data class AccountList(
+    val items: List<Account>,
+    val next_cursor: String?,
+) {
+    override fun toString() = "AccountList([redacted])"
+}
+
+@Serializable
+data class MutationResult(
+    val action_id: String,
+    val accounts: List<Account>,
+    val transactions: List<Transaction>,
+    val categories: List<Category>,
+    val tags: List<Tag>,
+    val deleted: List<Tombstone>,
+    val sync_group_sequence: String,
+    val generation_id: String,
+) {
+    override fun toString() = "MutationResult([redacted])"
+}
+
+@Serializable
+data class Transaction(
+    val id: String,
+    val workspace_id: String,
+    val version: String,
+    val created_at: String,
+    val updated_at: String,
+    val deleted_at: String?,
+    val kind: String,
+    val status: String,
+    val occurred_at: String,
+    val occurred_timezone: String,
+    val note: String,
+    val payee: String,
+    val reason: String?,
+    val parent_transaction_id: String?,
+    val fee_transaction_id: String?,
+    val rate: Rate?,
+    val entries: List<Entry>,
+    val allocations: List<Allocation>,
+    val tag_ids: List<String>,
+) {
+    init {
+        require(kind in setOf("opening", "expense", "income", "transfer", "refund", "adjustment")) { "Invalid Transaction.kind" }
+        require(status in setOf("pending", "posted")) { "Invalid Transaction.status" }
+    }
+    override fun toString() = "Transaction([redacted])"
+}
+
+@Serializable
+data class Category(
+    val id: String,
+    val workspace_id: String,
+    val version: String,
+    val created_at: String,
+    val updated_at: String,
+    val deleted_at: String?,
+    val name: String,
+    val archived_at: String?,
+    val parent_id: String?,
+) {
+    override fun toString() = "Category([redacted])"
+}
+
+@Serializable
+data class Tag(
+    val id: String,
+    val workspace_id: String,
+    val version: String,
+    val created_at: String,
+    val updated_at: String,
+    val deleted_at: String?,
+    val name: String,
+    val archived_at: String?,
+) {
+    override fun toString() = "Tag([redacted])"
+}
+
+@Serializable
+data class Tombstone(
+    val entity_type: String,
+    val id: String,
+    val workspace_id: String,
+    val version: String,
+    val deleted_at: String,
+) {
+    init {
+        require(entity_type in setOf("account", "transaction", "category", "tag")) { "Invalid Tombstone.entity_type" }
+    }
+    override fun toString() = "Tombstone([redacted])"
+}
+
+@Serializable
+data class Rate(
+    val numerator: String,
+    val denominator: String,
+) {
+    override fun toString() = "Rate([redacted])"
+}
+
+@Serializable
+data class Entry(
+    val id: String,
+    val account_id: String,
+    val currency: String,
+    val amount_minor: String,
+) {
+    override fun toString() = "Entry([redacted])"
+}
+
+@Serializable
+data class Allocation(
+    val id: String,
+    val category_id: String?,
+    val amount_minor: String,
+    val original_allocation_id: String?,
+    val remaining_refundable_minor: String,
+) {
+    override fun toString() = "Allocation([redacted])"
+}
