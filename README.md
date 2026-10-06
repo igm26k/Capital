@@ -2,7 +2,7 @@
 
 Приложение учета личных финансов: Go API, PostgreSQL и веб на React/TypeScript; Android — следующий этап. Первая версия использует ручной учет, затем CSV; банковские подключения выполняются в конце.
 
-Проектирование завершено: сценарии, финансовая модель, OpenAPI 0.2.0, синхронизация и проверка инвариантов. Идет реализация; первый вертикальный путь принят на настоящем API/PostgreSQL/Chrome. Готовые функции и фактически выполненные проверки указаны в [отчете этапа](docs/agent-tasks/STAGE-01-REPORT.md), задачи — в `docs/agent-tasks/`.
+Проектирование завершено: сценарии, финансовая модель, OpenAPI 0.2.0, синхронизация и проверка инвариантов. Этап сервера и веба завершен: все 35 API операций и полный online ручной учет приняты на настоящем API/PostgreSQL/Chrome (14/14 E2E). Следующий этап — Android. Готовые функции и фактически выполненные проверки указаны в [отчете этапа](docs/agent-tasks/STAGE-01-REPORT.md), задачи — в `docs/agent-tasks/`.
 
 - [Общий план](FINANCE_APP_PLAN.md)
 - [Структура, инструменты и порядок реализации](docs/decisions/007-repository-structure.md)
@@ -18,7 +18,7 @@ python3 contracts/check_contracts.py
 python3 contracts/fixtures/check_financial_model.py
 ```
 
-Эти команды проверяют спецификации и контрольные примеры. Они не подтверждают работу сервера, БД и браузера. Go/React-каркасы созданы. Реализованы identity, CommandRunner и базовый финансовый API: счета/opening, expense/income с частями, категории/теги и история. Первый веб-поток S3-06A реализован: вход, счет EUR, расход/доход, остатки и последние операции.
+Эти команды проверяют спецификации и контрольные примеры. Они не подтверждают работу сервера, БД и браузера. Реализованы identity, CommandRunner, финансовый API, pull и snapshots. Веб поддерживает счета/архивы, расходы/доходы с частями, переводы и комиссии, возвраты, корректировки, удаления, категории/теги, устройства, фильтры/страницы, массовую классификацию и сравнение конфликтов. Детали — в [web/README.md](web/README.md).
 
 Регистрация по умолчанию выключена; local/test окружение включает ее явно. Публичная регистрация и реальный backup/restore имеют отдельные задачи перед выпуском. Секреты и временные данные окружения не должны попадать в документы или логи.
 
@@ -52,7 +52,7 @@ make dev
 
 `make down` останавливает окружение, сохраняя volume БД. `make test-up` / `make test-down` используют отдельный Compose-проект и БД accounting_test, веб на https://localhost:8444. `make web-check` проверяет сборку веб-образа; `make backend-check` запускает проверки Go. Не запускайте down с удалением volumes для сохраненных финансовых данных.
 
-Compose ожидает readiness db и успешный migrate перед API/worker. Runner применяет четыре миграции identity/ledger/sync/snapshot-key; реализованы счета/opening и базовые expense/income/классификация; расширенные команды учета S3-02C реализованы. Worker очищает просроченные полные ответы, payload истекших snapshots и непрерывный префикс журнала старше 90 дней. Веб показывает состояние разработки.
+Compose ожидает readiness db и успешный migrate перед API/worker. Runner применяет четыре миграции identity/ledger/sync/snapshot-key; реализованы счета/opening и базовые expense/income/классификация; расширенные команды учета S3-02C реализованы. Worker очищает просроченные полные ответы, payload истекших snapshots и непрерывный префикс журнала старше 90 дней. Веб предоставляет online интерфейс ручного учета.
 
 Production overlay compose.prod.yaml — заготовка, не проверенный выпуск. Он требует явных PRODUCTION_DATABASE_URL, PRODUCTION_PUBLIC_ORIGIN, PRODUCTION_HTTPS_BIND и каталогов PRODUCTION_DB_TLS_DIR / PRODUCTION_DB_CA_DIR / PRODUCTION_WEB_TLS_DIR. Сертификат БД должен соответствовать hostname в URL; server.key должен быть доступен только пользователю PostgreSQL внутри контейнера. Во всех TLS-каталогах используются имена файлов из Compose/nginx-конфигурации. Публичная регистрация выключена. Production TLS и браузерная приемка еще не проверены; local/test контейнеры и HTTPS проверены.
 
@@ -72,7 +72,7 @@ REGISTRATION_ENABLED=false сохраняется по умолчанию. Дл�
 
 AUTH_HASH_CONCURRENCY=2 ограничивает одновременно работающие Argon2id вычисления; допустимы 1–8. AUTH_IP_ATTEMPTS_PER_MINUTE=100 и AUTH_EMAIL_ATTEMPTS_PER_MINUTE=20 ограничивают auth попытки, ответ 429 содержит Retry-After. Лимитер хранится в памяти процесса и использует адрес непосредственного соединения. За nginx это адрес proxy; доверенное определение клиентского IP и распределенные production-лимиты еще требуют настройки перед выпуском. Произвольным X-Forwarded-For API не доверяет.
 
-Сессии: idle 7 суток, absolute 30 суток; GET не продлевает срок, renew сохраняет credential. Logout/revoke вступают в силу после commit. Финансовые handlers должны выполнять команды внутри транзакционного guard; их реализация и гонки отзыва остаются следующими задачами.
+Сессии: idle 7 суток, absolute 30 суток; GET не продлевает срок, renew сохраняет credential. Logout/revoke вступают в силу после commit. Финансовые handlers выполняют команды внутри транзакционного guard; оба порядка гонки command/revoke проверены на PostgreSQL.
 
 ## Выполнение команд и квитанции
 
@@ -80,7 +80,7 @@ CommandRunner готов к подключению финансовых серв
 
 Проверка: `make command-check` (настоящая PostgreSQL, отдельная временная схема). Worker раз в минуту очищает до 1000 просроченных полных ответов одного доступного workspace; компактные квитанции сохраняются. Чтение уже учитывает 30-дневный deadline независимо от запуска cleanup.
 
-Финансовые write endpoints счетов/expense/income/категорий/тегов подключены к runner. Pull и snapshots еще не реализованы. [Гарантии и границы CommandRunner](backend/internal/sync/README.md).
+Финансовые write endpoints счетов/expense/income/категорий/тегов подключены к runner. Pull и immutable snapshots реализованы; клиентское применение mirror/outbox относится к Android. [Гарантии и границы CommandRunner](backend/internal/sync/README.md).
 
 Счета S3-02B: `GET /api/v1/currencies`, `GET/POST /api/v1/workspaces/{workspace_id}/accounts`, `GET/PUT .../accounts/{id}`. Создание счета атомарно публикует счет и opening в одной группе CommandRunner; нулевая opening не создает entry. PUT меняет имя/тип/архив с expected_version, сохраняя валюту, дату открытия и balance_version. GET и списки вычисляют остатки из активных entries в одном SQL-снимке. Пагинация UUID keyset, cursor связан с credential/endpoint/archived; archived=exclude (по умолчанию), include, only.
 
@@ -94,7 +94,7 @@ Dev/test сети используют подсети 192.168.240.0/24 и 192.16
 
 Категории/теги: `GET/POST .../categories`, `GET/PUT .../categories/{id}` и аналогично tags. Списки поддерживают archived и UUID keyset. Циклы проверяются по полному дереву под head mutex. Активные теги уникальны по strings.ToLower(strings.TrimSpace(name)) внутри workspace; архивное имя можно использовать повторно, восстановление конфликтующего тега отклоняется. Ручные JSON-команды ограничены 256 KiB.
 
-`make e2e` временно включает регистрацию только в accounting-test через compose.e2e.yaml, проверяет реальный ledger/reload/lost-response retry и останавливает тестовый проект без удаления volume. Не запускайте одновременно другие проверки accounting-test. Local регистрация остается выключенной. Если VPN блокирует npm внутри Docker build, используйте `DOCKER_BUILD_NETWORK=host` перед make dev/web-check/e2e; это меняет только сборочную сеть, runtime сети остаются изолированными.
+`make e2e` временно включает регистрацию только в accounting-test через compose.e2e.yaml, проверяет реальный ledger/reload/lost-response retry и останавливает тестовый проект без удаления volume. Не запускайте одновременно другие проверки accounting-test. Local регистрация определяется REGISTRATION_ENABLED в .env. Если VPN блокирует npm внутри Docker build, используйте `DOCKER_BUILD_NETWORK=host` перед make dev/web-check/e2e; это меняет только сборочную сеть, runtime сети остаются изолированными.
 
 Вертикальная приемка S3-07A завершена. `make backend-integration` сейчас запускает TestVertical в отдельной временной схеме accounting_test: новый API/pool восстанавливает session/receipt и не дублирует расход. `make e2e` перезапускает настоящие test API/web между потерей ответа и повтором, сверяет PID/StartedAt и SQL показатели; артефакты — ops/.runtime/checks/vertical-backend.json и ops/.runtime/e2e/*/vertical-browser.json (0600). Это не полный backup или restore drill. S3-02C завершена: расширенные команды учета приняты на PostgreSQL.
 

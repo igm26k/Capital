@@ -1,8 +1,8 @@
 # Этап 1: серверная часть и веб-интерфейс
 
-Дата обновления: 2026-10-06. Статус этапа: in_progress.
+Дата обновления: 2026-10-06. Статус этапа: done.
 
-Актуальный результат: финансовый серверный пакет S3-02A/B/C, sync пакет S3-04A/B/C, первый веб-поток S3-06A и вертикальная приемка S3-07A завершены. Pull: 26 HTTP ответов / 3 OpenAPI schemas; snapshots/bootstrap/cleanup: 54 / 5; advanced financial: 1652 / 5, basic: 179 / 11. Реальные PostgreSQL regression и Go проверки проходят. S3-03A/B завершены: все 35 API операций, 33 private guards, POST/PUT scopes и revoke races приняты на PostgreSQL/TLS (203 HTTP ответа / 10 OpenAPI schemas, 28 / 3; Go race detector PASS). S3-06A/B завершены: полный online интерфейс ручного учета, справочники, устройства, история/фильтры/страницы, atomic bulk и сравнения конфликтов приняты 14/14 Chrome E2E. Следующий шаг — S3-07B, полная приемка этапа. Клиентское Android mirror/outbox/staging и production выпуск еще не завершены.
+Актуальный результат: финансовый серверный пакет S3-02A/B/C, sync пакет S3-04A/B/C, первый веб-поток S3-06A и вертикальная приемка S3-07A завершены. Pull: 26 HTTP ответов / 3 OpenAPI schemas; snapshots/bootstrap/cleanup: 54 / 5; advanced financial: 1652 / 5, basic: 179 / 11. Реальные PostgreSQL regression и Go проверки проходят. S3-03A/B завершены: все 35 API операций, 33 private guards, POST/PUT scopes и revoke races приняты на PostgreSQL/TLS (203 HTTP ответа / 10 OpenAPI schemas, 28 / 3; Go race detector PASS). S3-06A/B завершены: полный online интерфейс ручного учета, справочники, устройства, история/фильтры/страницы, atomic bulk и сравнения конфликтов приняты 14/14 Chrome E2E. S3-07B завершена: общий regression PostgreSQL и штатный make e2e (14/14) приняты. Следующий шаг — APP-01, Android. Клиентское Android mirror/outbox/staging и production выпуск еще не завершены.
 
 Ниже сохранена хронология работ; прежние not_run относятся к состоянию на момент соответствующей записи.
 
@@ -383,3 +383,9 @@ Account/category/tag PUT conflicts показывают обе стороны и
 ## S3-06B завершена: полный online ручной учет (2026-10-06)
 
 Финальная расширенная приемка — **14/14 Chrome E2E PASS** на настоящих TLS API/PostgreSQL, текущем production bundle. Дополнительно приняты fee-refund parent/grandparent guards и DR-F08 UI, expense date edit, real transfer conflict/diff/explicit reload и сохранение .123456Z/UTC без ложного balance bump. S3-06A/B и пакет S3-06 завершены; docs текущего веба обновлены. Этап остается in_progress до S3-07B. Android outbox/mirror/staging, production/public registration и DR-S10 recovery не объявляются принятыми.
+
+## S3-07B завершена: общая приемка этапа 1 (2026-10-06)
+
+Сервер и веб приняты по критериям [плана](../implementation/03_PRODUCT_FOUNDATION_PLAN.md). Контракты, Compose, Go vet/unit/build, TestVertical PostgreSQL и web build — PASS. Все 10 integration suites выполнены на PostgreSQL/TLS; basic/vertical повторены успешно после отказа записи старых root-owned артефактов, новые outputs сохранены отдельно. Проверены 2142 actual responses по OpenAPI и покрытие 35 маршрутов/33 guards. Штатный `DOCKER_BUILD_NETWORK=host make e2e` с Node24 — **14/14 PASS** после реальных Docker builds. Исправлен backend build network override.
+
+Это приемка сервера и online веба. Клиентский DR-S03 (неполная группа → unchanged mirror/cursor), Android Room/outbox/staging/WorkManager переданы S3-05/APP-03; production/DR-S10/public registration/recovery не приняты. Исходные design-review fixtures с not_run не переписывались и не выдаются за журнал выполненных тестов. Следующий пакет — APP-01 по плану приложений.
