@@ -106,3 +106,65 @@ test('real transfer keeps exact balances and survives reload', async ({ page, co
   expect(history.items.filter((t: {kind: string}) => t.kind === 'transfer')).toHaveLength(1);
   expect(history.items.filter((t: {kind: string}) => ['income', 'expense'].includes(t.kind))).toHaveLength(0);
 });
+
+test('FX transfer and third-currency fee commit once after lost response', async ({ page, context }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Создать профиль', exact: true }).click();
+  await page.getByLabel('Электронная почта').fill(`fx-${crypto.randomUUID()}@example.test`);
+  await page.getByLabel('Пароль', { exact: true }).fill('synthetic-browser-password-2026');
+  await page.getByRole('button', { name: 'Зарегистрироваться', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Выйти', exact: true })).toBeVisible();
+  for (const [currency, name, type] of [['EUR', 'Евро', 'bank'], ['USD', 'Доллары', 'card'], ['KWD', 'Комиссии', 'cash']]) {
+    await page.getByLabel('Название счета').fill(name);
+    await page.getByLabel('Валюта счета', { exact: true }).selectOption(currency);
+    await page.getByLabel('Тип счета', { exact: true }).selectOption(type);
+    await page.getByLabel(`Начальный остаток, ${currency}`).fill('100');
+    await page.getByRole('button', { name: 'Создать счет', exact: true }).click();
+    await expect(page.locator('.accounts')).toContainText(name);
+  }
+  await page.getByLabel('Со счета', { exact: true }).selectOption({ label: 'Евро · EUR' });
+  await page.getByLabel('На счет', { exact: true }).selectOption({ label: 'Доллары · USD' });
+  await page.getByLabel('Сумма списания, EUR').fill('3');
+  await page.getByLabel('Сумма зачисления, USD').fill('1');
+  await page.getByLabel('Добавить комиссию', { exact: true }).check();
+  await page.getByLabel('Счет комиссии', { exact: true }).selectOption({ label: 'Комиссии · KWD' });
+  await page.getByLabel('Комиссия, KWD', { exact: true }).fill('0');
+  await page.getByRole('button', { name: 'Сохранить перевод', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('Комиссия должна быть больше нуля');
+  await expect(page.locator('.accounts li').filter({ hasText: 'Евро' })).toContainText('100,00 EUR');
+  await page.getByLabel('Комиссия, KWD', { exact: true }).fill('0,123');
+  const commands: { key: string | undefined; body: string | null }[] = [];
+  let dropped = false, replayed = false;
+  await page.route('**/api/v1/workspaces/*/transactions', async route => {
+    if (route.request().method() !== 'POST') { await route.continue(); return; }
+    commands.push({ key: route.request().headers()['idempotency-key'], body: route.request().postData() });
+    const response = await route.fetch();
+    expect(response.status()).toBe(201);
+    if (!dropped) { dropped = true; await route.abort('connectionfailed'); }
+    else { replayed = response.headers()['idempotency-replayed'] === 'true'; await route.fulfill({ response }); }
+  });
+  await page.getByRole('button', { name: 'Сохранить перевод', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('Операция могла сохраниться');
+  await page.reload();
+  await page.getByRole('button', { name: 'Повторить ту же команду', exact: true }).click();
+  await expect.poll(() => replayed).toBe(true);
+  await expect(page.getByRole('heading', { name: 'Команда ожидает подтверждения' })).toHaveCount(0);
+  expect(commands).toHaveLength(2); expect(commands[1]).toEqual(commands[0]);
+  for (const [name, balance] of [['Евро', '97,00 EUR'], ['Доллары', '101,00 USD'], ['Комиссии', '99,877 KWD']]) {
+    await expect(page.locator('.accounts li').filter({ hasText: name })).toContainText(balance);
+  }
+  await expect(page.locator('.history')).toContainText('Комиссия перевода');
+  const auth = await (await context.request.get('/api/v1/auth/session')).json();
+  const root = `/api/v1/workspaces/${auth.workspace.id}`;
+  const history = await (await context.request.get(`${root}/transactions`)).json();
+  const transfers = history.items.filter((t: {kind: string}) => t.kind === 'transfer');
+  const fees = history.items.filter((t: {kind: string}) => t.kind === 'expense');
+  expect(transfers).toHaveLength(1); expect(fees).toHaveLength(1);
+  expect(transfers[0].rate).toEqual({ numerator: '1', denominator: '3' });
+  expect(transfers[0].fee_transaction_id).toBe(fees[0].id);
+  expect(fees[0].parent_transaction_id).toBe(transfers[0].id);
+  expect(fees[0].allocations[0].amount_minor).toBe('123');
+  const accounts = await (await context.request.get(`${root}/accounts`)).json();
+  expect(accounts.items.find((a: {name: string}) => a.name === 'Доллары').type).toBe('card');
+  expect(accounts.items.find((a: {name: string}) => a.name === 'Комиссии').type).toBe('cash');
+});

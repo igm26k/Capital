@@ -1,4 +1,5 @@
 const scales: Record<string, number> = { EUR: 2, USD: 2, GBP: 2, RUB: 2, JPY: 0, KWD: 3 };
+export const currencies = Object.keys(scales);
 export function minor(value: string, currency = 'EUR'): string {
   const scale = scales[currency];
   if (scale === undefined || !/^-?\d+(?:[.,]\d+)?$/.test(value)) throw new Error('Введите сумму цифрами, например 12,34.');
