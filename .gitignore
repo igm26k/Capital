@@ -5,3 +5,8 @@ ops/.runtime/
 web/node_modules/
 web/dist/
 *.test
+
+android/.gradle/
+android/.kotlin/
+android/**/build/
+android/local.properties

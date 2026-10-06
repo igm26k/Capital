@@ -81,3 +81,9 @@ access-check:
 	python3 scripts/check-ledger-responses.py ops/.runtime/checks/access-responses.json
 	python3 scripts/check-ledger-responses.py ops/.runtime/checks/session-race-responses.json
 	python3 scripts/check-access-responses.py
+
+.PHONY: android-check android-device-check
+android-check:
+	cd android && ./gradlew assembleDebug testDebugUnitTest lintDebug
+android-device-check:
+	cd android && ./gradlew connectedDebugAndroidTest
