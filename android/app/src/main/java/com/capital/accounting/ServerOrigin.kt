@@ -3,6 +3,7 @@ package com.capital.accounting
 import java.net.URI
 
 fun normalizedOrigin(value: String): String {
+    require(value.trim().length <= 2048) { "Адрес сервера слишком длинный." }
     val uri = URI(value.trim())
     require(uri.scheme == "https" && !uri.host.isNullOrBlank() && uri.userInfo == null &&
         uri.query == null && uri.fragment == null && uri.path in listOf("", "/") &&
