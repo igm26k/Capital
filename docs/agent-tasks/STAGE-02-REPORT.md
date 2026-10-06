@@ -23,3 +23,9 @@ CredentialVault сохраняет token и идентификаторы princip
 Штатный `make android-auth-e2e` (JDK25/SDK/API36, DOCKER_BUILD_NETWORK=host) — PASS: сборки/debug/release, 2/2 unit, lint, **6/6 real instrumentation**, actual API/PostgreSQL/TLS. Force-stop/start восстанавливает тот же server session; отключение API оставляет durable logout intent, он переживает process restart, после явного повтора сервер отзывает session и app удаляет credential. SQL: revoked_at и ровно 2 sessions (registration + отдельный UI login), без создания sessions при renew/restore. Compiled release resource table/XML подтверждает system CA only и отсутствие debug trust. Ограниченные runtime artifacts не содержат token/password.
 
 APP-02 остается in_progress: devices/revoke и финансовый Android UI еще не приняты; S3-05 mirror/outbox/staging и APP-03 полная Android→server→web финансовая приемка остаются следующими пакетами.
+
+## APP-02: устройства и отзыв приняты — 2026-10-06
+
+Android показывает все страницы активных устройств и текущую сессию. Отзыв сохраняет encrypted target UUID до DELETE, переживает offline/process restart и требует явного повтора. Реальный `make android-auth-e2e`: **7/7 instrumentation**, unit/build/lint и release trust PASS. limit=1 проверяет pagination; cross-user revoke дает 404, другой bearer после отзыва получает 401 при сохраненной текущей сессии, повтор DELETE идемпотентен; self-revoke возвращает вход. Runtime API outage/cold restart/retry подтвержден SQL для выбранного другого UUID, затем logout drill отзывает текущую сессию и удаляет vault. Артефакты без token/password — ops/.runtime/checks/android-devices-instrumentation.txt и android-auth-runtime.json.
+
+APP-02 in_progress: финансовые экраны еще не приняты; далее счета, операции, классификация/фильтры, затем S3-05 и APP-03.

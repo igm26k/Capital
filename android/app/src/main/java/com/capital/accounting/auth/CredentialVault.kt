@@ -27,10 +27,13 @@ class StoredSession(
     val generationId: String,
     val sessionId: String,
     val logoutPending: Boolean = false,
+    val revokeSessionId: String? = null,
 ) {
     init {
         require(normalizedOrigin(origin) == origin)
         require(token.length in 32..256 && token.all { it.code in 33..126 })
+        require(!logoutPending || revokeSessionId == null)
+        if (revokeSessionId != null) require(UUID.fromString(revokeSessionId).toString().equals(revokeSessionId, ignoreCase = true))
         listOf(ownerId, workspaceId, generationId, sessionId).forEach {
             require(UUID.fromString(it).toString().equals(it, ignoreCase = true))
         }
@@ -59,7 +62,7 @@ class CredentialVault internal constructor(context: Context, storageName: String
             cipher.updateAAD(aad(session.origin))
             val plain = JSONObject().put("token", session.token).put("owner_id", session.ownerId)
                 .put("workspace_id", session.workspaceId).put("generation_id", session.generationId)
-                .put("session_id", session.sessionId).put("logout_pending", session.logoutPending).toString().toByteArray(Charsets.UTF_8)
+                .put("session_id", session.sessionId).put("logout_pending", session.logoutPending).put("revoke_session_id", session.revokeSessionId ?: JSONObject.NULL).toString().toByteArray(Charsets.UTF_8)
             val encrypted = try { cipher.doFinal(plain) } finally { plain.fill(0) }
             val packet = JSONObject().put("format", 1).put("origin", session.origin)
                 .put("iv", encode(cipher.iv)).put("ciphertext", encode(encrypted))
@@ -100,9 +103,11 @@ class CredentialVault internal constructor(context: Context, storageName: String
                 val plain = cipher.doFinal(Base64.decode(packet.getString("ciphertext"), Base64.NO_WRAP))
                 try {
                     val body = JSONObject(String(plain, Charsets.UTF_8))
+                    val revokeId = if (!body.has("revoke_session_id") || body.isNull("revoke_session_id")) null else body.getString("revoke_session_id")
                     VaultRead.Available(StoredSession(expected, body.getString("token"),
                         body.getString("owner_id"), body.getString("workspace_id"),
-                        body.getString("generation_id"), body.getString("session_id"), body.optBoolean("logout_pending", false)))
+                        body.getString("generation_id"), body.getString("session_id"),
+                        body.optBoolean("logout_pending", false), revokeId))
                 } finally { plain.fill(0) }
             } catch (_: Exception) { VaultRead.Invalid }
         }

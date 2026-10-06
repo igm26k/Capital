@@ -5,8 +5,14 @@ import sys
 from pathlib import Path
 root = Path(__file__).resolve().parents[1]
 schemas = json.loads((root / 'contracts/openapi.json').read_text())['components']['schemas']
-names = ['Profile', 'Workspace', 'Session', 'BearerAuth', 'Login', 'Register', 'Acknowledgement']
+names = ['Profile', 'Workspace', 'Session', 'BearerAuth', 'Login', 'Register', 'Acknowledgement', 'SessionList']
 def kotlin_type(schema):
+    if 'anyOf' in schema:
+        values = [x for x in schema['anyOf'] if x.get('type') != 'null']
+        assert len(values) == 1
+        return kotlin_type(values[0]) + '?'
+    if schema.get('type') == 'array':
+        return 'List<' + kotlin_type(schema['items']) + '>'
     if '$ref' in schema:
         name = schema['$ref'].split('/')[-1]
         return name if name in names else kotlin_type(schemas[name])

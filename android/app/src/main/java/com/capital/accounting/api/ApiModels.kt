@@ -91,3 +91,11 @@ data class Acknowledgement(
     }
     override fun toString() = "Acknowledgement([redacted])"
 }
+
+@Serializable
+data class SessionList(
+    val items: List<Session>,
+    val next_cursor: String?,
+) {
+    override fun toString() = "SessionList([redacted])"
+}

@@ -20,7 +20,7 @@ Device tests проверяют реальную Room DB после закрыт
 
 CredentialVault выполняет IO/Keystore операции вне main thread. AES256-GCM шифрует token и owner/workspace/generation/session IDs; HTTPS origin включен в authenticated data. AtomicFile находится в noBackupFilesDir, manifest и data-extraction rules исключают cloud backup/device transfer. Повреждение/потеря ключа возвращаются как Invalid без удаления исходного файла; другой origin не получает credential. Пароль не хранится, string representations скрывают значения для защиты от случайного вывода.
 
-Основание: [Android Keystore](https://developer.android.com/privacy-and-security/keystore), [правила Auto Backup](https://developer.android.com/identity/data/autobackup). Login/register/renew/logout и восстановление процесса приняты следующим шагом APP-02; список устройств/revoke другой сессии остается дальнейшей задачей.
+Основание: [Android Keystore](https://developer.android.com/privacy-and-security/keystore), [правила Auto Backup](https://developer.android.com/identity/data/autobackup). Login/register/renew/logout и восстановление процесса приняты следующим шагом APP-02; список устройств/revoke принят следующим шагом APP-02.
 
 Шаг CredentialVault принят: `make android-check android-device-check` — APK/unit/lint PASS, 4/4 device tests на API36. Фактический перенос устройства/backup drill пока не выполнялся.
 
@@ -30,6 +30,8 @@ CredentialVault выполняет IO/Keystore операции вне main thre
 JAVA_HOME=<JDK> ANDROID_HOME=<SDK> DOCKER_BUILD_NETWORK=host make android-auth-e2e
 ```
 
-Нужен отдельный запущенный test emulator (по умолчанию emulator-5556, можно задать ANDROID_TEST_SERIAL). Скрипт выбирает его явно, поднимает accounting-test, временно включает test registration, настраивает adb reverse8444 и выполняет 4 базовых + 2 реальных API/UI tests. Затем проверяет force-stop/start, реальную остановку API, persisted logout intent и SQL revoke/отсутствие лишних sessions. Останавливает test Compose без удаления volume; local окружение/.env не меняются. Артефакты 0600 в ops/.runtime/checks не содержат token/password.
+Нужен отдельный запущенный test emulator (по умолчанию emulator-5556, можно задать ANDROID_TEST_SERIAL). Скрипт выбирает его явно, поднимает accounting-test, временно включает test registration, настраивает adb reverse8444 и выполняет 4 базовых + 3 реальных API/UI tests. Затем проверяет force-stop/start, реальную остановку API, persisted logout intent и SQL revoke/отсутствие лишних sessions. Останавливает test Compose без удаления volume; local окружение/.env не меняются. Артефакты 0600 в ops/.runtime/checks не содержат token/password.
 
-Приемка: **6/6 instrumentation PASS без skips**, actual TLS/PostgreSQL, runtime restart/outage/logout PASS. Без api_origin два network tests явно skip, их нельзя считать принятыми обычным standalone android-device-check. Release unsigned APK собирается для проверки ресурсов через aapt2, без публикации; local CA не входит в release. Настройка TLS: [официальная Network Security Configuration](https://developer.android.com/privacy-and-security/security-config).
+Приемка: **7/7 instrumentation PASS без skips**, actual TLS/PostgreSQL, runtime restart/outage/logout PASS. Без api_origin три network tests явно skip, их нельзя считать принятыми обычным standalone android-device-check. Release unsigned APK собирается для проверки ресурсов через aapt2, без публикации; local CA не входит в release. Настройка TLS: [официальная Network Security Configuration](https://developer.android.com/privacy-and-security/security-config).
+
+Устройства: все страницы сессий, текущая метка, отзыв другого и текущего устройства. Encrypted pending target сохраняется до DELETE, блокирует другие действия и переживает process restart. Acceptance проверяет limit=1, чужие UUID/404, Compose other/self revoke, идемпотентный повтор, реальный API outage и cold restart с SQL подтверждением выбранного UUID. Финансовые экраны и mirror/outbox еще в работе.

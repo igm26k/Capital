@@ -37,7 +37,10 @@ class MainActivity : ComponentActivity() {
                         Text("Ручной учет финансов")
                         if (state.message.isNotEmpty()) Text(state.message)
                         if (state.busy) CircularProgressIndicator()
-                        if (state.logoutPending) {
+                        if (state.revokePendingId != null) {
+                            Text("Устройство: ${state.revokePendingId}")
+                            Button(enabled = !state.busy, onClick = { model.revokeSession(state.revokePendingId) }) { Text("Повторить отзыв устройства") }
+                        } else if (state.logoutPending) {
                             Button(enabled = !state.busy, onClick = model::logout) { Text("Повторить выход") }
                         } else if (state.auth != null) {
                             Text("Вы вошли: ${state.auth.profile.email}")
@@ -47,6 +50,16 @@ class MainActivity : ComponentActivity() {
                             if (!state.persisted) Button(enabled = !state.busy, onClick = model::persist) { Text("Повторить сохранение сессии") }
                             Button(enabled = !state.busy, onClick = model::renew) { Text("Продлить сессию") }
                             Button(enabled = !state.busy, onClick = model::logout) { Text("Выйти") }
+                            Text("Устройства", style = MaterialTheme.typography.titleLarge)
+                            Button(enabled = !state.busy && state.persisted, onClick = model::loadSessions) { Text("Обновить устройства") }
+                            state.sessions.forEach { session ->
+                                Text(session.device_name)
+                                if (session.is_current) Text("Текущее устройство")
+                                Text("Последняя активность: ${session.last_seen_at}")
+                                Button(enabled = !state.busy && state.persisted, onClick = { model.revokeSession(session.id) }) {
+                                    Text(if (session.is_current) "Завершить текущую сессию" else "Отключить устройство ${session.device_name}")
+                                }
+                            }
                         } else {
                             OutlinedTextField(origin, { origin = it }, label = { Text("Адрес сервера") }, singleLine = true, modifier = Modifier.fillMaxWidth(), enabled = !state.busy)
                             Button(enabled = !state.busy, onClick = { model.saveOrigin(origin) }) { Text("Сохранить адрес") }

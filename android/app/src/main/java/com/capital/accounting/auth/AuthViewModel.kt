@@ -15,10 +15,11 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
 import java.util.TimeZone
 
-class AuthState(
+data class AuthState(
     val origin: String = "", val busy: Boolean = true, val message: String = "",
     val auth: BearerAuth? = null, val restorePending: Boolean = false,
     val logoutPending: Boolean = false, val persisted: Boolean = true,
+    val sessions: List<Session> = emptyList(), val revokePendingId: String? = null,
 )
 
 class AuthViewModel(application: Application) : AndroidViewModel(application) {
@@ -29,7 +30,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     init { restoreInternal() }
 
     fun saveOrigin(value: String) {
-        if (state.busy || state.auth != null || state.logoutPending) return
+        if (state.busy || state.auth != null || state.logoutPending || state.revokePendingId != null) return
         viewModelScope.launch {
             state = AuthState(state.origin)
             try {
@@ -43,7 +44,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun authenticate(email: String, password: String, device: String, register: Boolean) {
-        if (state.busy || state.auth != null || state.logoutPending || state.origin.isEmpty()) return
+        if (state.busy || state.auth != null || state.logoutPending || state.revokePendingId != null || state.origin.isEmpty()) return
         val origin = state.origin
         state = AuthState(origin)
         viewModelScope.launch {
@@ -58,7 +59,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun restore() {
-        if (state.busy || state.auth != null || state.logoutPending) return
+        if (state.busy || state.auth != null || state.logoutPending || state.revokePendingId != null) return
         restoreInternal()
     }
 
@@ -72,7 +73,9 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                 when (val saved = app.credentialVault.load(origin)) {
                     is VaultRead.Available -> {
                         candidate = saved.session
-                        if (saved.session.logoutPending) {
+                        if (saved.session.revokeSessionId != null) {
+                            state = AuthState(origin, busy = false, message = "Отзыв устройства еще не подтвержден. Повторите отзыв.", revokePendingId = saved.session.revokeSessionId)
+                        } else if (saved.session.logoutPending) {
                             state = AuthState(origin, busy = false, message = "Выход еще не подтвержден. Повторите выход.", logoutPending = true)
                         } else refreshSaved(saved.session)
                     }
@@ -84,11 +87,11 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private suspend fun refreshSaved(saved: StoredSession, renew: Boolean = false) {
+    private suspend fun refreshSaved(saved: StoredSession, renew: Boolean = false, holdBusy: Boolean = false) {
         try {
             val result = decodeResponse<BearerAuth>(ApiClient(saved.origin).request(if (renew) "/auth/renew" else "/auth/session", if (renew) "POST" else "GET", session = saved))
             require(result.profile.id == saved.ownerId && result.session.id == saved.sessionId && result.access_token == saved.token && result.workspace.id == saved.workspaceId)
-            accept(result, saved.origin)
+            accept(result, saved.origin, holdBusy)
         } catch (e: ApiFailure) {
             if (e.status != 401) throw e
             app.credentialVault.clear()
@@ -97,26 +100,26 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private suspend fun accept(auth: BearerAuth, origin: String) {
+    private suspend fun accept(auth: BearerAuth, origin: String, holdBusy: Boolean = false) {
         val saved = auth.credential(origin)
         candidate = saved
         try {
             app.credentialVault.save(saved)
-            state = AuthState(origin, busy = false, auth = auth)
+            state = AuthState(origin, busy = holdBusy, auth = auth)
         } catch (e: CancellationException) { throw e }
-        catch (_: Exception) { state = AuthState(origin, busy = false, auth = auth, persisted = false, message = "Вход выполнен, но сессия не сохранена. Повторите сохранение.") }
+        catch (_: Exception) { state = AuthState(origin, busy = holdBusy, auth = auth, persisted = false, message = "Вход выполнен, но сессия не сохранена. Повторите сохранение.") }
     }
 
     fun persist() {
         val auth = state.auth ?: return
-        if (state.busy || state.logoutPending) return
+        if (state.busy || state.logoutPending || state.revokePendingId != null) return
         state = AuthState(state.origin, auth = auth)
         viewModelScope.launch { accept(auth, state.origin) }
     }
 
     fun renew() {
         val saved = candidate ?: return
-        if (state.busy || state.logoutPending) return
+        if (state.busy || state.logoutPending || state.revokePendingId != null) return
         val previous = state
         state = AuthState(saved.origin, auth = previous.auth, persisted = previous.persisted)
         viewModelScope.launch {
@@ -126,9 +129,81 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun loadSessions() {
+        val saved = candidate ?: return
+        if (state.busy || state.auth == null || state.logoutPending || state.revokePendingId != null || !state.persisted) return
+        val previous = state
+        state = previous.copy(busy = true, message = "")
+        viewModelScope.launch {
+            try { state = previous.copy(busy = false, sessions = ApiClient(saved.origin).sessions(saved)) }
+            catch (e: CancellationException) { throw e }
+            catch (e: ApiFailure) {
+                if (e.status == 401) expireSession(saved.origin)
+                else state = previous.copy(busy = false, message = errorMessage(e))
+            }
+            catch (e: Exception) { state = previous.copy(busy = false, message = errorMessage(e)) }
+        }
+    }
+
+    private suspend fun expireSession(origin: String, message: String = "Сессия завершена. Войдите снова.") {
+        app.credentialVault.clear()
+        candidate = null
+        state = AuthState(origin, busy = false, message = message)
+    }
+
+    fun revokeSession(id: String) {
+        val saved = candidate ?: return
+        if (state.busy || state.logoutPending || !state.persisted) return
+        if (saved.revokeSessionId != null && saved.revokeSessionId != id) return
+        if (saved.revokeSessionId == null && state.sessions.none { it.id == id }) return
+        val previous = state
+        state = previous.copy(busy = true, revokePendingId = id, message = "")
+        viewModelScope.launch {
+            var intentCleared = false
+            try {
+                val pending = StoredSession(saved.origin, saved.token, saved.ownerId, saved.workspaceId, saved.generationId, saved.sessionId, revokeSessionId = id)
+                app.credentialVault.save(pending)
+                candidate = pending
+                try {
+                    val result = decodeResponse<Acknowledgement>(ApiClient(saved.origin).request("/sessions/$id", "DELETE", session = pending))
+                    require(result.ok)
+                } catch (e: ApiFailure) {
+                    if (e.status == 401) {
+                        expireSession(saved.origin, if (id == saved.sessionId) "Вы вышли из аккаунта" else "Сессия завершена. Войдите снова и проверьте список устройств: отзыв не подтвержден.")
+                        return@launch
+                    }
+                    if (e.status in 400..499 && e.status !in listOf(408, 425, 429)) {
+                        val cleared = StoredSession(saved.origin, saved.token, saved.ownerId, saved.workspaceId, saved.generationId, saved.sessionId)
+                        app.credentialVault.save(cleared)
+                        candidate = cleared
+                        state = previous.copy(busy = false, revokePendingId = null, restorePending = previous.auth == null, message = "Сервер отклонил отзыв. Обновите список устройств.")
+                        return@launch
+                    }
+                    throw e
+                }
+                if (id == saved.sessionId) {
+                    expireSession(saved.origin, "Вы вышли из аккаунта")
+                } else {
+                    val cleared = StoredSession(saved.origin, saved.token, saved.ownerId, saved.workspaceId, saved.generationId, saved.sessionId)
+                    app.credentialVault.save(cleared)
+                    candidate = cleared
+                    intentCleared = true
+                    refreshSaved(cleared, holdBusy = true)
+                    if (state.auth != null) state = state.copy(busy = false, sessions = ApiClient(saved.origin).sessions(cleared), message = "Устройство отключено")
+                }
+            } catch (e: CancellationException) { throw e }
+            catch (_: Exception) {
+                state = if (intentCleared) previous.copy(busy = false, revokePendingId = null,
+                    sessions = previous.sessions.filterNot { it.id == id }, restorePending = previous.auth == null,
+                    message = "Устройство отключено. Не удалось обновить список; повторите проверку.")
+                else previous.copy(busy = false, revokePendingId = id, message = "Отзыв устройства еще не подтвержден. Повторите отзыв.")
+            }
+        }
+    }
+
     fun logout() {
         val saved = candidate ?: return
-        if (state.busy) return
+        if (state.busy || state.revokePendingId != null) return
         state = AuthState(saved.origin, auth = state.auth, logoutPending = true)
         viewModelScope.launch {
             try {

@@ -25,7 +25,8 @@ run_suite() {
 }
 run_suite 'com.capital.accounting.FoundationTest,com.capital.accounting.CredentialVaultTest,com.capital.accounting.SettingsScreenTest' 4 ops/.runtime/checks/android-foundation-instrumentation.txt
 run_suite com.capital.accounting.ApiAuthTest 1 ops/.runtime/checks/android-api-auth-instrumentation.txt
+run_suite com.capital.accounting.DevicesScreenTest 1 ops/.runtime/checks/android-devices-instrumentation.txt
 run_suite com.capital.accounting.AuthScreenTest 1 ops/.runtime/checks/android-ui-auth-instrumentation.txt
 python3 scripts/check-android-auth-runtime.py "$adb" "$serial"
 python3 scripts/check-android-release-trust.py "$sdk"
-echo 'PASS 6/6 real Android instrumentation tests and auth runtime acceptance'
+echo 'PASS 7/7 real Android instrumentation tests and auth runtime acceptance'

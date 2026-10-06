@@ -5,6 +5,8 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.capital.accounting.api.*
+import kotlinx.serialization.encodeToString
 import com.capital.accounting.auth.VaultRead
 import com.capital.accounting.data.ConnectionSettings
 import kotlinx.coroutines.runBlocking
@@ -60,7 +62,17 @@ class AuthScreenTest {
         assertEquals(before.sessionId, after.sessionId)
         assertTrue("Recreation changed credential", before.token == after.token)
         assertFalse(after.logoutPending)
+        val other = runBlocking {
+            val api = ApiClient(origin)
+            decodeResponse<BearerAuth>(api.request("/auth/login", "POST", ApiClient.json.encodeToString(Login(email, "  android ui 🥨 password  ", "Runtime device", "bearer"))))
+        }
+        runBlocking {
+            val pages = ApiClient(origin).sessions(after, limit = 1)
+            assertEquals(2, pages.size)
+            assertEquals(1, pages.count { it.is_current })
+            assertTrue(pages.any { it.id == other.session.id })
+        }
         // Synthetic identity only; never emit token/password into acceptance artifacts.
-        File(app.filesDir, "android-auth-proof.json").writeText(JSONObject().put("email", email).put("session_id", after.sessionId).toString())
+        File(app.filesDir, "android-auth-proof.json").writeText(JSONObject().put("email", email).put("session_id", after.sessionId).put("revoke_session_id", other.session.id).toString())
     }
 }
