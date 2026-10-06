@@ -1,5 +1,5 @@
 x-backend: &backend
-  build: ./backend
+  build: {context: ./backend, network: "${DOCKER_BUILD_NETWORK:-default}"}
   environment: &backend-env
     APP_ENV: local
     DATABASE_URL: postgres://${POSTGRES_USER:-accounting}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:-accounting}?sslmode=disable
