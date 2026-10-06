@@ -9,6 +9,8 @@ import androidx.compose.runtime.setValue
 import com.capital.accounting.CapitalApplication
 import com.capital.accounting.api.*
 import com.capital.accounting.data.ConnectionSettings
+import com.capital.accounting.data.FinancialCommand
+import com.capital.accounting.finance.CommandRunner
 import com.capital.accounting.normalizedOrigin
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -20,6 +22,9 @@ data class AuthState(
     val auth: BearerAuth? = null, val restorePending: Boolean = false,
     val logoutPending: Boolean = false, val persisted: Boolean = true,
     val sessions: List<Session> = emptyList(), val revokePendingId: String? = null,
+    val accounts: List<Account> = emptyList(), val financialCommand: FinancialCommand? = null,
+    val financeBlocked: Boolean = true, val accountConflict: Account? = null,
+
 )
 
 class AuthViewModel(application: Application) : AndroidViewModel(application) {
@@ -105,7 +110,8 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         candidate = saved
         try {
             app.credentialVault.save(saved)
-            state = AuthState(origin, busy = holdBusy, auth = auth)
+            val command = app.database.commands().get(saved.origin, saved.ownerId, saved.workspaceId)
+            state = AuthState(origin, busy = holdBusy, auth = auth, financialCommand = command, financeBlocked = command != null)
         } catch (e: CancellationException) { throw e }
         catch (_: Exception) { state = AuthState(origin, busy = holdBusy, auth = auth, persisted = false, message = "Вход выполнен, но сессия не сохранена. Повторите сохранение.") }
     }
@@ -119,7 +125,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
 
     fun renew() {
         val saved = candidate ?: return
-        if (state.busy || state.logoutPending || state.revokePendingId != null) return
+        if (state.busy || state.financeBlocked || state.logoutPending || state.revokePendingId != null) return
         val previous = state
         state = AuthState(saved.origin, auth = previous.auth, persisted = previous.persisted)
         viewModelScope.launch {
@@ -153,7 +159,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
 
     fun revokeSession(id: String) {
         val saved = candidate ?: return
-        if (state.busy || state.logoutPending || !state.persisted) return
+        if (state.busy || (state.financeBlocked && state.revokePendingId == null) || state.logoutPending || !state.persisted) return
         if (saved.revokeSessionId != null && saved.revokeSessionId != id) return
         if (saved.revokeSessionId == null && state.sessions.none { it.id == id }) return
         val previous = state
@@ -201,9 +207,113 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun loadAccounts() {
+        val saved = candidate ?: return
+        if (state.busy || state.auth == null || !state.persisted || state.logoutPending || state.revokePendingId != null) return
+        val previous = state
+        state = previous.copy(busy = true)
+        viewModelScope.launch {
+            try {
+                val command = app.database.commands().get(saved.origin, saved.ownerId, saved.workspaceId)
+                val accounts = ApiClient(saved.origin).accounts(saved)
+                state = previous.copy(busy = false, accounts = accounts, financialCommand = command, financeBlocked = command != null)
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { if (!financialFailure(saved, e)) state = previous.copy(busy = false, message = "Не удалось загрузить счета. Повторите обновление.") }
+        }
+    }
+
+    fun submitAccount(body: String, id: String? = null) {
+        val saved = candidate ?: return
+        if (state.busy || state.auth == null || !state.persisted || state.financeBlocked || state.logoutPending || state.revokePendingId != null) return
+        state = state.copy(busy = true, financeBlocked = true, message = "", accountConflict = null)
+        viewModelScope.launch {
+            try {
+                val command = CommandRunner(app.database.commands()).prepare(saved, if (id == null) "accounts" else "accounts/$id", if (id == null) "POST" else "PUT", body)
+                state = state.copy(financialCommand = command)
+                sendAccountCommand(saved)
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) {
+                if (financialFailure(saved, e)) return@launch
+                val pending = try { app.database.commands().get(saved.origin, saved.ownerId, saved.workspaceId) }
+                catch (_: Exception) { state = state.copy(busy = false, financeBlocked = true, message = "Не удалось прочитать сохраненную команду. Повторите обновление."); return@launch }
+                state = state.copy(busy = false, financialCommand = pending, financeBlocked = pending != null,
+                    message = if (pending == null) "Не удалось сохранить команду. Запрос не отправлен." else "Результат не подтвержден. Повторите ту же команду.")
+            }
+        }
+    }
+
+    fun retryAccountCommand() {
+        val saved = candidate ?: return
+        val command = state.financialCommand ?: return
+        if (state.busy || command.state != "pending" || !command.matches(saved)) return
+        state = state.copy(busy = true, message = "")
+        viewModelScope.launch {
+            try { sendAccountCommand(saved) }
+            catch (e: CancellationException) { throw e }
+            catch (e: Exception) { if (!financialFailure(saved, e)) state = state.copy(busy = false, message = "Результат не подтвержден. Повторите ту же команду.") }
+        }
+    }
+
+    private suspend fun sendAccountCommand(saved: StoredSession) {
+        val result = CommandRunner(app.database.commands()).send(saved)
+        state = state.copy(financialCommand = result, financeBlocked = true)
+        if (result.state == "confirmed") {
+            val accounts = ApiClient(saved.origin).accounts(saved)
+            require(app.database.commands().remove(result.commandId, "confirmed") == 1)
+            state = state.copy(busy = false, accounts = accounts, financialCommand = null, financeBlocked = false, message = "Счет сохранен")
+        } else {
+            var current: Account? = null
+            if (result.errorCode == "version_conflict" && result.method == "PUT") {
+                try { current = decodeResponse<Account>(ApiClient(saved.origin).request(result.path, session = saved)) }
+                catch (e: CancellationException) { throw e }
+                catch (_: Exception) { }
+            }
+            state = state.copy(busy = false, accountConflict = current,
+                message = if (result.state == "rejected") "Изменение отклонено: ${result.errorCode}. Обновите данные и проверьте черновик." else "Исходный результат требует сверки. Команда сохранена; новый ключ не создается.")
+        }
+    }
+
+    fun acceptAccountResult() {
+        val saved = candidate ?: return
+        val command = state.financialCommand ?: return
+        if (state.busy || command.state == "pending" || command.state == "reconcile") return
+        state = state.copy(busy = true)
+        viewModelScope.launch {
+            try {
+                val accounts = ApiClient(saved.origin).accounts(saved)
+                require(app.database.commands().remove(command.commandId, command.state) == 1)
+                state = state.copy(busy = false, accounts = accounts, financialCommand = null, financeBlocked = false,
+                    accountConflict = null, message = if (command.state == "confirmed") "Счет сохранен" else "Данные обновлены. Проверьте поля перед новой командой.")
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { if (!financialFailure(saved, e)) state = state.copy(busy = false, message = "Не удалось обновить данные. Команда сохранена.") }
+        }
+    }
+
+    private suspend fun financialFailure(saved: StoredSession, error: Exception): Boolean {
+        if (error !is ApiFailure || error.status != 401) return false
+        try { expireSession(saved.origin, "Сессия завершена. Сохраненная команда остается в базе; войдите снова.") }
+        catch (_: Exception) { state = state.copy(busy = false, financeBlocked = true, message = "Не удалось завершить локальную сессию. Команда сохранена.") }
+        return true
+    }
+
+    fun rebindAccountCommand() {
+        val saved = candidate ?: return
+        val command = state.financialCommand ?: return
+        if (state.busy || command.state != "pending" || command.origin != saved.origin || command.ownerId != saved.ownerId ||
+            command.workspaceId != saved.workspaceId || command.generationId != saved.generationId) return
+        state = state.copy(busy = true)
+        viewModelScope.launch {
+            try {
+                require(app.database.commands().rebind(command.commandId, saved.origin, saved.ownerId, saved.workspaceId, saved.generationId, saved.sessionId) == 1)
+                state = state.copy(busy = false, financialCommand = command.copy(sessionId = saved.sessionId), message = "Команда сохранена для текущей сессии. Проверьте черновик перед повтором.")
+            } catch (e: CancellationException) { throw e }
+            catch (_: Exception) { state = state.copy(busy = false, message = "Не удалось подготовить повтор. Команда сохранена.") }
+        }
+    }
+
     fun logout() {
         val saved = candidate ?: return
-        if (state.busy || state.revokePendingId != null) return
+        if (state.busy || (state.financeBlocked && !state.logoutPending) || state.revokePendingId != null) return
         state = AuthState(saved.origin, auth = state.auth, logoutPending = true)
         viewModelScope.launch {
             try {

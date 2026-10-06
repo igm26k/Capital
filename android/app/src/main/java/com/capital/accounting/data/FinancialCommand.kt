@@ -45,6 +45,8 @@ interface CommandDao {
     suspend fun confirm(id: String, result: String): Int
     @Query("UPDATE financial_commands SET state=:state, errorCode=:code WHERE commandId=:id AND state='pending'")
     suspend fun reject(id: String, state: String, code: String): Int
+    @Query("UPDATE financial_commands SET sessionId=:session WHERE commandId=:id AND origin=:origin AND ownerId=:owner AND workspaceId=:workspace AND generationId=:generation AND state='pending'")
+    suspend fun rebind(id: String, origin: String, owner: String, workspace: String, generation: String, session: String): Int
     @Query("DELETE FROM financial_commands WHERE commandId=:id AND state=:state")
     suspend fun remove(id: String, state: String): Int
 }

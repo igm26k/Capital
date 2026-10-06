@@ -41,3 +41,11 @@ APP-02 in_progress: финансовые экраны еще не приняты
 Room v2/migration 1→2 сохраняет настройки и исходный финансовый command key/body/context до отправки, без bearer/password. CommandRunner сохраняет pending при неопределенном результате/401, terminal rejection с черновиком и confirmed receipt перед явным удалением; не повторяет terminal commands. Exact ID/state updates защищают новую команду от старого подтверждения. Команда привязана к origin/owner/workspace/session/generation; typed MutationResult проверяется на action/generation/workspace.
 
 Полный `make android-auth-e2e`: **11/11 real instrumentation**, 4/4 unit, build/lint/release trust PASS. Genuine SQLite→Room migration и DB reopen подтверждены. Незаписанное подтверждение сервера воспроизведено закрытием DB до локальной отметки; новый runner повторяет тот же ключ, actual API/PostgreSQL history остается из одной opening записи и остаток не удваивается. Version conflict сохраняет terminal draft/key, чужая session guard и 401 сохраняют pending. Финансовый UI еще не принят; следующий шаг — UI счетов и финансовый outage/process restart drill. Full mirror/multi-command atomic outbox/staging остаются S3-05.
+
+## APP-02: UI счетов — 2026-10-06
+
+Добавлены создание счета с валютным initial balance/датой/timezone, список всех страниц с архивом, rename/type/archive/restore и точный остаток. Global busy + durable financial guard блокирует session mutation, пока результат команды не обработан; pending/rejected/confirmed имеют явные действия. Version conflict показывает текущую запись и черновик, обновление expected_version требует отдельного клика без auto-resubmit.
+
+`make android-auth-e2e`: **12/12 actual instrumentation**, 4/4 unit, debug/release/build/lint и compiled trust PASS. Real Compose/API/PostgreSQL сценарий: KWD 123456 minor → rename/type/archive → внешний concurrent update → UI stale version rejection с сохраненным draft/Room key → явная актуальная версия и restore. Баланс/balance_version сохранены, очередь очищена, Activity recreation/refresh читает server state. Legacy logout/revoke outage/cold restart/SQL drills проходят вместе с UI счетов.
+
+APP-02 in_progress. Далее финансовый outage/process restart, auth rebind/generation recovery и полный набор ручных операций; S3-05/APP-03 не приняты.
