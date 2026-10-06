@@ -655,7 +655,12 @@ test('bulk classification rejects the whole stale package and replays one atomic
     const original = source.find((t: {id: string}) => t.id === transaction.id);
     expect(BigInt(transaction.version)).toBe(BigInt(original.version) + (transaction.id === changed.id ? 1n : 0n));
   }
-  await page.getByRole('button', { name: 'Обновить', exact: true }).click();
+  const comparison = page.getByRole('heading', { name: 'Конфликт массовой классификации', exact: true }).locator('..');
+  await expect(comparison).toContainText('Чужая правка пакета');
+  await expect(comparison).toContainText('Массовая категория');
+  await expect(comparison).toContainText('Без категории');
+  await comparison.getByRole('button', { name: 'Обновить историю и снять выбор', exact: true }).click();
+  await expect(comparison).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Массовая классификация', exact: true })).toHaveCount(0);
   for (const transaction of rejected) await page.getByTestId(`transaction-${transaction.id}`).getByRole('checkbox').check();
   await page.getByLabel('Категория выбранных операций', { exact: true }).selectOption({ label: 'Массовая категория' });

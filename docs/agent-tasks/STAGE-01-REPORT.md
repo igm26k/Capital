@@ -371,3 +371,7 @@ History позволяет выбрать до 100 подходящих standalo
 ## S3-06B: даты и metadata переводов/комиссий (2026-10-06)
 
 Добавлены даты открытия и операций, transfer payee/tags, fee note/tags. Неизмененный instant/timezone сохраняется буквально, standalone fee date управляется переводом. Сборки PASS; **12/12 Chrome E2E PASS**. Исторические EUR→KWD transfer/fee сохраняют archived category/tag, точные timestamps и balance versions при note-only PUT; FX rate=617/1500. Расширенные date-edit/microsecond/fee-refund/transfer-conflict сценарии остаются следующей приемкой; пакет пока in_progress.
+
+## S3-06B: сравнение массового конфликта (2026-10-06)
+
+Bulk version conflict показывает desired и current category/tags всех item; refresh снимает старый выбор без auto-resubmit. Сборки PASS; **12/12 Chrome E2E PASS**, включая полный atomic conflict/review/refresh/replay flow. Далее — оставшаяся расширенная приемка и resource conflict UX, пакет in_progress.

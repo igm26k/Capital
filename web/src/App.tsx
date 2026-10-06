@@ -7,6 +7,7 @@ import { AccountForm } from './features/accounts/AccountForm';
 import { TransferForm } from './features/transactions/TransferForm';
 import { TransactionForm } from './features/transactions/TransactionForm';
 import { ClassificationManager } from './features/classification/ClassificationManager';
+import { BulkConflict, type BulkComparison } from './features/transactions/BulkConflict';
 import { DeleteTransaction, type Deletion } from './features/transactions/DeleteTransaction';
 import { AdjustmentForm } from './features/transactions/AdjustmentForm';
 import { RefundForm } from './features/transactions/RefundForm';
@@ -29,6 +30,7 @@ export function App() {
   const [needsRefresh, setNeedsRefresh] = useState(false);
   const [auth, setAuth] = useState<Auth | null>(null), [starting, setStarting] = useState(true), [startupError, setStartupError] = useState('');
   const [accounts, setAccounts] = useState<Account[]>([]), [historyRevision, setHistoryRevision] = useState(0);
+  const [bulkConflict, setBulkConflict] = useState<BulkComparison | null>(null);
   const [deleting, setDeleting] = useState<Deletion | null>(null);
   const [refundParent, setRefundParent] = useState<Transaction | null>(null), [refundTransferVersion, setRefundTransferVersion] = useState<string | null>(null);
   const [conflict, setConflict] = useState<TransactionComparison | null>(null);
@@ -36,7 +38,7 @@ export function App() {
   const [editing, setEditing] = useState<Transaction | null>(null);
   const [categories, setCategories] = useState<Category[]>([]), [tags, setTags] = useState<Tag[]>([]);
   const [pending, setPending] = useState<Command | null>(null), [busy, setBusy] = useState(false), [loading, setLoading] = useState(false), [message, setMessage] = useState(''), [error, setError] = useState(''), [online, setOnline] = useState(navigator.onLine), [formVersion, setFormVersion] = useState(0);
-  function authenticated(value: Auth) { activeSession.current = value.session.id; setAccounts([]); setCategories([]); setTags([]); setEditing(null); setRefundParent(null); setDeleting(null); setConflict(null); setAuth(value); setPending(restore(value)); setError(''); setMessage(''); }
+  function authenticated(value: Auth) { activeSession.current = value.session.id; setAccounts([]); setCategories([]); setTags([]); setEditing(null); setRefundParent(null); setDeleting(null); setBulkConflict(null); setConflict(null); setAuth(value); setPending(restore(value)); setError(''); setMessage(''); }
   async function session() {
     setStarting(true); setStartupError('');
     try { authenticated(await request<Auth>('/auth/session')); }
@@ -52,7 +54,7 @@ export function App() {
       const workspace = w.items.find(item => item.id === value.workspace.id);
       if (!workspace) throw new Error('Пространство недоступно.');
       if (activeSession.current !== value.session.id) return;
-      setNeedsRefresh(false); setAccounts(a); setHistoryRevision(v => v + 1); setCategories(c); setTags(tags); setAuth(current => current && current.session.id === value.session.id ? { ...current, workspace } : current);
+      setNeedsRefresh(false); setAccounts(a); setHistoryRevision(v => v + 1); setBulkConflict(null); setCategories(c); setTags(tags); setAuth(current => current && current.session.id === value.session.id ? { ...current, workspace } : current);
     } finally { setLoading(false); }
   }
   function showError(value: unknown) {
@@ -65,7 +67,7 @@ export function App() {
     setBusy(true); setError(''); setMessage('');
     try {
       await request(command.path, { method: command.method ?? 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': auth.csrf_token, 'X-Sync-Generation': command.generation, 'Idempotency-Key': command.key }, body: command.body });
-      persist(null); setPending(null); setEditing(null); setRefundParent(null); setDeleting(null); setConflict(null); setFormVersion(v => v + 1); setMessage('Сохранено.');
+      persist(null); setPending(null); setEditing(null); setRefundParent(null); setDeleting(null); setBulkConflict(null); setConflict(null); setFormVersion(v => v + 1); setMessage('Сохранено.');
       try { await refresh(auth); } catch (error) { setError('Операция сохранена, но обновить список не удалось. Нажмите «Обновить».'); showError(error); }
     } catch (error) {
       if (error instanceof RequestError && ['action_result_expired', 'idempotency_conflict'].includes(error.code)) {
@@ -76,7 +78,14 @@ export function App() {
         if (error.code === 'sync_generation_conflict') { setNeedsRefresh(true); setError('Данные восстановлены или изменены на сервере. Обновите список и проверьте данные перед новой операцией.'); }
         else if (error.status === 409) {
           setError(`Конфликт: ${error.message}. Обновите данные перед повторным вводом.`);
-          if (error.code === 'version_conflict' && command.method === 'PUT' && command.path.includes('/transactions/')) {
+          if (error.code === 'version_conflict' && command.path.endsWith('/transactions/classification')) {
+            try {
+              const proposed = JSON.parse(command.body) as BulkComparison['proposed'];
+              const current = await Promise.all(proposed.items.map(item => request<Transaction>(`/workspaces/${command.workspace}/transactions/${item.id}`).catch(error => { if (error instanceof RequestError && error.status === 404) return null; throw error; })));
+              if (activeSession.current === command.session) setBulkConflict({ proposed, current });
+            } catch { setError('Конфликт: весь пакет отклонен. Не удалось загрузить назначения для сравнения. Обновите историю перед новой командой.'); }
+          }
+          if (error.code === 'version_conflict' && command.method === 'PUT'  && command.path.includes('/transactions/')) {
             try {
               const current = await request<Transaction>(command.path);
               const fee = current.fee_transaction_id ? await request<Transaction>(`/workspaces/${command.workspace}/transactions/${current.fee_transaction_id}`) : null;
@@ -151,6 +160,7 @@ export function App() {
     <AccountManager key={`accounts-${formVersion}`} accounts={accounts} disabled={busy || loading || !!pending || needsRefresh || !online} loading={loading} submit={create} fail={setError} />
     <div className="forms"><AccountForm key={`account-${formVersion}`} disabled={busy || loading || !!pending || needsRefresh || !online} submit={body => create('accounts', body)} fail={setError} /><TransactionForm key={`transaction-${formVersion}`} accounts={accounts.filter(a => !a.archived_at)} categories={categories} tags={tags} disabled={busy || loading || !!pending || needsRefresh || !online} submit={body => create('transactions', body)} fail={setError} /></div>
     <TransferForm key={`transfer-${formVersion}`} accounts={accounts.filter(a => !a.archived_at)} categories={categories} tags={tags} disabled={busy || loading || !!pending || needsRefresh || !online} submit={body => create('transactions', body)} fail={setError} />
+    {bulkConflict && <BulkConflict value={bulkConflict} categories={categories} tags={tags} disabled={busy || loading || !!pending || !online} refresh={() => { setError(''); void refresh(auth).catch(showError); }} />}
     {deleting && <DeleteTransaction value={deleting} accounts={accounts} disabled={busy || loading || !!pending || needsRefresh || !online} confirm={() => create(`transactions/${deleting.transaction.id}`, { expected_version: deleting.transaction.version, related_versions: deleting.related.map(t => ({ id: t.id, version: t.version })) }, 'DELETE')} cancel={() => setDeleting(null)} />}
     {conflict && <TransactionConflict value={conflict} accounts={accounts} categories={categories} tags={tags} disabled={busy || loading || !!pending || !online} reload={() => void editTransaction(conflict.current.id)} dismiss={() => setConflict(null)} />}
     {editing && ['expense', 'income'].includes(editing.kind) && <TransactionForm key={`edit-${editing.id}-${editing.version}`} initial={editing} parentVersion={editingParentVersion} accounts={accounts} categories={categories} tags={tags} disabled={busy || loading || !!pending || needsRefresh || !online} submit={body => create(`transactions/${editing.id}`, body, 'PUT')} fail={setError} cancel={() => setEditing(null)} />}
