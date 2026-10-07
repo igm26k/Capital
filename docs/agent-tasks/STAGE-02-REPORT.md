@@ -63,3 +63,11 @@ Android создает income/expense через durable command engine с то�
 Полный `make android-auth-e2e`: **14/14 actual instrumentation без skips**, 6/6 unit, build/lint/debug/release и compiled trust PASS. Real Compose/API/PostgreSQL: KWD100000→expense12345→87655→income5001→92656; limit=1 читает всю историю. Сохраненный expense1000 после recreation/refresh восстанавливает minor/date/zone/note, same-key retry дает91656 и ровно4 записи. Ноль не пишет, архивный account запрещает новое создание, история сохраняется после recreation. Предыдущие auth/device и financial outage/process restart SQL drills прошли общим pipeline.
 
 Test harness распознает только системный Android System UI ANR/package=android; app ANR не скрывается. Accounts acceptance ожидает фактическую row, не текст поля до refresh. APP-02 in_progress: editing/deletion, classification/split, transfer/refund/adjustment, S3-05 mirror/outbox/staging/epoch recovery и APP-03 Android→web остаются впереди.
+
+## APP-02: изменение и удаление income/expense — 2026-10-07
+
+Independent single-allocation операции редактируются по generated Replace DTO и expected_version; kind/currency сохраняются, unchanged instant не теряет fractions, allocation/category/tags сохраняются. Version conflict сравнивается с draft, свежая version принимается явной кнопкой после refresh. Подтвержденный DELETE с JSON version expectations использует durable command protocol и cancel; dependency checks выполняет сервер.
+
+Actual `make android-auth-e2e`: **14/14 instrumentation**, 6/6 unit, debug/release/lint, auth/device и financial outage/cold restart/SQL gates, compiled system-only trust PASS. Real UI/API/PostgreSQL тест проверяет income update, external expense conflict/rejected draft/no auto-resubmit, latest-version update, cancel/delete expense/income, точные balances92156→93656→87655 и history4→3→2, очищенную очередь и recreation. После проверки уточнена информационная подпись сохраненной классификации; финальный android-check PASS.
+
+APP-02 in_progress. Split/classification/tag UI и полный редактор частей, linked fees, transfer/refund/adjustment, S3-05 и APP-03 остаются впереди; этот шаг не заявляет поддержку всех редакторов финансовой модели.

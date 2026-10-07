@@ -330,3 +330,58 @@ data class TransactionList(
 ) {
     override fun toString() = "TransactionList([redacted])"
 }
+
+@Serializable
+data class ExpenseReplace(
+    val occurred_at: String,
+    val occurred_timezone: String,
+    val note: String,
+    val payee: String,
+    val tag_ids: List<String>,
+    val kind: String,
+    val account_id: String,
+    val amount_minor: String,
+    val allocations: List<AllocationInput>,
+    val expected_version: String,
+    val expected_parent_version: String?,
+) {
+    init {
+        require(kind == "expense") { "Invalid ExpenseReplace.kind" }
+    }
+    override fun toString() = "ExpenseReplace([redacted])"
+}
+
+@Serializable
+data class IncomeReplace(
+    val occurred_at: String,
+    val occurred_timezone: String,
+    val note: String,
+    val payee: String,
+    val tag_ids: List<String>,
+    val kind: String,
+    val account_id: String,
+    val amount_minor: String,
+    val allocations: List<AllocationInput>,
+    val expected_version: String,
+) {
+    init {
+        require(kind == "income") { "Invalid IncomeReplace.kind" }
+    }
+    override fun toString() = "IncomeReplace([redacted])"
+}
+
+@Serializable
+data class TransactionDelete(
+    val expected_version: String,
+    val related_versions: List<VersionExpectation>,
+) {
+    override fun toString() = "TransactionDelete([redacted])"
+}
+
+@Serializable
+data class VersionExpectation(
+    val id: String,
+    val version: String,
+) {
+    override fun toString() = "VersionExpectation([redacted])"
+}

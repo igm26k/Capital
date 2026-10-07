@@ -23,7 +23,7 @@ data class AuthState(
     val logoutPending: Boolean = false, val persisted: Boolean = true,
     val sessions: List<Session> = emptyList(), val revokePendingId: String? = null,
     val accounts: List<Account> = emptyList(), val transactions: List<Transaction> = emptyList(), val financialCommand: FinancialCommand? = null,
-    val financeBlocked: Boolean = true, val accountConflict: Account? = null,
+    val financeBlocked: Boolean = true, val accountConflict: Account? = null, val transactionConflict: Transaction? = null,
 
 )
 
@@ -235,12 +235,12 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun submitAccount(body: String, id: String? = null) = submitFinancial(body, if (id == null) "accounts" else "accounts/$id", if (id == null) "POST" else "PUT")
-    fun submitTransaction(body: String) = submitFinancial(body, "transactions", "POST")
+    fun submitTransaction(body: String, id: String? = null, delete: Boolean = false) = submitFinancial(body, if (id == null) "transactions" else "transactions/$id", if (delete) "DELETE" else if (id == null) "POST" else "PUT")
 
     private fun submitFinancial(body: String, suffix: String, method: String) {
         val saved = candidate ?: return
         if (state.busy || state.auth == null || !state.persisted || state.financeBlocked || state.logoutPending || state.revokePendingId != null) return
-        state = state.copy(busy = true, financeBlocked = true, message = "", accountConflict = null)
+        state = state.copy(busy = true, financeBlocked = true, message = "", accountConflict = null, transactionConflict = null)
         viewModelScope.launch {
             try {
                 val command = CommandRunner(app.database.commands()).prepare(saved, suffix, method, body)
@@ -279,12 +279,18 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             state = state.copy(busy = false, accounts = accounts, transactions = history, financialCommand = null, financeBlocked = false, message = if (result.path.contains("/accounts")) "Счет сохранен" else "Операция сохранена")
         } else {
             var current: Account? = null
-            if (result.errorCode == "version_conflict" && result.method == "PUT") {
+            var transaction: Transaction? = null
+            if (result.errorCode == "version_conflict" && result.path.contains("/transactions/")) {
+                try { transaction = decodeResponse<Transaction>(ApiClient(saved.origin).request(result.path, session = saved)) }
+                catch (e: CancellationException) { throw e }
+                catch (_: Exception) { }
+            }
+            if (result.errorCode == "version_conflict" && result.method == "PUT" && result.path.contains("/accounts/")) {
                 try { current = decodeResponse<Account>(ApiClient(saved.origin).request(result.path, session = saved)) }
                 catch (e: CancellationException) { throw e }
                 catch (_: Exception) { }
             }
-            state = state.copy(busy = false, accountConflict = current,
+            state = state.copy(busy = false, accountConflict = current, transactionConflict = transaction,
                 message = if (result.state == "rejected") "Изменение отклонено: ${result.errorCode}. Обновите данные и проверьте черновик." else "Исходный результат требует сверки. Команда сохранена; новый ключ не создается.")
         }
     }
@@ -304,7 +310,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                 val history = ApiClient(saved.origin).transactions(saved)
                 require(app.database.commands().remove(command.commandId, command.state) == 1)
                 state = state.copy(busy = false, accounts = accounts, transactions = history, financialCommand = null, financeBlocked = false,
-                    accountConflict = null, message = if (command.state == "confirmed") (if (command.path.contains("/accounts")) "Счет сохранен" else "Операция сохранена") else "Данные обновлены. Проверьте поля перед новой командой.")
+                    accountConflict = null, transactionConflict = null, message = if (command.state == "confirmed") (if (command.path.contains("/accounts")) "Счет сохранен" else "Операция сохранена") else "Данные обновлены. Проверьте поля перед новой командой.")
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) { if (!financialFailure(saved, e)) state = state.copy(busy = false, message = "Не удалось обновить данные. Команда сохранена.") }
         }

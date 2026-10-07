@@ -9,7 +9,7 @@
 Критерии приемки: реальные API/PostgreSQL; exact integer minor/versions/generation, никакого финансового auto-resubmit при конфликте; credential не в Room/логах/backup; Android запись видна в вебе.
 Проверки: Gradle unit/build/lint и instrumentation на устройстве/эмуляторе с реальным TLS API/PostgreSQL; сквозная web сверка. Mock не подменяет приемку.
 Результат: приняты Keystore/bearer auth, devices/revoke, durable commands, счета и создание доходов/расходов с историей; текущий общий gate — 14/14 device и 6/6 unit PASS. APP-02 остается in_progress; каждый проверенный шаг — отдельный commit/push.
-Следующий шаг: изменение/удаление income/expense, классификация/split и другие финансовые виды; затем S3-05 durable atomic outbox/mirror/staging и APP-03 Android→server→web.
+Следующий шаг: классификация/split и другие финансовые виды; затем S3-05 durable atomic outbox/mirror/staging и APP-03 Android→server→web.
 
 ## Шаг 1: CredentialVault — 2026-10-06
 
@@ -88,3 +88,13 @@ APP-02 in_progress: далее ручные операции income/expense, з�
 Старый AccountsScreenTest уточнен: ожидание row edit button вместо совпадающего текста name input исключает гонку до загрузки accounts/history. Тест архивирования читает свежую version, поскольку финансовые операции увеличивают account version. Долгая cold boot выявила системный Android ANR: host helper dismisses только exact System UI dialog с package=android, никогда Capital ANR. Изменение относится к test harness; после него полный pipeline повторен успешно. Test project остановлен без удаления volume, local настройки сохранены, artifacts без credentials (0600).
 
 APP-02 in_progress. Следующие шаги — изменение/удаление income/expense с versions и конфликтами, категории/tags/split и другие финансовые виды; S3-05/APP-03 еще не приняты.
+
+## Шаг 9: правка и удаление основных операций — 2026-10-07
+
+ExpenseReplace/IncomeReplace/TransactionDelete/VersionExpectation генерируются из OpenAPI. Редактор independent income/expense с одной allocation сохраняет kind/currency, allocation ID/category и исходные tags; счет меняется только внутри исходной currency, исходный архивный счет допустим для редактирования. Неизмененные date/zone сохраняют точный original instant, включая fractional seconds. PUT сохраняет expected_version и expense expected_parent_version=null для независимой операции. Дробление и linked transfer fees пока не редактируются этим экраном: они должны быть добавлены следующими шагами, APP-02 не завершен.
+
+При 409 версия/заметка/signed entries текущей transaction показываются рядом с черновиком, terminal Room body/key сохраняются. После явного refresh пользователь отдельно принимает актуальную version перед новым PUT. Pending PUT восстанавливает edit target/version и поля из original body; generic retry не пересобирает запрос. Подтверждение DELETE показывает note/money и изменение остатка, имеет cancel; отправляет JSON expected_version/related_versions и тот же durable protocol. Сервер контролирует зависимости; linked fee/delete cascade и refund guards относятся к последующим финансовым экранам.
+
+Полный `make android-auth-e2e` — **14/14 instrumentation без skips**, **6/6 unit**, debug/release/lint и все существующие outage/cold restart/SQL/release trust gates PASS. Расширенный actual Compose/API/PostgreSQL тест: income 5001→6001 меняет KWD balance91656→92656; внешний expense PUT1000→1200 конфликтует с UI1500, draft сохраняется и logout disabled. Explicit latest-version PUT1500 дает92156. Cancel deletion не меняет4 history rows; confirmed expense DELETE дает93656/3rows, income DELETE дает87655/2rows; очередь пуста, архивный account guard и recreation/history сохраняют остаток. DELETE body подтвержден настоящим endpoint, не mock.
+
+После общего pipeline уточнена только подпись сохраненной классификации/тегов в редакторе; финальный android-check (build/unit/lint) повторен PASS. Отдельная UI-проверка измененной подписи для externally-classified записи не выполнялась и должна войти в шаг каталога классификации. APP-02 in_progress; далее категории/tags/split с сохранением всех частей, затем transfer/refund/adjustment и S3-05/APP-03.

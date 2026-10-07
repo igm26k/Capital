@@ -95,6 +95,48 @@ class TransactionsScreenTest {
         waitFor("Расход · −1,000 KWD · Pending expense")
         assertEquals("91656", runBlocking { api.accounts(auth.credential(origin)).single().posted_balance_minor })
         assertEquals(4, runBlocking { api.transactions(auth.credential(origin), limit = 1).size })
+        click("Изменить операцию Salary")
+        field("Сумма операции", "6.001")
+        field("Примечание операции", "Updated salary")
+        click("Сохранить изменения операции")
+        waitFor("Доход · 6,001 KWD · Updated salary")
+        assertEquals("92656", runBlocking { api.accounts(auth.credential(origin)).single().posted_balance_minor })
+        click("Отменить изменение операции")
+        click("Изменить операцию Pending expense")
+        field("Сумма операции", "1.5")
+        field("Примечание операции", "Local edited")
+        runBlocking {
+            val target = api.transactions(auth.credential(origin)).single { it.note == "Pending expense" }
+            api.request("/workspaces/${auth.workspace.id}/transactions/${target.id}", "PUT",
+                ApiClient.json.encodeToString(ExpenseReplace(target.occurred_at, target.occurred_timezone, "Server edited", target.payee, target.tag_ids, "expense", initial.id, "1200", listOf(AllocationInput(target.allocations.single().id, null, "1200")), target.version, null)),
+                auth.credential(origin), UUID.randomUUID().toString(), auth.workspace.sync_generation_id)
+        }
+        click("Сохранить изменения операции")
+        waitFor("Обновить данные для новой команды")
+        compose.onNodeWithText("Выйти").assertIsNotEnabled()
+        compose.onNodeWithText("На сервере: Server edited; версия 2; −1,200 KWD").assertExists()
+        assertEquals("rejected", runBlocking { app.database.commands().get(origin, auth.profile.id, auth.workspace.id)!!.state })
+        click("Обновить данные для новой команды")
+        waitFor("Использовать обновленную версию операции")
+        click("Использовать обновленную версию операции")
+        click("Сохранить изменения операции")
+        waitFor("Расход · −1,500 KWD · Local edited")
+        assertEquals("92156", runBlocking { api.accounts(auth.credential(origin)).single().posted_balance_minor })
+        click("Отменить изменение операции")
+        click("Удалить операцию Local edited")
+        click("Отменить удаление")
+        assertEquals(4, runBlocking { api.transactions(auth.credential(origin)).size })
+        click("Удалить операцию Local edited")
+        click("Подтвердить удаление операции")
+        compose.waitUntil(30000) { compose.onAllNodesWithText("Удалить операцию Local edited").fetchSemanticsNodes().isEmpty() }
+        assertEquals("93656", runBlocking { api.accounts(auth.credential(origin)).single().posted_balance_minor })
+        assertEquals(3, runBlocking { api.transactions(auth.credential(origin)).size })
+        click("Удалить операцию Updated salary")
+        click("Подтвердить удаление операции")
+        compose.waitUntil(30000) { compose.onAllNodesWithText("Удалить операцию Updated salary").fetchSemanticsNodes().isEmpty() }
+        assertEquals("87655", runBlocking { api.accounts(auth.credential(origin)).single().posted_balance_minor })
+        assertEquals(2, runBlocking { api.transactions(auth.credential(origin)).size })
+        assertNull(runBlocking { app.database.commands().get(origin, auth.profile.id, auth.workspace.id) })
         runBlocking {
             val currentAccount = api.accounts(auth.credential(origin)).single()
             api.request("/workspaces/${auth.workspace.id}/accounts/${currentAccount.id}", "PUT",
@@ -107,7 +149,7 @@ class TransactionsScreenTest {
         compose.activityRule.scenario.recreate()
         waitFor("Вы вошли: ${auth.profile.email}")
         click("Обновить историю")
-        waitFor("Доход · 5,001 KWD · Salary")
         waitFor("Расход · −12,345 KWD · <svg onload=alert(1)>")
+        compose.onNodeWithText("Доход · 6,001 KWD · Updated salary").assertDoesNotExist()
     }
 }
