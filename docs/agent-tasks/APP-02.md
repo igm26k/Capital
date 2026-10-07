@@ -8,8 +8,8 @@
 Задача: HTTPS bearer регистрация/вход/renew/revoke, Keystore credential, accounts/opening/archive, полные ручные операции, классификация/фильтры и явные ошибки/конфликты по готовому серверному контракту.
 Критерии приемки: реальные API/PostgreSQL; exact integer minor/versions/generation, никакого финансового auto-resubmit при конфликте; credential не в Room/логах/backup; Android запись видна в вебе.
 Проверки: Gradle unit/build/lint и instrumentation на устройстве/эмуляторе с реальным TLS API/PostgreSQL; сквозная web сверка. Mock не подменяет приемку.
-Результат: приняты Keystore/bearer auth, devices/revoke, durable commands, счета и создание доходов/расходов с историей; текущий общий gate — 15/15 device и 10/10 unit PASS. APP-02 остается in_progress; каждый проверенный шаг — отдельный commit/push.
-Следующий шаг: управление categories/tags и другие финансовые виды; затем S3-05 durable atomic outbox/mirror/staging и APP-03 Android→server→web.
+Результат: приняты Keystore/bearer auth, devices/revoke, durable commands, счета, создание/изменение/удаление доходов/расходов, части/классификация и управление categories/tags; текущий общий gate — 17/17 device и 10/10 unit PASS. APP-02 остается in_progress; каждый проверенный шаг — отдельный commit/push.
+Следующий шаг: transfer/refund/adjustment и фильтры; затем S3-05 durable atomic outbox/mirror/staging и APP-03 Android→server→web.
 
 ## Шаг 1: CredentialVault — 2026-10-06
 
@@ -114,3 +114,13 @@ CategoryList/TagList/Create DTOs генерируются из OpenAPI. CatalogR
 Полный `make android-auth-e2e` — **15/15 instrumentation без skips**, **10/10 unit**, debug/release/lint, actual auth/device и financial outage/cold restart/SQL drills, compiled system-only trust PASS. Расширенный real CatalogScreenTest создает KWD расход12345 с двумя частями5001/7344, категориями Home/Food и Home, тегом Shared. Изменение только первой части до6001 блокируется до записи и не меняет server version; изменение второй до6344 сохраняет сумму12345, исходные IDs/категории/тег и balance87655. Unit tests проверяют точную сумму, положительность, уникальность IDs, полные пути и поврежденную иерархию.
 
 APP-02 in_progress. Следующие шаги: создание/изменение/архивирование categories/tags с явными конфликтами, transfer/refund/adjustment и фильтры. Full S3-05 mirror/atomic multi-command outbox/staging/epoch recovery и APP-03 Android→server→web остаются отдельной приемкой.
+
+## Шаг 12: управление categories/tags и конфликты — 2026-10-07
+
+Generated CategoryUpdate/TagUpdate расширяют shared DTO без дублирования контрактов. Compose создает категории и теги, переименовывает, меняет parent, архивирует и восстанавливает; полный путь показывает дерево. Архивный прежний parent доступен для сохранения существующей связи. POST/PUT использует общий durable command protocol с исходным body/UUID/generation. Pending/rejected восстанавливает название, parent, archived и expected_version после пересоздания экрана. При version_conflict показывается текущая typed категория/тег; refresh не отправляет новую команду, свежая версия применяется отдельной кнопкой. Server validation отклоняет цикл дерева. Подтвержденный receipt удаляется только после полной загрузки accounts/history/categories/tags; session mutation блокируется до обработки результата.
+
+Финальный `make android-auth-e2e` — **17/17 instrumentation без skips**, **10/10 unit**, debug/release/lint, реальные auth/device и financial outage/process restart/SQL drills, compiled system-only release trust PASS. Три CatalogScreenTest проверяют прежнюю классификацию/split, создание Home/Travel, rename/move/archive/restore Trips, создание Mobile, конкурентную правку тега/rejected body/disabled logout/recreation/explicit latest version/archive/restore. Отдельный сценарий категории проверяет конкурентную server version2, сохраненный Local food draft, отсутствие auto-write после refresh, explicit version→3 и отказ parent Home→child без изменения server parent/version; очередь очищается после явной исправленной отправки.
+
+Первый общий прогон прошел 15 API/UI instrumentation tests, но runtime harness остановился: uiautomator после startup не создал XML. Shared read_screen теперь удаляет прежний снимок и принимает только свежий hierarchy; missing/invalid dump дает пустое наблюдение до существующего deadline, а не успешную проверку или stale evidence. Проверены missing/valid/wrong-root сценарии и повторный полный actual runtime gate. App ANR не скрывается. Test Compose остановлен без удаления volume, local env сохранен.
+
+APP-02 in_progress. Далее transfer/refund/adjustment, комиссии и фильтры; S3-05 atomic mirror/outbox/staging/epoch recovery и APP-03 Android→server→web остаются отдельной приемкой.

@@ -7,10 +7,9 @@ import subprocess
 import sys
 import time
 import uuid
-import xml.etree.ElementTree as ET
 from pathlib import Path
 sys.dont_write_bytecode = True
-from android_ui import dismiss_system_dialog
+from android_ui import read_screen
 adb, serial = sys.argv[1:3]
 root = Path(__file__).resolve().parents[1]
 package = 'com.capital.accounting'
@@ -22,10 +21,7 @@ assert uuid.UUID(proof['session_id']).version is not None
 assert uuid.UUID(proof['revoke_session_id']).version is not None
 assert re.fullmatch(r'android-ui-[0-9a-f-]+@example\.test', proof['email'])
 def screen():
-    device('shell', 'uiautomator', 'dump', '/sdcard/accounting-auth-ui.xml')
-    tree = ET.fromstring(device('exec-out', 'cat', '/sdcard/accounting-auth-ui.xml'))
-    dismiss_system_dialog(tree, device)
-    return tree
+    return read_screen(device, '/sdcard/accounting-auth-ui.xml')
 def wait_text(text, seconds=45):
     deadline = time.monotonic() + seconds
     while time.monotonic() < deadline:

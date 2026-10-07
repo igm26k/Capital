@@ -105,4 +105,126 @@ class CatalogScreenTest {
             api.request("/auth/logout", "POST", session = foreign.credential(origin))
         }
     }
+    @Test fun realCatalogMutationsArchiveAndExplicitVersionConflict() {
+        fun click(text: String) = compose.onNodeWithText(text).performScrollTo().performClick()
+        fun field(label: String, value: String) {
+            compose.onNodeWithText(label).performScrollTo().performTextClearance()
+            compose.onNodeWithText(label).performTextInput(value)
+        }
+        fun waitFor(text: String) = compose.waitUntil(30000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
+        fun categories() = runBlocking { api.categories(auth.credential(origin)) }
+        fun tags() = runBlocking { api.tags(auth.credential(origin)) }
+        waitFor("Вы вошли: ${auth.profile.email}")
+        click("Обновить категории и теги")
+        waitFor("Категория: Home / Food")
+        click("Новая категория")
+        field("Название категории", "Travel")
+        click("Родитель категории: Home")
+        click("Сохранить категорию")
+        waitFor("Категория: Home / Travel")
+        val created = categories().single { it.name == "Travel" }
+        assertEquals(categories().single { it.name == "Home" }.id, created.parent_id)
+        click("Изменить категорию Home / Travel")
+        field("Название категории", "Trips")
+        click("Категория в корне")
+        click("Поместить в архив")
+        click("Сохранить категорию")
+        waitFor("Категория: Trips · В архиве")
+        val archived = categories().single { it.id == created.id }
+        assertNotNull(archived.archived_at)
+        assertNull(archived.parent_id)
+        click("Изменить категорию Trips")
+        click("Восстановить из архива")
+        click("Сохранить категорию")
+        waitFor("Категория: Trips")
+        assertNull(categories().single { it.id == created.id }.archived_at)
+        click("Новый тег")
+        field("Название тега", "Mobile")
+        click("Сохранить тег")
+        waitFor("Тег: Mobile")
+        val tag = tags().single { it.name == "Mobile" }
+        click("Изменить тег Mobile")
+        field("Название тега", "Local tag")
+        runBlocking {
+            api.request("/workspaces/${auth.workspace.id}/tags/${tag.id}", "PUT", ApiClient.json.encodeToString(TagUpdate(tag.version, "Server tag", false)), auth.credential(origin), UUID.randomUUID().toString(), auth.workspace.sync_generation_id)
+        }
+        click("Сохранить тег")
+        waitFor("Тег на сервере: Server tag; версия 2")
+        val app = ApplicationProvider.getApplicationContext<CapitalApplication>()
+        val rejected = runBlocking { app.database.commands().get(origin, auth.profile.id, auth.workspace.id)!! }
+        assertEquals("rejected", rejected.state)
+        val draft = decodeResponse<TagUpdate>(rejected.body)
+        assertEquals(tag.version, draft.expected_version)
+        assertEquals("Local tag", draft.name)
+        compose.onNodeWithText("Выйти").assertIsNotEnabled()
+        compose.activityRule.scenario.recreate()
+        compose.onNodeWithText("Название тега").assertTextContains("Local tag")
+        click("Обновить данные для новой команды")
+        waitFor("Данные обновлены. Проверьте поля перед новой командой.")
+        click("Использовать обновленную версию классификации")
+        click("Поместить в архив")
+        click("Сохранить тег")
+        waitFor("Тег: Local tag · В архиве")
+        val updated = tags().single { it.id == tag.id }
+        assertNotNull(updated.archived_at)
+        assertEquals("3", updated.version)
+        click("Изменить тег Local tag")
+        click("Восстановить из архива")
+        click("Сохранить тег")
+        waitFor("Тег: Local tag")
+        assertNull(tags().single { it.id == tag.id }.archived_at)
+        assertNull(runBlocking { app.database.commands().get(origin, auth.profile.id, auth.workspace.id) })
+        compose.activityRule.scenario.recreate()
+        compose.onNodeWithText("Тег: Local tag").assertExists()
+    }
+
+    @Test fun categoryConflictAndCycleKeepRejectedDraftWithoutAutomaticWrite() {
+        fun click(text: String) = compose.onNodeWithText(text).performScrollTo().performClick()
+        fun waitFor(text: String) = compose.waitUntil(30000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
+        fun categories() = runBlocking { api.categories(auth.credential(origin)) }
+        waitFor("Вы вошли: ${auth.profile.email}")
+        click("Обновить категории и теги")
+        waitFor("Категория: Home / Food")
+        val home = categories().single { it.name == "Home" }
+        val food = categories().single { it.name == "Food" }
+        click("Изменить категорию Home / Food")
+        compose.onNodeWithText("Название категории").performScrollTo().performTextClearance()
+        compose.onNodeWithText("Название категории").performTextInput("Local food")
+        runBlocking {
+            api.request("/workspaces/${auth.workspace.id}/categories/${food.id}", "PUT", ApiClient.json.encodeToString(CategoryUpdate(food.version, "Server food", false, home.id)), auth.credential(origin), UUID.randomUUID().toString(), auth.workspace.sync_generation_id)
+        }
+        click("Сохранить категорию")
+        waitFor("Категория на сервере: Server food; версия 2")
+        val app = ApplicationProvider.getApplicationContext<CapitalApplication>()
+        val rejected = runBlocking { app.database.commands().get(origin, auth.profile.id, auth.workspace.id)!! }
+        assertEquals("version_conflict", rejected.errorCode)
+        assertEquals("Local food", decodeResponse<CategoryUpdate>(rejected.body).name)
+        assertEquals("Server food", categories().single { it.id == food.id }.name)
+        compose.activityRule.scenario.recreate()
+        compose.onNodeWithText("Название категории").assertTextContains("Local food")
+        click("Обновить данные для новой команды")
+        waitFor("Данные обновлены. Проверьте поля перед новой командой.")
+        assertEquals("2", categories().single { it.id == food.id }.version)
+        click("Использовать обновленную версию классификации")
+        click("Сохранить категорию")
+        waitFor("Категория: Home / Local food")
+        assertEquals("3", categories().single { it.id == food.id }.version)
+        click("Изменить категорию Home")
+        click("Родитель категории: Home / Local food")
+        click("Сохранить категорию")
+        waitFor("Изменение отклонено: validation_error. Обновите данные и проверьте черновик.")
+        val cycle = runBlocking { app.database.commands().get(origin, auth.profile.id, auth.workspace.id)!! }
+        assertEquals("rejected", cycle.state)
+        assertEquals(food.id, decodeResponse<CategoryUpdate>(cycle.body).parent_id)
+        assertNull(categories().single { it.id == home.id }.parent_id)
+        assertEquals(home.version, categories().single { it.id == home.id }.version)
+        click("Обновить данные для новой команды")
+        waitFor("Данные обновлены. Проверьте поля перед новой командой.")
+        click("Категория в корне")
+        click("Сохранить категорию")
+        waitFor("Категория сохранена")
+        assertNull(runBlocking { app.database.commands().get(origin, auth.profile.id, auth.workspace.id) })
+        assertNull(categories().single { it.id == home.id }.parent_id)
+    }
+
 }

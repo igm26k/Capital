@@ -418,3 +418,22 @@ data class TagCreate(
 ) {
     override fun toString() = "TagCreate([redacted])"
 }
+
+@Serializable
+data class CategoryUpdate(
+    val expected_version: String,
+    val name: String,
+    val archived: Boolean,
+    val parent_id: String?,
+) {
+    override fun toString() = "CategoryUpdate([redacted])"
+}
+
+@Serializable
+data class TagUpdate(
+    val expected_version: String,
+    val name: String,
+    val archived: Boolean,
+) {
+    override fun toString() = "TagUpdate([redacted])"
+}

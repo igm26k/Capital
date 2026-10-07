@@ -6,10 +6,9 @@ import subprocess
 import sys
 import time
 import uuid
-import xml.etree.ElementTree as ET
 from pathlib import Path
 sys.dont_write_bytecode = True
-from android_ui import dismiss_system_dialog
+from android_ui import read_screen
 
 adb, serial = sys.argv[1:3]
 root = Path(__file__).resolve().parents[1]
@@ -25,10 +24,7 @@ def proof():
         return None
 
 def screen():
-    device('shell', 'uiautomator', 'dump', '/sdcard/accounting-financial-ui.xml')
-    tree = ET.fromstring(device('exec-out', 'cat', '/sdcard/accounting-financial-ui.xml'))
-    dismiss_system_dialog(tree, device)
-    return tree
+    return read_screen(device, '/sdcard/accounting-financial-ui.xml')
 
 def find(text, seconds=45, scroll=False, row=False):
     deadline = time.monotonic() + seconds

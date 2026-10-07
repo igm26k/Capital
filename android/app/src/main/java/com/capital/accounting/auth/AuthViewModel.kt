@@ -23,7 +23,7 @@ data class AuthState(
     val logoutPending: Boolean = false, val persisted: Boolean = true,
     val sessions: List<Session> = emptyList(), val revokePendingId: String? = null,
     val accounts: List<Account> = emptyList(), val transactions: List<Transaction> = emptyList(), val categories: List<Category> = emptyList(), val tags: List<Tag> = emptyList(), val financialCommand: FinancialCommand? = null,
-    val financeBlocked: Boolean = true, val accountConflict: Account? = null, val transactionConflict: Transaction? = null,
+    val financeBlocked: Boolean = true, val accountConflict: Account? = null, val transactionConflict: Transaction? = null, val categoryConflict: Category? = null, val tagConflict: Tag? = null,
 
 )
 
@@ -252,10 +252,15 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     fun submitAccount(body: String, id: String? = null) = submitFinancial(body, if (id == null) "accounts" else "accounts/$id", if (id == null) "POST" else "PUT")
     fun submitTransaction(body: String, id: String? = null, delete: Boolean = false) = submitFinancial(body, if (id == null) "transactions" else "transactions/$id", if (delete) "DELETE" else if (id == null) "POST" else "PUT")
 
+    fun submitCatalog(body: String, collection: String, id: String? = null) {
+        require(collection in setOf("categories", "tags"))
+        submitFinancial(body, if (id == null) collection else "$collection/$id", if (id == null) "POST" else "PUT")
+    }
+
     private fun submitFinancial(body: String, suffix: String, method: String) {
         val saved = candidate ?: return
         if (state.busy || state.auth == null || !state.persisted || state.financeBlocked || state.logoutPending || state.revokePendingId != null) return
-        state = state.copy(busy = true, financeBlocked = true, message = "", accountConflict = null, transactionConflict = null)
+        state = state.copy(busy = true, financeBlocked = true, message = "", accountConflict = null, transactionConflict = null, categoryConflict = null, tagConflict = null)
         viewModelScope.launch {
             try {
                 val command = CommandRunner(app.database.commands()).prepare(saved, suffix, method, body)
@@ -290,11 +295,15 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         if (result.state == "confirmed") {
             val accounts = ApiClient(saved.origin).accounts(saved)
             val history = ApiClient(saved.origin).transactions(saved)
+            val categories = ApiClient(saved.origin).categories(saved)
+            val tags = ApiClient(saved.origin).tags(saved)
             require(app.database.commands().remove(result.commandId, "confirmed") == 1)
-            state = state.copy(busy = false, accounts = accounts, transactions = history, financialCommand = null, financeBlocked = false, message = if (result.path.contains("/accounts")) "Счет сохранен" else "Операция сохранена")
+            state = state.copy(busy = false, accounts = accounts, transactions = history, categories = categories, tags = tags, financialCommand = null, financeBlocked = false, message = savedMessage(result.path))
         } else {
             var current: Account? = null
             var transaction: Transaction? = null
+            var category: Category? = null
+            var tag: Tag? = null
             if (result.errorCode == "version_conflict" && result.path.contains("/transactions/")) {
                 try { transaction = decodeResponse<Transaction>(ApiClient(saved.origin).request(result.path, session = saved)) }
                 catch (e: CancellationException) { throw e }
@@ -305,7 +314,17 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                 catch (e: CancellationException) { throw e }
                 catch (_: Exception) { }
             }
-            state = state.copy(busy = false, accountConflict = current, transactionConflict = transaction,
+            if (result.errorCode == "version_conflict" && result.path.contains("/categories/")) {
+                try { category = decodeResponse<Category>(ApiClient(saved.origin).request(result.path, session = saved)) }
+                catch (e: CancellationException) { throw e }
+                catch (_: Exception) { }
+            }
+            if (result.errorCode == "version_conflict" && result.path.contains("/tags/")) {
+                try { tag = decodeResponse<Tag>(ApiClient(saved.origin).request(result.path, session = saved)) }
+                catch (e: CancellationException) { throw e }
+                catch (_: Exception) { }
+            }
+            state = state.copy(busy = false, accountConflict = current, transactionConflict = transaction, categoryConflict = category, tagConflict = tag,
                 message = if (result.state == "rejected") "Изменение отклонено: ${result.errorCode}. Обновите данные и проверьте черновик." else "Исходный результат требует сверки. Команда сохранена; новый ключ не создается.")
         }
     }
@@ -323,9 +342,11 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 val accounts = ApiClient(saved.origin).accounts(saved)
                 val history = ApiClient(saved.origin).transactions(saved)
+                val categories = ApiClient(saved.origin).categories(saved)
+                val tags = ApiClient(saved.origin).tags(saved)
                 require(app.database.commands().remove(command.commandId, command.state) == 1)
-                state = state.copy(busy = false, accounts = accounts, transactions = history, financialCommand = null, financeBlocked = false,
-                    accountConflict = null, transactionConflict = null, message = if (command.state == "confirmed") (if (command.path.contains("/accounts")) "Счет сохранен" else "Операция сохранена") else "Данные обновлены. Проверьте поля перед новой командой.")
+                state = state.copy(busy = false, accounts = accounts, transactions = history, categories = categories, tags = tags, financialCommand = null, financeBlocked = false,
+                    accountConflict = null, transactionConflict = null, categoryConflict = null, tagConflict = null, message = if (command.state == "confirmed") savedMessage(command.path) else "Данные обновлены. Проверьте поля перед новой командой.")
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) { if (!financialFailure(saved, e)) state = state.copy(busy = false, message = "Не удалось обновить данные. Команда сохранена.") }
         }
@@ -382,4 +403,11 @@ private fun errorMessage(error: Exception, authAttempt: Boolean = false): String
     error is ApiFailure && error.status in 400..499 -> "Сервер отклонил запрос. Проверьте введенные данные."
     authAttempt -> "Ответ не получен. Вход мог выполниться. Повторите вход после восстановления связи."
     else -> "Не удалось связаться с сервером. Повторите проверку сессии."
+}
+
+private fun savedMessage(path: String): String = when {
+    path.contains("/accounts") -> "Счет сохранен"
+    path.contains("/categories") -> "Категория сохранена"
+    path.contains("/tags") -> "Тег сохранен"
+    else -> "Операция сохранена"
 }
