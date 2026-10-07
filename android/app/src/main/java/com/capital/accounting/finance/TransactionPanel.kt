@@ -143,7 +143,7 @@ fun TransactionPanel(model: AuthViewModel) {
         }
         TextButton(enabled = enabled, onClick = { editingId = null; original = null; amount = ""; note = ""; parts = listOf(AllocationDraft()); selectedTags = emptyList(); error = "" }) { Text("Отменить изменение операции") }
     }
-    state.transactionConflict?.let { current ->
+    state.transactionConflict?.takeIf { it.kind in listOf("income", "expense") && it.parent_transaction_id == null }?.let { current ->
         Text("На сервере: ${current.note}; версия ${current.version}; ${current.entries.joinToString { Money.display(it.amount_minor, it.currency) }}")
         Text("Ваш черновик операции: $note; сумма $amount")
     }

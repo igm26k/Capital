@@ -152,4 +152,179 @@ class TransfersScreenTest {
         waitFor("Transfer source · В архиве")
         compose.onNodeWithText("Сохранить перевод").assertIsNotEnabled()
     }
+    @Test fun aggregateEditConflictFeeRemovalAdditionAndConfirmedDelete() {
+        fun click(text: String) = compose.onNodeWithText(text).performScrollTo().performClick()
+        fun field(label: String, value: String) {
+            compose.onNodeWithText(label).performScrollTo().performTextClearance()
+            compose.onNodeWithText(label).performTextInput(value)
+        }
+        fun waitFor(text: String) = compose.waitUntil(30000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
+        fun history() = runBlocking { api.transactions(auth.credential(origin)) }
+        fun account(id: String) = runBlocking { api.accounts(auth.credential(origin)).single { it.id == id } }
+        fun waitTransfer(note: String) = compose.waitUntil(30000) { compose.onAllNodes(hasText("Перевод ·", substring = true) and hasText(note, substring = true)).fetchSemanticsNodes().isNotEmpty() }
+        val initialFee = FeeInput(UUID.randomUUID().toString(), source.id, "501", listOf(AllocationInput(UUID.randomUUID().toString(), category.id, "200"), AllocationInput(UUID.randomUUID().toString(), null, "301")), "Original fee", listOf(tag.id))
+        val initial = TransferCreate(UUID.randomUUID().toString(), "2026-10-06T08:20:30.123456Z", "Europe/Nicosia", "Original aggregate", "Recipient", listOf(tag.id), "transfer", source.id, target.id, "10000", "300", Rate("3", "10"), initialFee)
+        runBlocking { api.request("/workspaces/${auth.workspace.id}/transactions", "POST", ApiClient.json.encodeToString(initial), auth.credential(origin), UUID.randomUUID().toString(), auth.workspace.sync_generation_id) }
+        waitFor("Вы вошли: ${auth.profile.email}")
+        click("Обновить счета")
+        waitFor("Списать со счета: Transfer source · KWD")
+        click("Обновить категории и теги")
+        waitFor("Тег: Transfer tag")
+        click("Обновить историю")
+        waitTransfer("Original aggregate")
+        val original = history().single { it.id == initial.id }
+        click("Изменить перевод Original aggregate")
+        compose.onNodeWithText("Списать со счета: Transfer target · USD").assertIsNotEnabled()
+        compose.onNodeWithText("Зачислить на счет: Transfer same · KWD").assertIsNotEnabled()
+        compose.onNodeWithText("Счет комиссии: Transfer target · USD").assertIsNotEnabled()
+        field("Сумма списания перевода", "12.000")
+        field("Сумма зачисления перевода", "4.00")
+        field("Сумма комиссии перевода", "0.601")
+        field("Сумма части комиссии 2", "0.401")
+        field("Примечание перевода", "Edited aggregate")
+        val beforeEdit = account(source.id)
+        click("Сохранить изменения перевода")
+        waitTransfer("Edited aggregate")
+        val edited = history().single { it.id == initial.id }
+        val editedFee = history().single { it.id == initialFee.id }
+        assertEquals("87399", account(source.id).posted_balance_minor)
+        assertEquals("3400", account(target.id).posted_balance_minor)
+        assertEquals((beforeEdit.balance_version.toLong() + 1).toString(), account(source.id).balance_version)
+        assertEquals(original.entries.map { it.id }.toSet(), edited.entries.map { it.id }.toSet())
+        assertEquals(initialFee.allocations.map { it.id }.toSet(), editedFee.allocations.map { it.id }.toSet())
+        assertEquals(initial.occurred_at, edited.occurred_at)
+        assertEquals(listOf(tag.id), edited.tag_ids)
+        assertEquals(listOf(tag.id), editedFee.tag_ids)
+        assertEquals(category.id, editedFee.allocations.single { it.amount_minor == "200" }.category_id)
+        click("Изменить перевод Edited aggregate")
+        field("Сумма списания перевода", "13.000")
+        field("Сумма зачисления перевода", "4.50")
+        field("Сумма комиссии перевода", "0.701")
+        field("Сумма части комиссии 2", "0.501")
+        field("Примечание перевода", "Local aggregate")
+        val remote = TransferReplace(initial.occurred_at, initial.occurred_timezone, "Server aggregate", initial.payee, initial.tag_ids, "transfer", source.id, target.id, "11000", "350", null, initialFee.copy(amount_minor = "601", allocations = editedFee.allocations.map { AllocationInput(it.id, it.category_id, it.amount_minor) }), edited.version, editedFee.version)
+        runBlocking { api.request("/workspaces/${auth.workspace.id}/transactions/${initial.id}", "PUT", ApiClient.json.encodeToString(remote), auth.credential(origin), UUID.randomUUID().toString(), auth.workspace.sync_generation_id) }
+        click("Сохранить изменения перевода")
+        waitFor("Перевод на сервере: Server aggregate; версия 3")
+        val app = ApplicationProvider.getApplicationContext<CapitalApplication>()
+        val rejected = runBlocking { app.database.commands().get(origin, auth.profile.id, auth.workspace.id)!! }
+        val draft = decodeResponse<TransferReplace>(rejected.body)
+        assertEquals("rejected", rejected.state)
+        assertEquals("2", draft.expected_version)
+        assertEquals("2", draft.expected_fee_version)
+        assertEquals(initialFee.id, draft.fee!!.id)
+        assertEquals("Local aggregate", draft.note)
+        compose.onNodeWithText("Выйти").assertIsNotEnabled()
+        compose.activityRule.scenario.recreate()
+        compose.onNodeWithText("Примечание перевода").assertTextContains("Local aggregate")
+        compose.onNodeWithText("Сумма комиссии перевода").assertTextContains("0,701")
+        click("Обновить данные для новой команды")
+        waitFor("Данные обновлены. Проверьте поля перед новой командой.")
+        assertEquals("Server aggregate", history().single { it.id == initial.id }.note)
+        assertEquals("3", history().single { it.id == initial.id }.version)
+        click("Использовать обновленные версии перевода и комиссии")
+        click("Сохранить изменения перевода")
+        waitTransfer("Local aggregate")
+        assertEquals("86299", account(source.id).posted_balance_minor)
+        assertEquals("3450", account(target.id).posted_balance_minor)
+        assertEquals("4", history().single { it.id == initial.id }.version)
+        assertEquals("4", history().single { it.id == initialFee.id }.version)
+        click("Изменить перевод Local aggregate")
+        click("Убрать комиссию перевода")
+        click("Сохранить изменения перевода")
+        compose.waitUntil(30000) { history().none { it.id == initialFee.id } && compose.onAllNodesWithText("Изменить перевод Local aggregate").fetchSemanticsNodes().isNotEmpty() && runBlocking { app.database.commands().get(origin, auth.profile.id, auth.workspace.id) } == null }
+        assertEquals("87000", account(source.id).posted_balance_minor)
+        assertNull(history().single { it.id == initial.id }.fee_transaction_id)
+        click("Изменить перевод Local aggregate")
+        click("Добавить комиссию перевода")
+        click("Счет комиссии: Transfer source · KWD")
+        field("Сумма комиссии перевода", "0.101")
+        field("Примечание комиссии перевода", "Replacement fee")
+        click("Категория комиссии 1: Bank fee")
+        click("Сохранить изменения перевода")
+        compose.waitUntil(30000) { history().any { it.note == "Replacement fee" } && runBlocking { app.database.commands().get(origin, auth.profile.id, auth.workspace.id) } == null }
+        val replacement = history().single { it.note == "Replacement fee" }
+        assertNotEquals(initialFee.id, replacement.id)
+        assertTrue(replacement.allocations.none { part -> initialFee.allocations.any { it.id == part.id } })
+        assertEquals("86899", account(source.id).posted_balance_minor)
+        assertEquals(initial.occurred_at, history().single { it.id == initial.id }.occurred_at)
+        click("Удалить перевод Local aggregate")
+        compose.onNodeWithText("Вместе с переводом будет удалена комиссия: Replacement fee; −0,101 KWD").assertExists()
+        click("Отменить удаление перевода")
+        assertEquals(5, history().size)
+        click("Удалить перевод Local aggregate")
+        click("Подтвердить удаление перевода")
+        compose.waitUntil(30000) { compose.onAllNodesWithText("Изменить перевод Local aggregate").fetchSemanticsNodes().isEmpty() }
+        assertEquals(3, history().size)
+        assertEquals("100000", account(source.id).posted_balance_minor)
+        assertEquals("3000", account(target.id).posted_balance_minor)
+        assertNull(runBlocking { app.database.commands().get(origin, auth.profile.id, auth.workspace.id) })
+        compose.activityRule.scenario.recreate()
+        compose.onNodeWithText("100,000 KWD").assertExists()
+    }
+
+    @Test fun staleDeleteAndFeeRefundDependencyNeverRemoveFinancialMovements() {
+        fun click(text: String) = compose.onNodeWithText(text).performScrollTo().performClick()
+        fun waitFor(text: String) = compose.waitUntil(30000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
+        fun history() = runBlocking { api.transactions(auth.credential(origin)) }
+        fun balance(id: String) = runBlocking { api.accounts(auth.credential(origin)).single { it.id == id }.posted_balance_minor }
+        val fee = FeeInput(UUID.randomUUID().toString(), source.id, "501", listOf(AllocationInput(UUID.randomUUID().toString(), category.id, "501")), "Dependency fee", emptyList())
+        val transfer = TransferCreate(UUID.randomUUID().toString(), "2026-10-06T08:10:00Z", "UTC", "Dependency transfer", "", emptyList(), "transfer", source.id, target.id, "10000", "300", null, fee)
+        runBlocking { api.request("/workspaces/${auth.workspace.id}/transactions", "POST", ApiClient.json.encodeToString(transfer), auth.credential(origin), UUID.randomUUID().toString(), auth.workspace.sync_generation_id) }
+        waitFor("Вы вошли: ${auth.profile.email}")
+        click("Обновить счета")
+        waitFor("Списать со счета: Transfer source · KWD")
+        click("Обновить историю")
+        waitFor("Изменить перевод Dependency transfer")
+        click("Удалить перевод Dependency transfer")
+        val before = history().associateBy { it.id }
+        val refund = RefundCreate(UUID.randomUUID().toString(), "2026-10-06T08:11:00Z", "UTC", "Fee refund", "", emptyList(), "refund", source.id, "100", fee.id, before[fee.id]!!.version, before[transfer.id]!!.version, listOf(RefundAllocationInput(UUID.randomUUID().toString(), fee.allocations.single().id, "100")))
+        runBlocking { api.request("/workspaces/${auth.workspace.id}/transactions", "POST", ApiClient.json.encodeToString(refund), auth.credential(origin), UUID.randomUUID().toString(), auth.workspace.sync_generation_id) }
+        click("Подтвердить удаление перевода")
+        waitFor("Изменение отклонено: version_conflict. Обновите данные и проверьте черновик.")
+        val app = ApplicationProvider.getApplicationContext<CapitalApplication>()
+        val stale = runBlocking { app.database.commands().get(origin, auth.profile.id, auth.workspace.id)!! }
+        val deletion = decodeResponse<TransactionDelete>(stale.body)
+        assertEquals("1", deletion.expected_version)
+        assertEquals(listOf(VersionExpectation(fee.id, "1")), deletion.related_versions)
+        assertEquals(6, history().size)
+        assertEquals("89599", balance(source.id))
+        click("Обновить данные для новой команды")
+        waitFor("Данные обновлены. Проверьте поля перед новой командой.")
+        click("Удалить перевод Dependency transfer")
+        compose.onNodeWithText("Зависимый возврат: Fee refund. Сначала удалите возврат.").assertExists()
+        click("Подтвердить удаление перевода")
+        waitFor("Изменение отклонено: dependent_transactions. Обновите данные и проверьте черновик.")
+        assertEquals(6, history().size)
+        assertEquals("89599", balance(source.id))
+        click("Обновить данные для новой команды")
+        waitFor("Данные обновлены. Проверьте поля перед новой командой.")
+        click("Изменить перевод Dependency transfer")
+        click("Убрать комиссию перевода")
+        click("Сохранить изменения перевода")
+        waitFor("Изменение отклонено: dependent_transactions. Обновите данные и проверьте черновик.")
+        val blocked = decodeResponse<TransferReplace>(runBlocking { app.database.commands().get(origin, auth.profile.id, auth.workspace.id)!!.body })
+        assertNull(blocked.fee)
+        assertEquals("2", blocked.expected_fee_version)
+        assertEquals(fee.id, history().single { it.id == transfer.id }.fee_transaction_id)
+        assertEquals("89599", balance(source.id))
+        click("Обновить данные для новой команды")
+        waitFor("Данные обновлены. Проверьте поля перед новой командой.")
+        click("Отменить изменение перевода")
+        val latest = history().associateBy { it.id }
+        runBlocking {
+            api.request("/workspaces/${auth.workspace.id}/transactions/${refund.id}", "DELETE", ApiClient.json.encodeToString(TransactionDelete(latest[refund.id]!!.version, listOf(VersionExpectation(fee.id, latest[fee.id]!!.version), VersionExpectation(transfer.id, latest[transfer.id]!!.version)))), auth.credential(origin), UUID.randomUUID().toString(), auth.workspace.sync_generation_id)
+        }
+        click("Обновить историю")
+        // Wait for the actual UI refresh, not just the already-updated API.
+        compose.waitUntil(30000) { compose.onAllNodes(hasText("Возврат ·", substring = true) and hasText("Fee refund", substring = true)).fetchSemanticsNodes().isEmpty() }
+        click("Удалить перевод Dependency transfer")
+        click("Подтвердить удаление перевода")
+        compose.waitUntil(30000) { compose.onAllNodesWithText("Изменить перевод Dependency transfer").fetchSemanticsNodes().isEmpty() }
+        assertEquals(3, history().size)
+        assertEquals("100000", balance(source.id))
+        assertEquals("3000", balance(target.id))
+        assertNull(runBlocking { app.database.commands().get(origin, auth.profile.id, auth.workspace.id) })
+    }
+
 }

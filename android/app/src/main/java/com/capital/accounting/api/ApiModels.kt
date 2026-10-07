@@ -471,3 +471,57 @@ data class FeeInput(
 ) {
     override fun toString() = "FeeInput([redacted])"
 }
+
+@Serializable
+data class TransferReplace(
+    val occurred_at: String,
+    val occurred_timezone: String,
+    val note: String,
+    val payee: String,
+    val tag_ids: List<String>,
+    val kind: String,
+    val source_account_id: String,
+    val target_account_id: String,
+    val source_amount_minor: String,
+    val target_amount_minor: String,
+    val rate: Rate?,
+    val fee: FeeInput?,
+    val expected_version: String,
+    val expected_fee_version: String?,
+) {
+    init {
+        require(kind == "transfer") { "Invalid TransferReplace.kind" }
+    }
+    override fun toString() = "TransferReplace([redacted])"
+}
+
+@Serializable
+data class RefundCreate(
+    val id: String,
+    val occurred_at: String,
+    val occurred_timezone: String,
+    val note: String,
+    val payee: String,
+    val tag_ids: List<String>,
+    val kind: String,
+    val account_id: String,
+    val amount_minor: String,
+    val parent_transaction_id: String,
+    val expected_parent_version: String,
+    val expected_transfer_version: String?,
+    val allocations: List<RefundAllocationInput>,
+) {
+    init {
+        require(kind == "refund") { "Invalid RefundCreate.kind" }
+    }
+    override fun toString() = "RefundCreate([redacted])"
+}
+
+@Serializable
+data class RefundAllocationInput(
+    val id: String,
+    val original_allocation_id: String,
+    val amount_minor: String,
+) {
+    override fun toString() = "RefundAllocationInput([redacted])"
+}
