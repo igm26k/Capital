@@ -275,3 +275,58 @@ data class Allocation(
 ) {
     override fun toString() = "Allocation([redacted])"
 }
+
+@Serializable
+data class AllocationInput(
+    val id: String,
+    val category_id: String?,
+    val amount_minor: String,
+) {
+    override fun toString() = "AllocationInput([redacted])"
+}
+
+@Serializable
+data class ExpenseCreate(
+    val id: String,
+    val occurred_at: String,
+    val occurred_timezone: String,
+    val note: String,
+    val payee: String,
+    val tag_ids: List<String>,
+    val kind: String,
+    val account_id: String,
+    val amount_minor: String,
+    val allocations: List<AllocationInput>,
+) {
+    init {
+        require(kind == "expense") { "Invalid ExpenseCreate.kind" }
+    }
+    override fun toString() = "ExpenseCreate([redacted])"
+}
+
+@Serializable
+data class IncomeCreate(
+    val id: String,
+    val occurred_at: String,
+    val occurred_timezone: String,
+    val note: String,
+    val payee: String,
+    val tag_ids: List<String>,
+    val kind: String,
+    val account_id: String,
+    val amount_minor: String,
+    val allocations: List<AllocationInput>,
+) {
+    init {
+        require(kind == "income") { "Invalid IncomeCreate.kind" }
+    }
+    override fun toString() = "IncomeCreate([redacted])"
+}
+
+@Serializable
+data class TransactionList(
+    val items: List<Transaction>,
+    val next_cursor: String?,
+) {
+    override fun toString() = "TransactionList([redacted])"
+}

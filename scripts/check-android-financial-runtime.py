@@ -8,6 +8,8 @@ import time
 import uuid
 import xml.etree.ElementTree as ET
 from pathlib import Path
+sys.dont_write_bytecode = True
+from android_ui import dismiss_system_dialog
 
 adb, serial = sys.argv[1:3]
 root = Path(__file__).resolve().parents[1]
@@ -24,7 +26,9 @@ def proof():
 
 def screen():
     device('shell', 'uiautomator', 'dump', '/sdcard/accounting-financial-ui.xml')
-    return ET.fromstring(device('exec-out', 'cat', '/sdcard/accounting-financial-ui.xml'))
+    tree = ET.fromstring(device('exec-out', 'cat', '/sdcard/accounting-financial-ui.xml'))
+    dismiss_system_dialog(tree, device)
+    return tree
 
 def find(text, seconds=45, scroll=False, row=False):
     deadline = time.monotonic() + seconds

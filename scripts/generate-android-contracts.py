@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 root = Path(__file__).resolve().parents[1]
 schemas = json.loads((root / 'contracts/openapi.json').read_text())['components']['schemas']
-names = ['Profile', 'Workspace', 'Session', 'BearerAuth', 'Login', 'Register', 'Acknowledgement', 'SessionList', 'Account', 'AccountCreate', 'AccountUpdate', 'AccountList', 'MutationResult', 'Transaction', 'Category', 'Tag', 'Tombstone', 'Rate', 'Entry', 'Allocation']
+names = ['Profile', 'Workspace', 'Session', 'BearerAuth', 'Login', 'Register', 'Acknowledgement', 'SessionList', 'Account', 'AccountCreate', 'AccountUpdate', 'AccountList', 'MutationResult', 'Transaction', 'Category', 'Tag', 'Tombstone', 'Rate', 'Entry', 'Allocation', 'AllocationInput', 'ExpenseCreate', 'IncomeCreate', 'TransactionList']
 def kotlin_type(schema):
     if 'anyOf' in schema:
         values = [x for x in schema['anyOf'] if x.get('type') != 'null']

@@ -1,0 +1,14 @@
+"""Dedicated emulator UI support; app ANRs are never dismissed."""
+import re
+
+def dismiss_system_dialog(tree, device):
+    nodes = list(tree.iter('node'))
+    if not any(node.get('package') == 'android' and node.get('text') == "System UI isn't responding" for node in nodes):
+        return False
+    buttons = [node for node in nodes if node.get('package') == 'android' and node.get('text') == 'Close app' and node.get('enabled') == 'true']
+    if len(buttons) != 1:
+        raise RuntimeError('System UI dialog has no unique close action')
+    x1, y1, x2, y2 = [int(v) for v in re.findall(r'\d+', buttons[0].attrib['bounds'])]
+    assert x2 > x1 and y2 > y1
+    device('shell', 'input', 'tap', str((x1+x2)//2), str((y1+y2)//2))
+    return True

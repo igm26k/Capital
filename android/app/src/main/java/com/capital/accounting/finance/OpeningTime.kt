@@ -12,3 +12,11 @@ fun openingLocal(instant: String, zone: String): String {
     val date = requireNotNull(parser.parse(instant.take(19)))
     return SimpleDateFormat(format, Locale.ROOT).apply { timeZone = TimeZone.getTimeZone(zone) }.format(date)
 }
+
+fun openingInstant(local: String, zone: String): String {
+    require(zone in TimeZone.getAvailableIDs()) { "Проверьте часовой пояс." }
+    require(local.matches(Regex("[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}"))) { "Проверьте дату." }
+    val parser = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.ROOT).apply { isLenient = false; timeZone = TimeZone.getTimeZone(zone) }
+    val date = requireNotNull(parser.parse(local))
+    return SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.ROOT).apply { timeZone = TimeZone.getTimeZone("UTC") }.format(date)
+}

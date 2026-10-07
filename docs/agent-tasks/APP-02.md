@@ -8,8 +8,8 @@
 Задача: HTTPS bearer регистрация/вход/renew/revoke, Keystore credential, accounts/opening/archive, полные ручные операции, классификация/фильтры и явные ошибки/конфликты по готовому серверному контракту.
 Критерии приемки: реальные API/PostgreSQL; exact integer minor/versions/generation, никакого финансового auto-resubmit при конфликте; credential не в Room/логах/backup; Android запись видна в вебе.
 Проверки: Gradle unit/build/lint и instrumentation на устройстве/эмуляторе с реальным TLS API/PostgreSQL; сквозная web сверка. Mock не подменяет приемку.
-Результат: начато хранение bearer credential через Android Keystore/AES-GCM и noBackupFilesDir; проверки завершены для этого шага (4/4 device PASS). Сначала auth/Keystore/read bootstrap, затем самостоятельные проверяемые финансовые шаги; каждый завершенный шаг — отдельный commit/push.
-Следующий шаг: S3-05 durable atomic outbox/mirror/staging; APP-03 общая приемка Android→server→web.
+Результат: приняты Keystore/bearer auth, devices/revoke, durable commands, счета и создание доходов/расходов с историей; текущий общий gate — 14/14 device и 6/6 unit PASS. APP-02 остается in_progress; каждый проверенный шаг — отдельный commit/push.
+Следующий шаг: изменение/удаление income/expense, классификация/split и другие финансовые виды; затем S3-05 durable atomic outbox/mirror/staging и APP-03 Android→server→web.
 
 ## Шаг 1: CredentialVault — 2026-10-06
 
@@ -76,3 +76,15 @@ FinancialOutageTest координируется host harness только из 
 Финальный `make android-auth-e2e` — **13/13 instrumentation без skips**, **6/6 unit**, debug/release/build/lint, прежние auth/device runtime drills и compiled system-only release trust PASS. Артефакты: android-financial-outage-instrumentation.txt и android-financial-runtime.json (0600), без bearer/password. Test Compose остановлен без удаления volume; local окружение не изменено.
 
 APP-02 in_progress: далее ручные операции income/expense, затем transfer/refund/adjustment, классификация и фильтры. Сверка Android→web и full mirror/atomic multi-command outbox/staging/epoch recovery остаются APP-03/S3-05.
+
+## Шаг 8: создание доходов/расходов и история — 2026-10-07
+
+Добавлены генерируемые ExpenseCreate/IncomeCreate/AllocationInput/TransactionList, формы дохода/расхода и история всех страниц с guard workspace/cursor. Пользователь выбирает активный счет, вводит положительную decimal сумму, дату/timezone, получателя и примечание. Money сохраняет minor через BigInteger, openingInstant строго переводит дату в UTC. На этом шаге одна allocation без категории и пустые tags; полный выбор классификации/split относится к следующим шагам. Архивный счет исключен из создания. История показывает русские типы/статусы, точные signed entries, заметку и момент операции.
+
+Операции используют тот же durable prepare/send/retry/rebind/receipt, что счета. После подтверждения обновляются accounts и history до удаления confirmed command; неизвестный результат сохраняет original body/key и блокирует новую запись/мутацию auth. Pending transaction восстанавливает account/kind/amount/note/payee/date/timezone, включая currency после загрузки account list. Подтвержденный результат операции обозначается отдельно от результата счета.
+
+Финальный `make android-auth-e2e` — **14/14 instrumentation без skips**, **6/6 unit**, debug/release/build/lint, прежние auth/device и financial outage/cold restart/SQL drills, compiled release trust PASS. Новый TransactionsScreenTest использует real TLS API/PostgreSQL: opening 100000 KWD → expense 12345 → balance 87655 → income 5001 → balance 92656. История с limit=1 содержит все 3 записи, expense entry=-12345 и allocation=12345/category=null, timezone Europe/Nicosia и UTC08:01 подтверждены. Нулевая сумма не создает запись. Prepared Room expense 1000 после Activity recreation + явного refresh восстанавливает 1,000 KWD/11:02/date/note; explicit same-key retry дает balance 91656 и ровно 4 записи. Архив исключает новый submit, история сохраняется после повторной recreation/refresh.
+
+Старый AccountsScreenTest уточнен: ожидание row edit button вместо совпадающего текста name input исключает гонку до загрузки accounts/history. Тест архивирования читает свежую version, поскольку финансовые операции увеличивают account version. Долгая cold boot выявила системный Android ANR: host helper dismisses только exact System UI dialog с package=android, никогда Capital ANR. Изменение относится к test harness; после него полный pipeline повторен успешно. Test project остановлен без удаления volume, local настройки сохранены, artifacts без credentials (0600).
+
+APP-02 in_progress. Следующие шаги — изменение/удаление income/expense с versions и конфликтами, категории/tags/split и другие финансовые виды; S3-05/APP-03 еще не приняты.

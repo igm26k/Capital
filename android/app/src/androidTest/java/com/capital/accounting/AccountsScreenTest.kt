@@ -52,7 +52,7 @@ class AccountsScreenTest {
         click("KWD")
         field("Начальный остаток", "123.456")
         click("Создать счет")
-        waitFor("Android pocket")
+        waitFor("Изменить счет Android pocket")
         compose.onNodeWithText("123,456 KWD").assertExists()
         val initial = runBlocking { api.accounts(auth.credential(origin), limit = 1).single() }
         assertEquals("123456", initial.posted_balance_minor)
@@ -86,7 +86,7 @@ class AccountsScreenTest {
         click("Использовать обновленную версию")
         compose.onNode(isToggleable()).performScrollTo().performClick()
         click("Сохранить счет")
-        waitFor("Local proposal")
+        waitFor("Изменить счет Local proposal")
         val restored = runBlocking { api.accounts(auth.credential(origin)).single() }
         assertNull(restored.archived_at)
         assertEquals("123456", restored.posted_balance_minor)
@@ -95,7 +95,7 @@ class AccountsScreenTest {
         compose.activityRule.scenario.recreate()
         waitFor("Вы вошли: ${auth.profile.email}")
         click("Обновить счета")
-        waitFor("Local proposal")
+        waitFor("Изменить счет Local proposal")
         val pending = runBlocking {
             com.capital.accounting.finance.CommandRunner(app.database.commands()).prepare(auth.credential(origin), "accounts/${restored.id}", "PUT",
                 ApiClient.json.encodeToString(AccountUpdate(restored.version, "Rebound pocket", restored.type, false)))
@@ -116,7 +116,7 @@ class AccountsScreenTest {
         assertEquals(pending.body, rebound.body)
         assertNotEquals(pending.sessionId, rebound.sessionId)
         click("Повторить сохраненную команду")
-        waitFor("Rebound pocket")
+        waitFor("Изменить счет Rebound pocket")
         val current = runBlocking { (app.credentialVault.load(origin) as com.capital.accounting.auth.VaultRead.Available).session }
         val final = runBlocking { api.accounts(current).single() }
         assertEquals("Rebound pocket", final.name)
