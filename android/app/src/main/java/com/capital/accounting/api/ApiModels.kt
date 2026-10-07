@@ -385,3 +385,36 @@ data class VersionExpectation(
 ) {
     override fun toString() = "VersionExpectation([redacted])"
 }
+
+@Serializable
+data class CategoryList(
+    val items: List<Category>,
+    val next_cursor: String?,
+) {
+    override fun toString() = "CategoryList([redacted])"
+}
+
+@Serializable
+data class TagList(
+    val items: List<Tag>,
+    val next_cursor: String?,
+) {
+    override fun toString() = "TagList([redacted])"
+}
+
+@Serializable
+data class CategoryCreate(
+    val id: String,
+    val name: String,
+    val parent_id: String?,
+) {
+    override fun toString() = "CategoryCreate([redacted])"
+}
+
+@Serializable
+data class TagCreate(
+    val id: String,
+    val name: String,
+) {
+    override fun toString() = "TagCreate([redacted])"
+}

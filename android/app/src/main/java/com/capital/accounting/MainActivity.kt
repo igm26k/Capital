@@ -19,6 +19,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.capital.accounting.auth.AuthViewModel
 import com.capital.accounting.finance.AccountPanel
 import com.capital.accounting.finance.TransactionPanel
+import com.capital.accounting.finance.CatalogPanel
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -63,6 +64,7 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                             AccountPanel(model)
+                            CatalogPanel(model)
                             TransactionPanel(model)
                         } else {
                             OutlinedTextField(origin, { origin = it }, label = { Text("Адрес сервера") }, singleLine = true, modifier = Modifier.fillMaxWidth(), enabled = !state.busy)

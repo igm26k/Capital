@@ -22,7 +22,7 @@ data class AuthState(
     val auth: BearerAuth? = null, val restorePending: Boolean = false,
     val logoutPending: Boolean = false, val persisted: Boolean = true,
     val sessions: List<Session> = emptyList(), val revokePendingId: String? = null,
-    val accounts: List<Account> = emptyList(), val transactions: List<Transaction> = emptyList(), val financialCommand: FinancialCommand? = null,
+    val accounts: List<Account> = emptyList(), val transactions: List<Transaction> = emptyList(), val categories: List<Category> = emptyList(), val tags: List<Tag> = emptyList(), val financialCommand: FinancialCommand? = null,
     val financeBlocked: Boolean = true, val accountConflict: Account? = null, val transactionConflict: Transaction? = null,
 
 )
@@ -231,6 +231,21 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             try { state = previous.copy(busy = false, transactions = ApiClient(saved.origin).transactions(saved)) }
             catch (e: CancellationException) { throw e }
             catch (e: Exception) { if (!financialFailure(saved, e)) state = previous.copy(busy = false, message = "Не удалось загрузить историю. Повторите обновление.") }
+        }
+    }
+
+    fun loadCatalog() {
+        val saved = candidate ?: return
+        if (state.busy || state.auth == null || !state.persisted || state.logoutPending || state.revokePendingId != null) return
+        val previous = state
+        state = state.copy(busy = true)
+        viewModelScope.launch {
+            try {
+                val categories = ApiClient(saved.origin).categories(saved)
+                val tags = ApiClient(saved.origin).tags(saved)
+                state = previous.copy(busy = false, categories = categories, tags = tags)
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { if (!financialFailure(saved, e)) state = previous.copy(busy = false, message = "Не удалось загрузить категории и теги. Повторите обновление.") }
         }
     }
 

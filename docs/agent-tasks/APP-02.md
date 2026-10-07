@@ -8,7 +8,7 @@
 Задача: HTTPS bearer регистрация/вход/renew/revoke, Keystore credential, accounts/opening/archive, полные ручные операции, классификация/фильтры и явные ошибки/конфликты по готовому серверному контракту.
 Критерии приемки: реальные API/PostgreSQL; exact integer minor/versions/generation, никакого финансового auto-resubmit при конфликте; credential не в Room/логах/backup; Android запись видна в вебе.
 Проверки: Gradle unit/build/lint и instrumentation на устройстве/эмуляторе с реальным TLS API/PostgreSQL; сквозная web сверка. Mock не подменяет приемку.
-Результат: приняты Keystore/bearer auth, devices/revoke, durable commands, счета и создание доходов/расходов с историей; текущий общий gate — 14/14 device и 6/6 unit PASS. APP-02 остается in_progress; каждый проверенный шаг — отдельный commit/push.
+Результат: приняты Keystore/bearer auth, devices/revoke, durable commands, счета и создание доходов/расходов с историей; текущий общий gate — 15/15 device и 6/6 unit PASS. APP-02 остается in_progress; каждый проверенный шаг — отдельный commit/push.
 Следующий шаг: классификация/split и другие финансовые виды; затем S3-05 durable atomic outbox/mirror/staging и APP-03 Android→server→web.
 
 ## Шаг 1: CredentialVault — 2026-10-06
@@ -98,3 +98,11 @@ ExpenseReplace/IncomeReplace/TransactionDelete/VersionExpectation генерир
 Полный `make android-auth-e2e` — **14/14 instrumentation без skips**, **6/6 unit**, debug/release/lint и все существующие outage/cold restart/SQL/release trust gates PASS. Расширенный actual Compose/API/PostgreSQL тест: income 5001→6001 меняет KWD balance91656→92656; внешний expense PUT1000→1200 конфликтует с UI1500, draft сохраняется и logout disabled. Explicit latest-version PUT1500 дает92156. Cancel deletion не меняет4 history rows; confirmed expense DELETE дает93656/3rows, income DELETE дает87655/2rows; очередь пуста, архивный account guard и recreation/history сохраняют остаток. DELETE body подтвержден настоящим endpoint, не mock.
 
 После общего pipeline уточнена только подпись сохраненной классификации/тегов в редакторе; финальный android-check (build/unit/lint) повторен PASS. Отдельная UI-проверка измененной подписи для externally-classified записи не выполнялась и должна войти в шаг каталога классификации. APP-02 in_progress; далее категории/tags/split с сохранением всех частей, затем transfer/refund/adjustment и S3-05/APP-03.
+
+## Шаг 10: чтение справочника классификации — 2026-10-07
+
+CategoryList/TagList/Create DTOs генерируются из OpenAPI. CatalogReader читает все страницы с archived=include, объединяет IDs, проверяет workspace каждой записи и отклоняет повторяющийся cursor. AuthViewModel публикует categories/tags вместе после успешной загрузки обоих списков, сохраняет предыдущий снимок при ошибке; 401 использует общий auth recovery без потери финансовой команды. Read-only CatalogPanel показывает category/parent и имена tags как Text, архивные отметки предусмотрены. На этом шаге нет управления каталогом или назначения классификации операции: они нужны следующими шагами, APP-02 остается in_progress.
+
+`make android-auth-e2e` — **15/15 instrumentation без skips**, 6/6 unit, debug/release/build/lint и все прежние auth/device/financial outage/cold restart/SQL/release-trust gates PASS. CatalogScreenTest создает на реальном API/PostgreSQL parent/child categories и 2 tags; native reader limit=1 получает все записи, Compose показывает Home/Food, SVG-like tag как буквальный текст и сохраняет список после recreation. Чужой bearer получает404 на оба workspace catalogs. Артефакт: android-catalog-ui-instrumentation.txt (0600, без credentials). Test Compose остановлен без удаления volume.
+
+Далее — выбор категории/тегов и split allocation editor с сохранением IDs/точным total, затем управление каталогом/конфликты и остальные финансовые виды. S3-05/APP-03 не приняты.

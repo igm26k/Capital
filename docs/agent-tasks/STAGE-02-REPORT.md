@@ -71,3 +71,9 @@ Independent single-allocation операции редактируются по g
 Actual `make android-auth-e2e`: **14/14 instrumentation**, 6/6 unit, debug/release/lint, auth/device и financial outage/cold restart/SQL gates, compiled system-only trust PASS. Real UI/API/PostgreSQL тест проверяет income update, external expense conflict/rejected draft/no auto-resubmit, latest-version update, cancel/delete expense/income, точные balances92156→93656→87655 и history4→3→2, очищенную очередь и recreation. После проверки уточнена информационная подпись сохраненной классификации; финальный android-check PASS.
 
 APP-02 in_progress. Split/classification/tag UI и полный редактор частей, linked fees, transfer/refund/adjustment, S3-05 и APP-03 остаются впереди; этот шаг не заявляет поддержку всех редакторов финансовой модели.
+
+## APP-02: справочник categories/tags — 2026-10-07
+
+Добавлены generated list/create DTOs, чтение всех страниц с workspace/cursor guard и read-only Compose catalog. Categories/tags публикуются одним state update после обеих загрузок; auth401 не стирает Room pending. Real CatalogScreenTest проверяет limit=1, parent/child, literal tag text, recreation и foreign workspace404 для обоих списков.
+
+Полный `make android-auth-e2e`: **15/15 instrumentation**,6/6unit,debug/release/lint, прежние outage/cold restart/SQL и system-only compiled trust PASS. Read-only catalog — подготовка назначения классификации/split, а не завершение этого требования. APP-02 in_progress; выбор частей/categories/tags, catalog mutations/conflicts, другие виды операций и S3-05/APP-03 остаются впереди.
