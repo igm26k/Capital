@@ -44,6 +44,8 @@ fun TransactionPanel(model: AuthViewModel) {
             parts = parts.map { it.copy(id = UUID.randomUUID().toString()) }
         }
         if (command != null && command.method in listOf("POST", "PUT") && command.path.contains("/transactions")) {
+            val commandKind = ApiClient.json.parseToJsonElement(command.body).jsonObject.getValue("kind").jsonPrimitive.content
+            if (commandKind !in listOf("expense", "income")) return@LaunchedEffect
             if (command.method == "PUT") {
                 editingId = command.path.substringAfterLast('/')
                 editingVersion = ApiClient.json.parseToJsonElement(command.body).jsonObject.getValue("expected_version").jsonPrimitive.content

@@ -437,3 +437,37 @@ data class TagUpdate(
 ) {
     override fun toString() = "TagUpdate([redacted])"
 }
+
+@Serializable
+data class TransferCreate(
+    val id: String,
+    val occurred_at: String,
+    val occurred_timezone: String,
+    val note: String,
+    val payee: String,
+    val tag_ids: List<String>,
+    val kind: String,
+    val source_account_id: String,
+    val target_account_id: String,
+    val source_amount_minor: String,
+    val target_amount_minor: String,
+    val rate: Rate?,
+    val fee: FeeInput?,
+) {
+    init {
+        require(kind == "transfer") { "Invalid TransferCreate.kind" }
+    }
+    override fun toString() = "TransferCreate([redacted])"
+}
+
+@Serializable
+data class FeeInput(
+    val id: String,
+    val account_id: String,
+    val amount_minor: String,
+    val allocations: List<AllocationInput>,
+    val note: String,
+    val tag_ids: List<String>,
+) {
+    override fun toString() = "FeeInput([redacted])"
+}
