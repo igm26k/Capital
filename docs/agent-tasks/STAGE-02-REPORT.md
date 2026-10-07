@@ -77,3 +77,9 @@ APP-02 in_progress. Split/classification/tag UI и полный редактор
 Добавлены generated list/create DTOs, чтение всех страниц с workspace/cursor guard и read-only Compose catalog. Categories/tags публикуются одним state update после обеих загрузок; auth401 не стирает Room pending. Real CatalogScreenTest проверяет limit=1, parent/child, literal tag text, recreation и foreign workspace404 для обоих списков.
 
 Полный `make android-auth-e2e`: **15/15 instrumentation**,6/6unit,debug/release/lint, прежние outage/cold restart/SQL и system-only compiled trust PASS. Read-only catalog — подготовка назначения классификации/split, а не завершение этого требования. APP-02 in_progress; выбор частей/categories/tags, catalog mutations/conflicts, другие виды операций и S3-05/APP-03 остаются впереди.
+
+## APP-02: классификация и части income/expense — 2026-10-07
+
+Compose выбирает категории по полному пути и теги, добавляет/удаляет до100 частей, проверяет положительные minor и точную сумму через BigInteger. Редактирование нескольких частей сохраняет IDs/категории/теги; pending восстанавливается из сохраненного тела, новые операции получают новые allocation IDs.
+
+Полный `make android-auth-e2e`: **15/15 instrumentation**, **10/10 unit**, debug/release/lint, прежние actual outage/process restart/SQL и compiled release trust PASS. Real CatalogScreenTest проверяет KWD12345=5001+7344, назначенные категории/Shared, блокировку несовпадающей суммы без изменения version, update6001+6344 с прежними IDs/классификацией и balance87655. Unit tests покрывают суммы и полную иерархию. APP-02 in_progress; catalog mutations/conflicts, другие виды операций/фильтры, S3-05 и APP-03 остаются впереди.

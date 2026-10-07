@@ -8,8 +8,8 @@
 Задача: HTTPS bearer регистрация/вход/renew/revoke, Keystore credential, accounts/opening/archive, полные ручные операции, классификация/фильтры и явные ошибки/конфликты по готовому серверному контракту.
 Критерии приемки: реальные API/PostgreSQL; exact integer minor/versions/generation, никакого финансового auto-resubmit при конфликте; credential не в Room/логах/backup; Android запись видна в вебе.
 Проверки: Gradle unit/build/lint и instrumentation на устройстве/эмуляторе с реальным TLS API/PostgreSQL; сквозная web сверка. Mock не подменяет приемку.
-Результат: приняты Keystore/bearer auth, devices/revoke, durable commands, счета и создание доходов/расходов с историей; текущий общий gate — 15/15 device и 6/6 unit PASS. APP-02 остается in_progress; каждый проверенный шаг — отдельный commit/push.
-Следующий шаг: классификация/split и другие финансовые виды; затем S3-05 durable atomic outbox/mirror/staging и APP-03 Android→server→web.
+Результат: приняты Keystore/bearer auth, devices/revoke, durable commands, счета и создание доходов/расходов с историей; текущий общий gate — 15/15 device и 10/10 unit PASS. APP-02 остается in_progress; каждый проверенный шаг — отдельный commit/push.
+Следующий шаг: управление categories/tags и другие финансовые виды; затем S3-05 durable atomic outbox/mirror/staging и APP-03 Android→server→web.
 
 ## Шаг 1: CredentialVault — 2026-10-06
 
@@ -106,3 +106,11 @@ CategoryList/TagList/Create DTOs генерируются из OpenAPI. CatalogR
 `make android-auth-e2e` — **15/15 instrumentation без skips**, 6/6 unit, debug/release/build/lint и все прежние auth/device/financial outage/cold restart/SQL/release-trust gates PASS. CatalogScreenTest создает на реальном API/PostgreSQL parent/child categories и 2 tags; native reader limit=1 получает все записи, Compose показывает Home/Food, SVG-like tag как буквальный текст и сохраняет список после recreation. Чужой bearer получает404 на оба workspace catalogs. Артефакт: android-catalog-ui-instrumentation.txt (0600, без credentials). Test Compose остановлен без удаления volume.
 
 Далее — выбор категории/тегов и split allocation editor с сохранением IDs/точным total, затем управление каталогом/конфликты и остальные финансовые виды. S3-05/APP-03 не приняты.
+
+## Шаг 11: категории, теги и распределение суммы — 2026-10-07
+
+Форма income/expense выбирает категорию каждой части и теги операции; полный путь категории различает одинаковые названия в разных ветках. Можно добавить до 100 частей, изменить суммы и убрать часть. BigInteger проверяет положительные minor каждой части и точное равенство общей сумме до отправки. Одна часть получает всю сумму операции. Редактор сохраняет allocation IDs/category IDs/tag IDs; новая операция получает новые allocation IDs. Pending POST/PUT восстанавливает все части и теги из сохраненного тела. Архивная выбранная классификация сохраняется при редактировании, активные значения доступны для нового выбора. Независимые income/expense с несколькими частями теперь доступны для изменения.
+
+Полный `make android-auth-e2e` — **15/15 instrumentation без skips**, **10/10 unit**, debug/release/lint, actual auth/device и financial outage/cold restart/SQL drills, compiled system-only trust PASS. Расширенный real CatalogScreenTest создает KWD расход12345 с двумя частями5001/7344, категориями Home/Food и Home, тегом Shared. Изменение только первой части до6001 блокируется до записи и не меняет server version; изменение второй до6344 сохраняет сумму12345, исходные IDs/категории/тег и balance87655. Unit tests проверяют точную сумму, положительность, уникальность IDs, полные пути и поврежденную иерархию.
+
+APP-02 in_progress. Следующие шаги: создание/изменение/архивирование categories/tags с явными конфликтами, transfer/refund/adjustment и фильтры. Full S3-05 mirror/atomic multi-command outbox/staging/epoch recovery и APP-03 Android→server→web остаются отдельной приемкой.
