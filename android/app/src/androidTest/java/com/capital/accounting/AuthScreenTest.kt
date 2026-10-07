@@ -1,6 +1,9 @@
 package com.capital.accounting
 
 import androidx.compose.ui.test.*
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.lifecycle.ViewModelProvider
+import com.capital.accounting.auth.AuthViewModel
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -49,9 +52,20 @@ class AuthScreenTest {
         val registered = runBlocking { (app.credentialVault.load(origin) as VaultRead.Available).session }
         compose.onNodeWithText("Выйти").performScrollTo().performClick()
         compose.waitUntil(30000) { compose.onAllNodesWithText("Вы вышли из аккаунта").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Email").assertTextContains(email)
+        assertTrue("Password must be cleared after logout", compose.onNodeWithText("Пароль").fetchSemanticsNode().config[SemanticsProperties.EditableText].text.isEmpty())
         compose.onNodeWithText("Пароль").performScrollTo().performTextInput("  android ui 🥨 password  ")
-        compose.onNodeWithText("Войти").performScrollTo().performClick()
-        compose.waitUntil(30000) { compose.onAllNodesWithText("Вы вошли: $email").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Войти").assertIsEnabled().performScrollTo().performClick()
+        try {
+            compose.waitUntil(30000) { compose.onAllNodesWithText("Вы вошли: $email").fetchSemanticsNodes().isNotEmpty() }
+        } catch (e: ComposeTimeoutException) {
+            var diagnostic = "Activity state unavailable"
+            compose.activityRule.scenario.onActivity { activity ->
+                val current = ViewModelProvider(activity)[AuthViewModel::class.java].state
+                diagnostic = "busy=${current.busy}; authenticated=${current.auth != null}; message=${current.message}"
+            }
+            throw AssertionError("Login UI not confirmed: $diagnostic", e)
+        }
         val before = runBlocking { (app.credentialVault.load(origin) as VaultRead.Available).session }
         assertNotEquals(registered.sessionId, before.sessionId)
         compose.onNodeWithText("Продлить сессию").performScrollTo().performClick()

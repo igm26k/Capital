@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.capital.accounting.auth.AuthViewModel
 import com.capital.accounting.finance.AccountPanel
+import com.capital.accounting.finance.RefundPanel
 import com.capital.accounting.finance.TransferPanel
 import com.capital.accounting.finance.TransactionPanel
 import com.capital.accounting.finance.CatalogPanel
@@ -68,6 +69,7 @@ class MainActivity : ComponentActivity() {
                             CatalogPanel(model)
                             TransactionPanel(model)
                             TransferPanel(model)
+                            RefundPanel(model)
                         } else {
                             OutlinedTextField(origin, { origin = it }, label = { Text("Адрес сервера") }, singleLine = true, modifier = Modifier.fillMaxWidth(), enabled = !state.busy)
                             Button(enabled = !state.busy, onClick = { model.saveOrigin(origin) }) { Text("Сохранить адрес") }

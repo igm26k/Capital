@@ -173,6 +173,7 @@ class TransfersScreenTest {
         click("Обновить историю")
         waitTransfer("Original aggregate")
         val original = history().single { it.id == initial.id }
+        val changingFeePart = history().single { it.id == initialFee.id }.allocations.indexOfFirst { it.id == initialFee.allocations.last().id } + 1
         click("Изменить перевод Original aggregate")
         compose.onNodeWithText("Списать со счета: Transfer target · USD").assertIsNotEnabled()
         compose.onNodeWithText("Зачислить на счет: Transfer same · KWD").assertIsNotEnabled()
@@ -180,7 +181,7 @@ class TransfersScreenTest {
         field("Сумма списания перевода", "12.000")
         field("Сумма зачисления перевода", "4.00")
         field("Сумма комиссии перевода", "0.601")
-        field("Сумма части комиссии 2", "0.401")
+        field("Сумма части комиссии $changingFeePart", "0.401")
         field("Примечание перевода", "Edited aggregate")
         val beforeEdit = account(source.id)
         click("Сохранить изменения перевода")
@@ -200,7 +201,7 @@ class TransfersScreenTest {
         field("Сумма списания перевода", "13.000")
         field("Сумма зачисления перевода", "4.50")
         field("Сумма комиссии перевода", "0.701")
-        field("Сумма части комиссии 2", "0.501")
+        field("Сумма части комиссии $changingFeePart", "0.501")
         field("Примечание перевода", "Local aggregate")
         val remote = TransferReplace(initial.occurred_at, initial.occurred_timezone, "Server aggregate", initial.payee, initial.tag_ids, "transfer", source.id, target.id, "11000", "350", null, initialFee.copy(amount_minor = "601", allocations = editedFee.allocations.map { AllocationInput(it.id, it.category_id, it.amount_minor) }), edited.version, editedFee.version)
         runBlocking { api.request("/workspaces/${auth.workspace.id}/transactions/${initial.id}", "PUT", ApiClient.json.encodeToString(remote), auth.credential(origin), UUID.randomUUID().toString(), auth.workspace.sync_generation_id) }
