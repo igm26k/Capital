@@ -1,5 +1,6 @@
 package com.capital.accounting.finance
 
+import com.capital.accounting.api.Allocation
 import com.capital.accounting.api.RefundAllocationInput
 import java.math.BigInteger
 import java.util.UUID
@@ -19,4 +20,17 @@ fun refundInputs(currency: String, parts: List<RefundDraft>, remaining: Map<Stri
     // Apply the same aggregate monetary bound as the server, without rounding.
     require(Money.minor(Money.display(total, currency).removeSuffix(" $currency"), currency) == total)
     return total to allocations
+}
+
+/** Editing releases only this refund's reservation; other refunds remain reserved. */
+fun refundRemaining(originals: List<Allocation>, current: List<Allocation> = emptyList()): Map<String, String> {
+    require(originals.map { it.id }.toSet().size == originals.size)
+    require(current.map { it.original_allocation_id }.toSet().size == current.size)
+    val own = current.associate { requireNotNull(it.original_allocation_id) to BigInteger(it.amount_minor) }
+    require(own.keys.all { key -> originals.any { it.id == key } } && own.values.all { it.signum() > 0 })
+    return originals.associate { original ->
+        val available = BigInteger(original.remaining_refundable_minor) + (own[original.id] ?: BigInteger.ZERO)
+        require(available.signum() >= 0 && available <= BigInteger(original.amount_minor))
+        original.id to available.toString()
+    }
 }

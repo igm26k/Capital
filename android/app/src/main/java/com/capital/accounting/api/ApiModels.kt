@@ -525,3 +525,25 @@ data class RefundAllocationInput(
 ) {
     override fun toString() = "RefundAllocationInput([redacted])"
 }
+
+@Serializable
+data class RefundReplace(
+    val occurred_at: String,
+    val occurred_timezone: String,
+    val note: String,
+    val payee: String,
+    val tag_ids: List<String>,
+    val kind: String,
+    val account_id: String,
+    val amount_minor: String,
+    val parent_transaction_id: String,
+    val expected_parent_version: String,
+    val expected_transfer_version: String?,
+    val allocations: List<RefundAllocationInput>,
+    val expected_version: String,
+) {
+    init {
+        require(kind == "refund") { "Invalid RefundReplace.kind" }
+    }
+    override fun toString() = "RefundReplace([redacted])"
+}

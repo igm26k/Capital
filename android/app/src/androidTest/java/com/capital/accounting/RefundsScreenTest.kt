@@ -200,4 +200,99 @@ class RefundsScreenTest {
         assertEquals(listOf(tag.id), confirmed[replay.id]!!.tag_ids)
         assertNull(runBlocking { app.database.commands().get(origin, auth.profile.id, auth.workspace.id) })
     }
+    @Test fun realRefundReplacementConflictPreservesIdsAndDeleteRestoresQuota() {
+        val original = expense.allocations.single { it.amount_minor == "5001" }
+        val index = expense.allocations.indexOfFirst { it.id == original.id } + 1
+        val partId = UUID.randomUUID().toString()
+        val draft = RefundCreate(UUID.randomUUID().toString(), "2026-10-06T08:20:30.123456Z", "Europe/Nicosia", "Editable refund", "Refund recipient", listOf(tag.id), "refund", alternate.id, "3003", expense.id, expense.version, null, listOf(RefundAllocationInput(partId, original.id, "3003")))
+        runBlocking { decodeResponse<MutationResult>(api.request("/workspaces/${auth.workspace.id}/transactions", "POST", ApiClient.json.encodeToString(draft), auth.credential(origin), UUID.randomUUID().toString(), auth.workspace.sync_generation_id)) }
+        load()
+        click("Изменить возврат Editable refund")
+        waitFor("Доступно для части возврата $index: 5,001 KWD")
+        compose.onNodeWithText("Создать возврат расхода Refund expense").assertIsNotEnabled()
+        compose.onNodeWithText("Счет возврата: Refund USD · USD").assertDoesNotExist()
+        click("Счет возврата: Refund source · KWD")
+        field("Сумма части возврата $index", "4.003")
+        field("Примечание возврата", "Edited refund")
+        click("Сохранить изменения возврата")
+        waitFor("Возврат · 4,003 KWD · Edited refund")
+        val edited = history().single { it.id == draft.id }
+        assertEquals(partId, edited.allocations.single().id)
+        assertEquals(original.id, edited.allocations.single().original_allocation_id)
+        assertEquals(category.id, edited.allocations.single().category_id)
+        assertEquals(draft.occurred_at, edited.occurred_at)
+        assertEquals(draft.tag_ids, edited.tag_ids)
+        assertEquals("20000", accounts()[alternate.id]!!.posted_balance_minor)
+        assertEquals("91658", accounts()[source.id]!!.posted_balance_minor)
+        val parent = history().single { it.id == expense.id }
+        val remote = RefundReplace(edited.occurred_at, edited.occurred_timezone, "Remote refund edit", edited.payee, edited.tag_ids, "refund", source.id, "4003", expense.id, parent.version, null, listOf(RefundAllocationInput(partId, original.id, "4003")), edited.version)
+        runBlocking { decodeResponse<MutationResult>(api.request("/workspaces/${auth.workspace.id}/transactions/${draft.id}", "PUT", ApiClient.json.encodeToString(remote), auth.credential(origin), UUID.randomUUID().toString(), auth.workspace.sync_generation_id)) }
+        field("Примечание возврата", "Local refund edit")
+        field("Сумма части возврата $index", "5.001")
+        click("Сохранить изменения возврата")
+        waitFor("Изменение отклонено: version_conflict. Обновите данные и проверьте черновик.")
+        val app = ApplicationProvider.getApplicationContext<CapitalApplication>()
+        val rejected = runBlocking { app.database.commands().get(origin, auth.profile.id, auth.workspace.id)!! }
+        val replacement = decodeResponse<RefundReplace>(rejected.body)
+        assertEquals("PUT", rejected.method)
+        assertEquals(edited.version, replacement.expected_version)
+        assertEquals(partId, replacement.allocations.single().id)
+        assertEquals(draft.occurred_at, replacement.occurred_at)
+        compose.onNodeWithText("Выйти").assertIsNotEnabled()
+        compose.activityRule.scenario.recreate()
+        compose.onNodeWithText("Примечание возврата").assertTextContains("Local refund edit")
+        click("Обновить данные для новой команды")
+        waitFor("Данные обновлены. Проверьте поля перед новой командой.")
+        click("Использовать обновленную версию возврата")
+        click("Сохранить изменения возврата")
+        waitFor("Возврат · 5,001 KWD · Local refund edit")
+        assertEquals("92656", accounts()[source.id]!!.posted_balance_minor)
+        assertEquals(partId, history().single { it.id == draft.id }.allocations.single().id)
+        click("Удалить возврат Local refund edit")
+        click("Отменить удаление возврата")
+        assertTrue(history().any { it.id == draft.id })
+        click("Удалить возврат Local refund edit")
+        click("Подтвердить удаление возврата")
+        compose.waitUntil(30000) { compose.onAllNodesWithText("Удалить возврат Local refund edit").fetchSemanticsNodes().isEmpty() }
+        assertFalse(history().any { it.id == draft.id })
+        assertEquals("87655", accounts()[source.id]!!.posted_balance_minor)
+        assertEquals("5001", history().single { it.id == expense.id }.allocations.single { it.id == original.id }.remaining_refundable_minor)
+        assertNull(runBlocking { app.database.commands().get(origin, auth.profile.id, auth.workspace.id) })
+    }
+
+    @Test fun realFeeRefundReplacementAndDeleteUseThreeVersions() {
+        val fee = FeeInput(UUID.randomUUID().toString(), source.id, "501", listOf(AllocationInput(UUID.randomUUID().toString(), category.id, "501")), "Editable fee", emptyList())
+        val transfer = TransferCreate(UUID.randomUUID().toString(), "2026-10-06T08:15:00Z", "UTC", "Editable fee transfer", "", emptyList(), "transfer", source.id, usd.id, "10000", "300", null, fee)
+        runBlocking { decodeResponse<MutationResult>(api.request("/workspaces/${auth.workspace.id}/transactions", "POST", ApiClient.json.encodeToString(transfer), auth.credential(origin), UUID.randomUUID().toString(), auth.workspace.sync_generation_id)) }
+        load()
+        click("Создать возврат комиссии Editable fee")
+        field("Сумма части возврата 1", "0.101")
+        field("Примечание возврата", "Editable fee refund")
+        click("Сохранить возврат")
+        waitFor("Возврат · 0,101 KWD · Editable fee refund")
+        val created = history().single { it.note == "Editable fee refund" }
+        click("Изменить возврат Editable fee refund")
+        waitFor("Доступно для части возврата 1: 0,501 KWD")
+        field("Сумма части возврата 1", "0.301")
+        click("Сохранить изменения возврата")
+        waitFor("Возврат · 0,301 KWD · Editable fee refund")
+        val changed = history().associateBy { it.id }
+        assertEquals("2", changed[created.id]!!.version)
+        assertEquals("3", changed[fee.id]!!.version)
+        assertEquals("3", changed[transfer.id]!!.version)
+        assertEquals(created.allocations.single().id, changed[created.id]!!.allocations.single().id)
+        assertEquals("200", changed[fee.id]!!.allocations.single().remaining_refundable_minor)
+        assertEquals("77455", accounts()[source.id]!!.posted_balance_minor)
+        click("Удалить возврат Editable fee refund")
+        click("Подтвердить удаление возврата")
+        compose.waitUntil(30000) { compose.onAllNodesWithText("Удалить возврат Editable fee refund").fetchSemanticsNodes().isEmpty() }
+        val deleted = history().associateBy { it.id }
+        assertFalse(deleted.containsKey(created.id))
+        assertEquals("4", deleted[fee.id]!!.version)
+        assertEquals("4", deleted[transfer.id]!!.version)
+        assertEquals("501", deleted[fee.id]!!.allocations.single().remaining_refundable_minor)
+        assertEquals("77154", accounts()[source.id]!!.posted_balance_minor)
+        assertEquals("3300", accounts()[usd.id]!!.posted_balance_minor)
+    }
+
 }
