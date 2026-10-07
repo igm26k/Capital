@@ -49,3 +49,9 @@ Room v2/migration 1→2 сохраняет настройки и исходны�
 `make android-auth-e2e`: **12/12 actual instrumentation**, 4/4 unit, debug/release/build/lint и compiled trust PASS. Real Compose/API/PostgreSQL сценарий: KWD 123456 minor → rename/type/archive → внешний concurrent update → UI stale version rejection с сохраненным draft/Room key → явная актуальная версия и restore. Баланс/balance_version сохранены, очередь очищена, Activity recreation/refresh читает server state. Legacy logout/revoke outage/cold restart/SQL drills проходят вместе с UI счетов.
 
 APP-02 in_progress. Далее финансовый outage/process restart, auth rebind/generation recovery и полный набор ручных операций; S3-05/APP-03 не приняты.
+
+## APP-02: финансовое восстановление проверено — 2026-10-07
+
+Account draft восстанавливает исходную дату/zone; actual UI 401→login→explicit same-key/session rebind подтвержден неизменными body/key и точным остатком после retry. FinancialOutageTest + host helper останавливают API перед нативным Create, проверяют pending/disabled auth mutation, делают настоящий force-stop/start offline, затем явное восстановление auth и повтор прежнего command UUID. Повторный restart/refresh читает счет; SQL доказывает один account/opening/applied action, 123456 minor KWD и исходные 08:00UTC/Europe-Nicosia. Обработка confirmed receipt разблокирует logout.
+
+Полный `make android-auth-e2e`: **13/13 instrumentation без skips**, 6/6 unit, build/lint/debug/release и system-only compiled trust PASS. Доказательства без secrets: ops/.runtime/checks/android-financial-outage-instrumentation.txt и android-financial-runtime.json. Generation rejection acceptance теперь refreshes auth перед новым вводом; отдельный actual restore/epoch UI drill пока не выполнен и должен пройти в S3-05. APP-02 in_progress; впереди остальные ручные операции, классификация/фильтры, mirror/outbox и Android→web приемка.

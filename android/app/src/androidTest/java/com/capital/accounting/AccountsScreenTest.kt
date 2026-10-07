@@ -32,7 +32,11 @@ class AccountsScreenTest {
             app.credentialVault.save(auth.credential(origin))
         }
         override fun after() = runBlocking<Unit> {
-            if (::auth.isInitialized) api.request("/auth/logout", "POST", session = auth.credential(origin))
+            if (::auth.isInitialized) {
+                val app = ApplicationProvider.getApplicationContext<CapitalApplication>()
+                val saved = app.credentialVault.load(origin)
+                if (saved is com.capital.accounting.auth.VaultRead.Available) api.request("/auth/logout", "POST", session = saved.session)
+            }
         }
     }
     @get:Rule(order = 1) val compose = createAndroidComposeRule<MainActivity>()
@@ -92,5 +96,31 @@ class AccountsScreenTest {
         waitFor("Вы вошли: ${auth.profile.email}")
         click("Обновить счета")
         waitFor("Local proposal")
+        val pending = runBlocking {
+            com.capital.accounting.finance.CommandRunner(app.database.commands()).prepare(auth.credential(origin), "accounts/${restored.id}", "PUT",
+                ApiClient.json.encodeToString(AccountUpdate(restored.version, "Rebound pocket", restored.type, false)))
+        }
+        runBlocking { api.request("/auth/logout", "POST", session = auth.credential(origin)) }
+        click("Обновить счета")
+        waitFor("Войти")
+        field("Email", auth.profile.email)
+        field("Пароль", "synthetic accounts password")
+        click("Войти")
+        waitFor("Продолжить сохраненную команду в этой сессии")
+        compose.onNodeWithText("Повторить сохраненную команду").assertIsNotEnabled()
+        compose.onNodeWithText("Выйти").assertIsNotEnabled()
+        click("Продолжить сохраненную команду в этой сессии")
+        waitFor("Команда сохранена для текущей сессии. Проверьте черновик перед повтором.")
+        val rebound = runBlocking { app.database.commands().get(origin, auth.profile.id, auth.workspace.id)!! }
+        assertEquals(pending.commandId, rebound.commandId)
+        assertEquals(pending.body, rebound.body)
+        assertNotEquals(pending.sessionId, rebound.sessionId)
+        click("Повторить сохраненную команду")
+        waitFor("Rebound pocket")
+        val current = runBlocking { (app.credentialVault.load(origin) as com.capital.accounting.auth.VaultRead.Available).session }
+        val final = runBlocking { api.accounts(current).single() }
+        assertEquals("Rebound pocket", final.name)
+        assertEquals("123456", final.posted_balance_minor)
+        assertNull(runBlocking { app.database.commands().get(origin, auth.profile.id, auth.workspace.id) })
     }
 }

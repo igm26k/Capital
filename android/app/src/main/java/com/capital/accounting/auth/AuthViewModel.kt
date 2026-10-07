@@ -280,6 +280,10 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         state = state.copy(busy = true)
         viewModelScope.launch {
             try {
+                if (command.errorCode == "sync_generation_conflict") {
+                    refreshSaved(saved, holdBusy = true)
+                    require(state.auth != null && state.persisted)
+                }
                 val accounts = ApiClient(saved.origin).accounts(saved)
                 require(app.database.commands().remove(command.commandId, command.state) == 1)
                 state = state.copy(busy = false, accounts = accounts, financialCommand = null, financeBlocked = false,

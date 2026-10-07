@@ -35,6 +35,7 @@ fun AccountPanel(model: AuthViewModel) {
         } else if (command?.method == "POST" && command.path.endsWith("/accounts")) {
             val draft = decodeResponse<AccountCreate>(command.body)
             name = draft.name; type = draft.type; currency = draft.currency
+            zone = draft.occurred_timezone; opened = openingLocal(draft.opened_at, zone)
             balance = Money.display(draft.opening_balance_minor, draft.currency).removeSuffix(" ${draft.currency}").replace('−', '-')
         }
     }
