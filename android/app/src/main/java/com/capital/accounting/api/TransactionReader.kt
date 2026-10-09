@@ -23,3 +23,10 @@ suspend fun ApiClient.transactions(session: StoredSession, limit: Int = 100, fil
     } while (cursor != null)
     return items.values.toList()
 }
+
+suspend fun ApiClient.transaction(session: StoredSession, id: String): Transaction {
+    require(java.util.UUID.fromString(id).toString() == id)
+    val item = decodeResponse<Transaction>(request("/workspaces/${session.workspaceId}/transactions/$id", session = session))
+    require(item.id == id && item.workspace_id == session.workspaceId)
+    return item
+}

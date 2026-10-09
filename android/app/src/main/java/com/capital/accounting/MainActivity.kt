@@ -17,6 +17,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.capital.accounting.auth.AuthViewModel
+import com.capital.accounting.finance.TransactionDetails
 import com.capital.accounting.finance.AccountPanel
 import com.capital.accounting.finance.AdjustmentPanel
 import com.capital.accounting.finance.RefundPanel
@@ -37,6 +38,7 @@ class MainActivity : ComponentActivity() {
             var device by remember { mutableStateOf("Android") }
             LaunchedEffect(state.auth) { if (state.auth != null) password = "" }
             MaterialTheme(colorScheme = if (isSystemInDarkTheme()) darkColorScheme() else lightColorScheme()) {
+                if (state.auth != null && state.detailStack.isNotEmpty()) TransactionDetails(model)
                 Surface(Modifier.fillMaxSize()) {
                     Column(Modifier.safeDrawingPadding().imePadding().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                         Text("Capital", style = MaterialTheme.typography.headlineLarge)

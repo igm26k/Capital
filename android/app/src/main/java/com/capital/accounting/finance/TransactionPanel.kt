@@ -174,6 +174,7 @@ fun TransactionPanel(model: AuthViewModel) {
             else -> "Корректировка"
         }
         Text("$label · ${transaction.entries.joinToString { Money.display(it.amount_minor, it.currency) }} · ${transaction.note}")
+        TextButton(enabled = !state.busy && state.persisted, onClick = { model.openTransactionDetails(transaction.id) }) { Text("Детали операции ${transaction.note.ifEmpty { label }}") }
         if (transaction.kind in listOf("income", "expense") && transaction.parent_transaction_id == null) {
             TextButton(enabled = enabled, onClick = {
                 original = transaction; editingId = transaction.id; editingVersion = transaction.version; kind = transaction.kind

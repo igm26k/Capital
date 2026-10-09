@@ -30,6 +30,7 @@ data class AuthState(
     val logoutPending: Boolean = false, val persisted: Boolean = true,
     val sessions: List<Session> = emptyList(), val revokePendingId: String? = null,
     val accounts: List<Account> = emptyList(), val transactions: List<Transaction> = emptyList(), val categories: List<Category> = emptyList(), val tags: List<Tag> = emptyList(), val financialCommand: FinancialCommand? = null,
+    val detailStack: List<String> = emptyList(), val detailTransaction: Transaction? = null, val detailMissing: Boolean = false, val detailError: String = "",
     val transactionsLoaded: Boolean = false, val transactionReceipt: TransactionReceipt? = null,
     val historyFilter: TransactionFilter? = null, val historyItems: List<Transaction>? = null,
     val historyLimit: Int = 50, val historyNextCursor: String? = null, val historyCursors: List<String> = emptyList(), val historyError: String = "",
@@ -289,6 +290,56 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         if (state.busy) return
         state = state.copy(historyFilter = null, historyItems = null, historyNextCursor = null, historyCursors = emptyList(), historyError = "")
         loadTransactions()
+    }
+
+    fun openTransactionDetails(id: String) {
+        require(java.util.UUID.fromString(id).toString() == id)
+        val existing = state.detailStack.indexOf(id)
+        val stack = if (existing >= 0) state.detailStack.take(existing + 1) else state.detailStack + id
+        loadTransactionDetails(id, stack)
+    }
+
+    fun refreshTransactionDetails() { state.detailStack.lastOrNull()?.let { loadTransactionDetails(it, state.detailStack) } }
+
+    fun backTransactionDetails() {
+        if (state.busy) return
+        if (state.detailStack.size <= 1) closeTransactionDetails()
+        else { val stack = state.detailStack.dropLast(1); loadTransactionDetails(stack.last(), stack) }
+    }
+
+    fun closeTransactionDetails() {
+        if (state.busy) return
+        state = state.copy(detailStack = emptyList(), detailTransaction = null, detailMissing = false, detailError = "")
+    }
+
+    private fun loadTransactionDetails(id: String, stack: List<String>) {
+        val saved = candidate ?: return
+        if (state.busy || state.auth == null || !state.persisted || state.logoutPending || state.revokePendingId != null) return
+        val previous = state
+        state = state.copy(busy = true, detailStack = stack, detailTransaction = null, detailMissing = false, detailError = "")
+        viewModelScope.launch {
+            try {
+                val client = ApiClient(saved.origin)
+                val accounts = client.accounts(saved)
+                val categories = client.categories(saved)
+                val tags = client.tags(saved)
+                val history = client.transactions(saved)
+                val item = try { client.transaction(saved, id) }
+                    catch (e: ApiFailure) {
+                        if (e.status != 404) throw e
+                        state = previous.copy(busy = false, accounts = accounts, categories = categories, tags = tags,
+                            transactions = history.filterNot { it.id == id }, transactionsLoaded = true,
+                            historyItems = previous.historyItems?.filterNot { it.id == id }, detailStack = stack,
+                            detailTransaction = null, detailMissing = true, detailError = "")
+                        return@launch
+                    }
+                state = previous.copy(busy = false, accounts = accounts, categories = categories, tags = tags,
+                    transactions = (history + item).associateBy { it.id }.values.toList(), transactionsLoaded = true,
+                    detailStack = stack, detailTransaction = item, detailMissing = false, detailError = "")
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { if (!financialFailure(saved, e)) state = previous.copy(busy = false, detailStack = stack,
+                detailTransaction = null, detailMissing = false, detailError = "Не удалось загрузить детали. Повторите обновление.") }
+        }
     }
 
     fun loadCatalog() {
