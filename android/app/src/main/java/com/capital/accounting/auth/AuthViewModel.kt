@@ -250,6 +250,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun submitAccount(body: String, id: String? = null) = submitFinancial(body, if (id == null) "accounts" else "accounts/$id", if (id == null) "POST" else "PUT")
+    fun submitAdjustment(body: String, accountId: String) = submitFinancial(body, "accounts/$accountId/adjustments", "POST")
     fun submitTransaction(body: String, id: String? = null, delete: Boolean = false) = submitFinancial(body, if (id == null) "transactions" else "transactions/$id", if (delete) "DELETE" else if (id == null) "POST" else "PUT")
 
     fun submitCatalog(body: String, collection: String, id: String? = null) {
@@ -406,6 +407,7 @@ private fun errorMessage(error: Exception, authAttempt: Boolean = false): String
 }
 
 private fun savedMessage(path: String): String = when {
+    path.endsWith("/adjustments") -> "Операция сохранена"
     path.contains("/accounts") -> "Счет сохранен"
     path.contains("/categories") -> "Категория сохранена"
     path.contains("/tags") -> "Тег сохранен"

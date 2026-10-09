@@ -30,6 +30,7 @@ run_suite com.capital.accounting.AccountApiTest 1 ops/.runtime/checks/android-ac
 run_suite com.capital.accounting.DevicesScreenTest 1 ops/.runtime/checks/android-devices-instrumentation.txt
 run_suite com.capital.accounting.AccountsScreenTest 1 ops/.runtime/checks/android-accounts-ui-instrumentation.txt
 run_suite com.capital.accounting.TransactionsScreenTest 1 ops/.runtime/checks/android-transactions-ui-instrumentation.txt
+run_suite com.capital.accounting.AdjustmentsScreenTest 2 ops/.runtime/checks/android-adjustments-ui-instrumentation.txt
 run_suite com.capital.accounting.RefundsScreenTest 4 ops/.runtime/checks/android-refunds-ui-instrumentation.txt
 run_suite com.capital.accounting.TransfersScreenTest 3 ops/.runtime/checks/android-transfers-ui-instrumentation.txt
 run_suite com.capital.accounting.CatalogScreenTest 3 ops/.runtime/checks/android-catalog-ui-instrumentation.txt
@@ -37,4 +38,4 @@ run_suite com.capital.accounting.AuthScreenTest 1 ops/.runtime/checks/android-ui
 python3 scripts/check-android-auth-runtime.py "$adb" "$serial"
 python3 scripts/check-android-financial-runtime.py "$adb" "$serial"
 python3 scripts/check-android-release-trust.py "$sdk"
-echo 'PASS 24/24 real Android instrumentation tests and auth runtime acceptance'
+echo 'PASS 26/26 real Android instrumentation tests and auth runtime acceptance'

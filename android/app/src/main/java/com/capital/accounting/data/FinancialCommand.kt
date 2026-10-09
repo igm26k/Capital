@@ -24,7 +24,8 @@ data class FinancialCommand(
         require(normalizedOrigin(origin) == origin)
         listOf(commandId, ownerId, workspaceId, sessionId, generationId).forEach { require(UUID.fromString(it).toString() == it) }
         require(method in setOf("POST", "PUT", "DELETE"))
-        require(path.matches(Regex("/workspaces/$workspaceId/(accounts|transactions|categories|tags)(/[a-z0-9-]+)?")))
+        val adjustmentPath = path.matches(Regex("/workspaces/$workspaceId/accounts/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/adjustments"))
+        require(path.matches(Regex("/workspaces/$workspaceId/(accounts|transactions|categories|tags)(/[a-z0-9-]+)?")) || (method == "POST" && adjustmentPath))
         require(body.toByteArray(Charsets.UTF_8).size <= 256 * 1024)
         require(state in setOf("pending", "confirmed", "rejected", "reconcile"))
         require((state == "confirmed") == (result != null))

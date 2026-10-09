@@ -547,3 +547,27 @@ data class RefundReplace(
     }
     override fun toString() = "RefundReplace([redacted])"
 }
+
+@Serializable
+data class AdjustmentCreate(
+    val id: String,
+    val expected_balance_version: String,
+    val target_balance_minor: String,
+    val reason: String,
+    val note: String,
+    val occurred_timezone: String,
+) {
+    override fun toString() = "AdjustmentCreate([redacted])"
+}
+
+@Serializable
+data class AdjustmentReplace(
+    val kind: String,
+    val expected_version: String,
+    val note: String,
+) {
+    init {
+        require(kind == "adjustment") { "Invalid AdjustmentReplace.kind" }
+    }
+    override fun toString() = "AdjustmentReplace([redacted])"
+}
