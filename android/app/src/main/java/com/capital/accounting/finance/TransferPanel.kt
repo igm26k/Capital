@@ -20,33 +20,33 @@ fun TransferPanel(model: AuthViewModel) {
     val enabled = !state.busy && !state.financeBlocked && state.persisted
     val accounts = state.accounts.filter { it.deleted_at == null && it.archived_at == null }
     var handledReceipt by remember { mutableStateOf(state.transactionReceipt?.commandId) }
-    var editingId by remember { mutableStateOf<String?>(null) }
-    var editingVersion by remember { mutableStateOf("") }
-    var expectedFeeVersion by remember { mutableStateOf<String?>(null) }
-    var feeAnchorId by remember { mutableStateOf<String?>(null) }
-    var feeDraftId by remember { mutableStateOf(UUID.randomUUID().toString()) }
-    var sourceCurrency by remember { mutableStateOf<String?>(null) }
-    var targetCurrency by remember { mutableStateOf<String?>(null) }
-    var feeCurrency by remember { mutableStateOf<String?>(null) }
-    var preservedInstant by remember { mutableStateOf<String?>(null) }
-    var preservedZone by remember { mutableStateOf<String?>(null) }
+    var editingId by rememberFinancialDraft<String?>("transfer.editingId") { null }
+    var editingVersion by rememberFinancialDraft("transfer.editingVersion") { "" }
+    var expectedFeeVersion by rememberFinancialDraft<String?>("transfer.expectedFeeVersion") { null }
+    var feeAnchorId by rememberFinancialDraft<String?>("transfer.feeAnchorId") { null }
+    var feeDraftId by rememberFinancialDraft("transfer.feeDraftId") { UUID.randomUUID().toString() }
+    var sourceCurrency by rememberFinancialDraft<String?>("transfer.sourceCurrency") { null }
+    var targetCurrency by rememberFinancialDraft<String?>("transfer.targetCurrency") { null }
+    var feeCurrency by rememberFinancialDraft<String?>("transfer.feeCurrency") { null }
+    var preservedInstant by rememberFinancialDraft<String?>("transfer.preservedInstant") { null }
+    var preservedZone by rememberFinancialDraft<String?>("transfer.preservedZone") { null }
     var deleting by remember { mutableStateOf<Transaction?>(null) }
     var deletingFee by remember { mutableStateOf<Transaction?>(null) }
-    var sourceId by remember { mutableStateOf<String?>(null) }
-    var targetId by remember { mutableStateOf<String?>(null) }
-    var sourceAmount by remember { mutableStateOf("") }
-    var targetAmount by remember { mutableStateOf("") }
-    var note by remember { mutableStateOf("") }
-    var payee by remember { mutableStateOf("") }
-    var occurred by remember { mutableStateOf(SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.ROOT).format(Date())) }
-    var zone by remember { mutableStateOf(TimeZone.getDefault().id) }
-    var tags by remember { mutableStateOf<List<String>>(emptyList()) }
-    var feeEnabled by remember { mutableStateOf(false) }
-    var feeAccountId by remember { mutableStateOf<String?>(null) }
-    var feeAmount by remember { mutableStateOf("") }
-    var feeNote by remember { mutableStateOf("") }
-    var feeTags by remember { mutableStateOf<List<String>>(emptyList()) }
-    var feeParts by remember { mutableStateOf(listOf(AllocationDraft())) }
+    var sourceId by rememberFinancialDraft<String?>("transfer.sourceId") { null }
+    var targetId by rememberFinancialDraft<String?>("transfer.targetId") { null }
+    var sourceAmount by rememberFinancialDraft("transfer.sourceAmount") { "" }
+    var targetAmount by rememberFinancialDraft("transfer.targetAmount") { "" }
+    var note by rememberFinancialDraft("transfer.note") { "" }
+    var payee by rememberFinancialDraft("transfer.payee") { "" }
+    var occurred by rememberFinancialDraft("transfer.occurred") { SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.ROOT).format(Date()) }
+    var zone by rememberFinancialDraft("transfer.zone") { TimeZone.getDefault().id }
+    var tags by rememberFinancialDraft<List<String>>("transfer.tags") { emptyList() }
+    var feeEnabled by rememberFinancialDraft("transfer.feeEnabled") { false }
+    var feeAccountId by rememberFinancialDraft<String?>("transfer.feeAccountId") { null }
+    var feeAmount by rememberFinancialDraft("transfer.feeAmount") { "" }
+    var feeNote by rememberFinancialDraft("transfer.feeNote") { "" }
+    var feeTags by rememberFinancialDraft<List<String>>("transfer.feeTags") { emptyList() }
+    var feeParts by rememberFinancialDraft("transfer.feeParts") { listOf(AllocationDraft()) }
     var error by remember { mutableStateOf("") }
     val source = accounts.find { it.id == sourceId } ?: if (sourceId == null) accounts.firstOrNull() else null
     val target = accounts.find { it.id == targetId } ?: if (targetId == null) accounts.firstOrNull { it.id != source?.id } else null

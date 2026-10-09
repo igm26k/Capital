@@ -15,16 +15,16 @@ import java.util.*
 fun AccountPanel(model: AuthViewModel) {
     val state = model.state
     val enabled = !state.busy && state.persisted && !state.financeBlocked
-    var editingId by remember(state.auth?.session?.id) { mutableStateOf<String?>(null) }
-    var editingVersion by remember { mutableStateOf("") }
-    var editingBalance by remember { mutableStateOf("0") }
-    var name by remember { mutableStateOf("") }
-    var type by remember { mutableStateOf("bank") }
-    var currency by remember { mutableStateOf("EUR") }
-    var balance by remember { mutableStateOf("0") }
-    var opened by remember { mutableStateOf(SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.ROOT).format(Date())) }
-    var zone by remember { mutableStateOf(TimeZone.getDefault().id) }
-    var archived by remember { mutableStateOf(false) }
+    var editingId by rememberFinancialDraft<String?>("account.editingId") { null }
+    var editingVersion by rememberFinancialDraft("account.editingVersion") { "" }
+    var editingBalance by rememberFinancialDraft("account.editingBalance") { "0" }
+    var name by rememberFinancialDraft("account.name") { "" }
+    var type by rememberFinancialDraft("account.type") { "bank" }
+    var currency by rememberFinancialDraft("account.currency") { "EUR" }
+    var balance by rememberFinancialDraft("account.balance") { "0" }
+    var opened by rememberFinancialDraft("account.opened") { SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.ROOT).format(Date()) }
+    var zone by rememberFinancialDraft("account.zone") { TimeZone.getDefault().id }
+    var archived by rememberFinancialDraft("account.archived") { false }
     var error by remember { mutableStateOf("") }
     LaunchedEffect(state.financialCommand?.commandId) {
         val command = state.financialCommand

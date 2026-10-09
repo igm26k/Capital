@@ -15,15 +15,15 @@ import java.util.UUID
 fun AdjustmentPanel(model: AuthViewModel) {
     val state = model.state
     val enabled = !state.busy && !state.financeBlocked && state.persisted
-    var accountId by remember { mutableStateOf<String?>(null) }
-    var balanceVersion by remember { mutableStateOf("") }
-    var target by remember { mutableStateOf("") }
-    var reason by remember { mutableStateOf("") }
-    var note by remember { mutableStateOf("") }
-    var zone by remember { mutableStateOf(TimeZone.getDefault().id) }
+    var accountId by rememberFinancialDraft<String?>("adjustment.accountId") { null }
+    var balanceVersion by rememberFinancialDraft("adjustment.balanceVersion") { "" }
+    var target by rememberFinancialDraft("adjustment.target") { "" }
+    var reason by rememberFinancialDraft("adjustment.reason") { "" }
+    var note by rememberFinancialDraft("adjustment.note") { "" }
+    var zone by rememberFinancialDraft("adjustment.zone") { TimeZone.getDefault().id }
     var handledReceipt by remember { mutableStateOf(state.transactionReceipt?.commandId) }
-    var editingId by remember { mutableStateOf<String?>(null) }
-    var editingVersion by remember { mutableStateOf("") }
+    var editingId by rememberFinancialDraft<String?>("adjustment.editingId") { null }
+    var editingVersion by rememberFinancialDraft("adjustment.editingVersion") { "" }
     var deleting by remember { mutableStateOf<Transaction?>(null) }
     var error by remember { mutableStateOf("") }
     val account = state.accounts.find { it.id == accountId }

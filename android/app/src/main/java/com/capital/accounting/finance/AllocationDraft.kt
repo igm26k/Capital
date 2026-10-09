@@ -4,6 +4,7 @@ import com.capital.accounting.api.AllocationInput
 import java.math.BigInteger
 import java.util.UUID
 
+@kotlinx.serialization.Serializable
 data class AllocationDraft(val id: String = UUID.randomUUID().toString(), val categoryId: String? = null, val amount: String = "")
 
 fun allocationInputs(total: String, currency: String, parts: List<AllocationDraft>): List<AllocationInput> {

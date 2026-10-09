@@ -11,12 +11,12 @@ import java.util.UUID
 fun CatalogPanel(model: AuthViewModel) {
     val state = model.state
     val enabled = !state.busy && !state.financeBlocked && state.persisted
-    var collection by remember { mutableStateOf("categories") }
-    var id by remember { mutableStateOf<String?>(null) }
-    var version by remember { mutableStateOf("") }
-    var name by remember { mutableStateOf("") }
-    var parentId by remember { mutableStateOf<String?>(null) }
-    var archived by remember { mutableStateOf(false) }
+    var collection by rememberFinancialDraft("catalog.collection") { "categories" }
+    var id by rememberFinancialDraft<String?>("catalog.id") { null }
+    var version by rememberFinancialDraft("catalog.version") { "" }
+    var name by rememberFinancialDraft("catalog.name") { "" }
+    var parentId by rememberFinancialDraft<String?>("catalog.parentId") { null }
+    var archived by rememberFinancialDraft("catalog.archived") { false }
     var error by remember { mutableStateOf("") }
     LaunchedEffect(state.financialCommand?.commandId) {
         val command = state.financialCommand ?: return@LaunchedEffect

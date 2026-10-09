@@ -5,6 +5,7 @@ import com.capital.accounting.api.RefundAllocationInput
 import java.math.BigInteger
 import java.util.UUID
 
+@kotlinx.serialization.Serializable
 data class RefundDraft(val originalId: String, val id: String = UUID.randomUUID().toString(), val amount: String = "")
 
 fun refundInputs(currency: String, parts: List<RefundDraft>, remaining: Map<String, String>): Pair<String, List<RefundAllocationInput>> {

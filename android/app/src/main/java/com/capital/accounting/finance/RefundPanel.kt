@@ -19,23 +19,23 @@ fun RefundPanel(model: AuthViewModel) {
     val state = model.state
     val enabled = !state.busy && !state.financeBlocked && state.persisted
     var handledReceipt by remember { mutableStateOf(state.transactionReceipt?.commandId) }
-    var editingId by remember { mutableStateOf<String?>(null) }
-    var editingVersion by remember { mutableStateOf("") }
-    var preservedInstant by remember { mutableStateOf<String?>(null) }
-    var preservedZone by remember { mutableStateOf<String?>(null) }
+    var editingId by rememberFinancialDraft<String?>("refund.editingId") { null }
+    var editingVersion by rememberFinancialDraft("refund.editingVersion") { "" }
+    var preservedInstant by rememberFinancialDraft<String?>("refund.preservedInstant") { null }
+    var preservedZone by rememberFinancialDraft<String?>("refund.preservedZone") { null }
     var deleting by remember { mutableStateOf<Transaction?>(null) }
     var deletingParent by remember { mutableStateOf<Transaction?>(null) }
     var deletingTransfer by remember { mutableStateOf<Transaction?>(null) }
-    var parentId by remember { mutableStateOf<String?>(null) }
-    var parentVersion by remember { mutableStateOf("") }
-    var transferVersion by remember { mutableStateOf<String?>(null) }
-    var accountId by remember { mutableStateOf<String?>(null) }
-    var parts by remember { mutableStateOf<List<RefundDraft>>(emptyList()) }
-    var note by remember { mutableStateOf("") }
-    var payee by remember { mutableStateOf("") }
-    var occurred by remember { mutableStateOf(SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.ROOT).format(Date())) }
-    var zone by remember { mutableStateOf(TimeZone.getDefault().id) }
-    var tags by remember { mutableStateOf<List<String>>(emptyList()) }
+    var parentId by rememberFinancialDraft<String?>("refund.parentId") { null }
+    var parentVersion by rememberFinancialDraft("refund.parentVersion") { "" }
+    var transferVersion by rememberFinancialDraft<String?>("refund.transferVersion") { null }
+    var accountId by rememberFinancialDraft<String?>("refund.accountId") { null }
+    var parts by rememberFinancialDraft<List<RefundDraft>>("refund.parts") { emptyList() }
+    var note by rememberFinancialDraft("refund.note") { "" }
+    var payee by rememberFinancialDraft("refund.payee") { "" }
+    var occurred by rememberFinancialDraft("refund.occurred") { SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.ROOT).format(Date()) }
+    var zone by rememberFinancialDraft("refund.zone") { TimeZone.getDefault().id }
+    var tags by rememberFinancialDraft<List<String>>("refund.tags") { emptyList() }
     var error by remember { mutableStateOf("") }
     val parent = state.transactions.find { it.id == parentId }
     val edited = state.transactions.find { it.id == editingId }

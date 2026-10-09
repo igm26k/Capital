@@ -17,6 +17,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.capital.accounting.auth.AuthViewModel
+import com.capital.accounting.finance.FinancialDraftContent
 import com.capital.accounting.finance.TransactionDetails
 import com.capital.accounting.finance.AccountPanel
 import com.capital.accounting.finance.AdjustmentPanel
@@ -68,12 +69,16 @@ class MainActivity : ComponentActivity() {
                                     Text(if (session.is_current) "Завершить текущую сессию" else "Отключить устройство ${session.device_name}")
                                 }
                             }
-                            AccountPanel(model)
-                            CatalogPanel(model)
-                            TransactionPanel(model)
-                            TransferPanel(model)
-                            RefundPanel(model)
-                            AdjustmentPanel(model)
+                            key(state.origin, state.auth.profile.id, state.auth.workspace.id) {
+                                FinancialDraftContent(this@MainActivity, state.origin, state.auth.profile.id, state.auth.workspace.id) {
+                                    AccountPanel(model)
+                                    CatalogPanel(model)
+                                    TransactionPanel(model)
+                                    TransferPanel(model)
+                                    RefundPanel(model)
+                                    AdjustmentPanel(model)
+                                }
+                            }
                         } else {
                             OutlinedTextField(origin, { origin = it }, label = { Text("Адрес сервера") }, singleLine = true, modifier = Modifier.fillMaxWidth(), enabled = !state.busy)
                             Button(enabled = !state.busy, onClick = { model.saveOrigin(origin) }) { Text("Сохранить адрес") }

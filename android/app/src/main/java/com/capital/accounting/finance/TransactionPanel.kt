@@ -20,24 +20,24 @@ fun TransactionPanel(model: AuthViewModel) {
     val state = model.state
     val enabled = !state.busy && !state.financeBlocked && state.persisted
     var handledReceipt by remember { mutableStateOf(state.transactionReceipt?.commandId) }
-    var editingId by remember { mutableStateOf<String?>(null) }
-    var editingVersion by remember { mutableStateOf("") }
-    var original by remember { mutableStateOf<Transaction?>(null) }
+    var editingId by rememberFinancialDraft<String?>("transaction.editingId") { null }
+    var editingVersion by rememberFinancialDraft("transaction.editingVersion") { "" }
+    var original by rememberFinancialDraft<Transaction?>("transaction.original") { null }
     var deleting by remember { mutableStateOf<Transaction?>(null) }
     val sourceForEdit = original ?: state.transactions.find { it.id == editingId }
     val eligible = state.accounts.filter { it.deleted_at == null &&
         (it.archived_at == null || it.id == sourceForEdit?.entries?.firstOrNull()?.account_id) &&
         (editingId == null || sourceForEdit == null || it.currency == sourceForEdit.entries.first().currency) }
-    var kind by remember { mutableStateOf("expense") }
-    var accountId by remember { mutableStateOf<String?>(null) }
-    var amount by remember { mutableStateOf("") }
-    var note by remember { mutableStateOf("") }
-    var payee by remember { mutableStateOf("") }
-    var occurred by remember { mutableStateOf(SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.ROOT).format(Date())) }
-    var zone by remember { mutableStateOf(TimeZone.getDefault().id) }
+    var kind by rememberFinancialDraft("transaction.kind") { "expense" }
+    var accountId by rememberFinancialDraft<String?>("transaction.accountId") { null }
+    var amount by rememberFinancialDraft("transaction.amount") { "" }
+    var note by rememberFinancialDraft("transaction.note") { "" }
+    var payee by rememberFinancialDraft("transaction.payee") { "" }
+    var occurred by rememberFinancialDraft("transaction.occurred") { SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.ROOT).format(Date()) }
+    var zone by rememberFinancialDraft("transaction.zone") { TimeZone.getDefault().id }
     var error by remember { mutableStateOf("") }
-    var parts by remember { mutableStateOf(listOf(AllocationDraft())) }
-    var selectedTags by remember { mutableStateOf<List<String>>(emptyList()) }
+    var parts by rememberFinancialDraft("transaction.parts") { listOf(AllocationDraft()) }
+    var selectedTags by rememberFinancialDraft<List<String>>("transaction.selectedTags") { emptyList() }
     val account = eligible.find { it.id == accountId } ?: if (accountId == null) eligible.firstOrNull() else null
     LaunchedEffect(state.financialCommand?.commandId, state.transactionReceipt?.commandId, state.accounts, state.transactions) {
         val command = state.financialCommand

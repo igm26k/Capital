@@ -24,6 +24,8 @@ run_suite() {
     { rg -q "^OK \($expected tests?\)" "$artifact" && ! rg -q "INSTRUMENTATION_STATUS_CODE: -[1-4]" "$artifact"; } || { echo 'Android instrumentation failed; inspect restricted local artifact.' >&2; exit 1; }
 }
 run_suite 'com.capital.accounting.FoundationTest,com.capital.accounting.CommandStoreTest,com.capital.accounting.CredentialVaultTest,com.capital.accounting.SettingsScreenTest' 6 ops/.runtime/checks/android-foundation-instrumentation.txt
+run_suite com.capital.accounting.FinancialDraftStoreTest 2 ops/.runtime/checks/android-draft-store-instrumentation.txt
+python3 scripts/check-android-draft-runtime.py "$adb" "$serial"
 run_suite com.capital.accounting.ApiAuthTest 1 ops/.runtime/checks/android-api-auth-instrumentation.txt
 run_suite com.capital.accounting.CommandApiTest 1 ops/.runtime/checks/android-command-api-instrumentation.txt
 run_suite com.capital.accounting.AccountApiTest 1 ops/.runtime/checks/android-account-api-instrumentation.txt
@@ -37,8 +39,9 @@ run_suite com.capital.accounting.AdjustmentsScreenTest 2 ops/.runtime/checks/and
 run_suite com.capital.accounting.RefundsScreenTest 4 ops/.runtime/checks/android-refunds-ui-instrumentation.txt
 run_suite com.capital.accounting.TransfersScreenTest 3 ops/.runtime/checks/android-transfers-ui-instrumentation.txt
 run_suite com.capital.accounting.CatalogScreenTest 3 ops/.runtime/checks/android-catalog-ui-instrumentation.txt
+# AuthScreen publishes the current session proof; consume it before any fixture changes auth.
 run_suite com.capital.accounting.AuthScreenTest 1 ops/.runtime/checks/android-ui-auth-instrumentation.txt
 python3 scripts/check-android-auth-runtime.py "$adb" "$serial"
 python3 scripts/check-android-financial-runtime.py "$adb" "$serial"
 python3 scripts/check-android-release-trust.py "$sdk"
-echo 'PASS 32/32 real Android instrumentation tests and auth runtime acceptance'
+echo 'PASS 36/36 real Android instrumentation executions and auth runtime acceptance'
