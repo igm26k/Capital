@@ -19,6 +19,7 @@ import java.util.*
 fun TransactionPanel(model: AuthViewModel) {
     val state = model.state
     val enabled = !state.busy && !state.financeBlocked && state.persisted
+    var handledReceipt by remember { mutableStateOf(state.transactionReceipt?.commandId) }
     var editingId by remember { mutableStateOf<String?>(null) }
     var editingVersion by remember { mutableStateOf("") }
     var original by remember { mutableStateOf<Transaction?>(null) }
@@ -38,10 +39,16 @@ fun TransactionPanel(model: AuthViewModel) {
     var parts by remember { mutableStateOf(listOf(AllocationDraft())) }
     var selectedTags by remember { mutableStateOf<List<String>>(emptyList()) }
     val account = eligible.find { it.id == accountId } ?: if (accountId == null) eligible.firstOrNull() else null
-    LaunchedEffect(state.financialCommand?.commandId, state.accounts) {
+    LaunchedEffect(state.financialCommand?.commandId, state.transactionReceipt?.commandId, state.accounts, state.transactions) {
         val command = state.financialCommand
-        if (command == null && state.message == "Операция сохранена" && editingId == null) {
-            parts = parts.map { it.copy(id = UUID.randomUUID().toString()) }
+        if (command == null && state.transactionReceipt?.commandId != handledReceipt) {
+            val receipt = state.transactionReceipt
+            handledReceipt = receipt?.commandId
+            if (receipt?.created == true && receipt.kind in listOf("income", "expense") && editingId == null) parts = parts.map { it.copy(id = UUID.randomUUID().toString()) }
+            if (receipt != null && receipt.transactionId == editingId) {
+                if (receipt.deleted) { editingId = null; original = null; amount = ""; note = ""; parts = listOf(AllocationDraft()); selectedTags = emptyList() }
+                else receipt.transaction?.let { original = it; editingVersion = it.version }
+            }
         }
         if (command != null && command.method in listOf("POST", "PUT") && command.path.contains("/transactions")) {
             val commandKind = ApiClient.json.parseToJsonElement(command.body).jsonObject.getValue("kind").jsonPrimitive.content
@@ -114,7 +121,7 @@ fun TransactionPanel(model: AuthViewModel) {
         }
     }
     if (error.isNotEmpty()) Text(error)
-    Button(enabled = enabled && account != null, onClick = {
+    Button(enabled = enabled && account != null && (editingId == null || state.transactions.any { it.id == editingId }), onClick = {
         try {
             val selected = requireNotNull(account)
             val minor = Money.minor(amount, selected.currency)
@@ -136,6 +143,7 @@ fun TransactionPanel(model: AuthViewModel) {
         } catch (e: Exception) { error = if (e is IllegalArgumentException && e.message == "Сумма частей должна точно совпадать с суммой операции.") e.message!! else "Проверьте положительную сумму, счет, дату, часовой пояс и длину текста." }
     }) { Text(if (editingId == null) "Сохранить операцию" else "Сохранить изменения операции") }
     if (editingId != null) {
+        if (state.transactionsLoaded && state.transactions.none { it.id == editingId }) Text("Операция удалена на сервере. Черновик сохранен; отмените редактирование.")
         val current = state.transactions.find { it.id == editingId }
         if (current != null && current.version != editingVersion) {
             Text("Версия операции на сервере: ${current.version}; версия черновика: $editingVersion")
@@ -150,7 +158,7 @@ fun TransactionPanel(model: AuthViewModel) {
     deleting?.let { target ->
         Text("Удаление: ${target.note}; ${target.entries.joinToString { Money.display(it.amount_minor, it.currency) }}")
         Text("Движение будет исключено из остатка. Историю зависимых операций проверит сервер.")
-        Button(enabled = enabled, onClick = { model.submitTransaction(ApiClient.json.encodeToString(TransactionDelete(target.version, emptyList())), target.id, delete = true); deleting = null }) { Text("Подтвердить удаление операции") }
+        Button(enabled = enabled && state.transactions.any { it.id == target.id }, onClick = { model.submitTransaction(ApiClient.json.encodeToString(TransactionDelete(target.version, emptyList())), target.id, delete = true); deleting = null }) { Text("Подтвердить удаление операции") }
         TextButton(enabled = enabled, onClick = { deleting = null }) { Text("Отменить удаление") }
     }
     Text("История операций", style = MaterialTheme.typography.titleLarge)

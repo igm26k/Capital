@@ -18,6 +18,7 @@ import java.util.*
 fun RefundPanel(model: AuthViewModel) {
     val state = model.state
     val enabled = !state.busy && !state.financeBlocked && state.persisted
+    var handledReceipt by remember { mutableStateOf(state.transactionReceipt?.commandId) }
     var editingId by remember { mutableStateOf<String?>(null) }
     var editingVersion by remember { mutableStateOf("") }
     var preservedInstant by remember { mutableStateOf<String?>(null) }
@@ -44,12 +45,20 @@ fun RefundPanel(model: AuthViewModel) {
     val currency = originalAccount?.currency
     val accounts = state.accounts.filter { it.archived_at == null && it.deleted_at == null && it.currency == currency }
     val account = accounts.find { it.id == accountId }
-    LaunchedEffect(state.financialCommand?.commandId, state.accounts, state.transactions) {
+    LaunchedEffect(state.financialCommand?.commandId, state.transactionReceipt?.commandId, state.accounts, state.transactions) {
         val command = state.financialCommand
         if (command == null) {
-            if (editingId != null && state.message == "Операция сохранена") {
-                if (edited == null) { editingId = null; parentId = null; parts = emptyList() }
-                else { editingVersion = edited.version; parentVersion = parent?.version ?: parentVersion; transferVersion = transfer?.version }
+            val receipt = state.transactionReceipt
+            if (receipt?.commandId != handledReceipt) {
+                handledReceipt = receipt?.commandId
+                if (receipt != null && receipt.transactionId == editingId) {
+                    if (receipt.deleted) { editingId = null; parentId = null; parts = emptyList() }
+                    else {
+                        editingVersion = receipt.version(editingId) ?: editingVersion
+                        parentVersion = receipt.version(parentId) ?: parentVersion
+                        transferVersion = receipt.version(transfer?.id) ?: transferVersion
+                    }
+                }
             }
             return@LaunchedEffect
         }
@@ -114,7 +123,8 @@ fun RefundPanel(model: AuthViewModel) {
             Button(enabled = enabled && (parent.parent_transaction_id == null || transfer != null), onClick = { parentVersion = parent.version; transferVersion = transfer?.version }) { Text("Использовать обновленные версии расхода и перевода") }
         }
         if (error.isNotEmpty()) Text(error)
-        Button(enabled = enabled && parent != null && originalAccount?.archived_at == null && account != null && (parent.parent_transaction_id == null || transfer != null), onClick = {
+        if (editingId != null && state.transactionsLoaded && edited == null) Text("Возврат удален на сервере. Черновик сохранен; отмените редактирование.")
+        Button(enabled = enabled && (editingId == null || edited != null) && parent != null && originalAccount?.archived_at == null && account != null && (parent.parent_transaction_id == null || transfer != null), onClick = {
             try {
                 val selected = requireNotNull(account)
                 require(parent?.kind == "expense" && parent.status == "posted" && note.length <= 2000 && payee.length <= 200 && tags.size <= 50)
@@ -135,7 +145,7 @@ fun RefundPanel(model: AuthViewModel) {
     deleting?.let { refund ->
         Text("Удалить возврат: ${refund.note}")
         Text("Зачисление будет исключено из остатка, квота исходного расхода восстановится.")
-        Button(enabled = enabled && deletingParent != null && (deletingParent?.parent_transaction_id == null || deletingTransfer != null), onClick = {
+        Button(enabled = enabled && state.transactions.any { it.id == refund.id } && deletingParent != null && (deletingParent?.parent_transaction_id == null || deletingTransfer != null), onClick = {
             val related = listOfNotNull(deletingParent, deletingTransfer).map { VersionExpectation(it.id, it.version) }
             model.submitTransaction(ApiClient.json.encodeToString(TransactionDelete(refund.version, related)), refund.id, delete = true)
             deleting = null; deletingParent = null; deletingTransfer = null

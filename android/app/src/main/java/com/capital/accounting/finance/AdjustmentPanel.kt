@@ -21,6 +21,7 @@ fun AdjustmentPanel(model: AuthViewModel) {
     var reason by remember { mutableStateOf("") }
     var note by remember { mutableStateOf("") }
     var zone by remember { mutableStateOf(TimeZone.getDefault().id) }
+    var handledReceipt by remember { mutableStateOf(state.transactionReceipt?.commandId) }
     var editingId by remember { mutableStateOf<String?>(null) }
     var editingVersion by remember { mutableStateOf("") }
     var deleting by remember { mutableStateOf<Transaction?>(null) }
@@ -30,11 +31,15 @@ fun AdjustmentPanel(model: AuthViewModel) {
     val difference = try {
         account?.let { Money.display((BigInteger(Money.minor(target, it.currency)) - BigInteger(it.posted_balance_minor)).toString(), it.currency) }
     } catch (_: Exception) { null }
-    LaunchedEffect(state.financialCommand?.commandId, state.accounts, state.transactions) {
+    LaunchedEffect(state.financialCommand?.commandId, state.transactionReceipt?.commandId, state.accounts, state.transactions) {
         val command = state.financialCommand
         if (command == null) {
-            if (editingId != null && state.message == "Операция сохранена") {
-                if (edited == null) editingId = null else editingVersion = edited.version
+            val receipt = state.transactionReceipt
+            if (receipt?.commandId != handledReceipt) {
+                handledReceipt = receipt?.commandId
+                if (receipt != null && receipt.transactionId == editingId) {
+                    if (receipt.deleted) editingId = null else editingVersion = receipt.version(editingId) ?: editingVersion
+                }
             }
             return@LaunchedEffect
         }
@@ -74,6 +79,7 @@ fun AdjustmentPanel(model: AuthViewModel) {
             }
         }
     } else {
+        if (state.transactionsLoaded && edited == null) Text("Корректировка удалена на сервере. Черновик сохранен; отмените редактирование.")
         Text("Изменяется только примечание. Сумма, причина, счет и время сохраняются.")
         edited?.let { item ->
             Text("Счет корректировки: ${account?.name ?: "Обновите счета"}")
@@ -90,7 +96,7 @@ fun AdjustmentPanel(model: AuthViewModel) {
     if (accountId != null || editingId != null) {
         OutlinedTextField(note, { note = it }, label = { Text("Примечание корректировки") }, enabled = enabled)
         if (error.isNotEmpty()) Text(error)
-        Button(enabled = enabled && account != null && account.archived_at == null && account.deleted_at == null, onClick = {
+        Button(enabled = enabled && (editingId == null || edited != null) && account != null && account.archived_at == null && account.deleted_at == null, onClick = {
             try {
                 require(note.length <= 2000)
                 if (editingId == null) {
@@ -108,7 +114,7 @@ fun AdjustmentPanel(model: AuthViewModel) {
     deleting?.let { item ->
         Text("Удалить корректировку: ${item.note}")
         Text("Разница корректировки будет исключена из остатка счета.")
-        Button(enabled = enabled, onClick = { model.submitTransaction(ApiClient.json.encodeToString(TransactionDelete(item.version, emptyList())), item.id, delete = true); deleting = null }) { Text("Подтвердить удаление корректировки") }
+        Button(enabled = enabled && state.transactions.any { it.id == item.id }, onClick = { model.submitTransaction(ApiClient.json.encodeToString(TransactionDelete(item.version, emptyList())), item.id, delete = true); deleting = null }) { Text("Подтвердить удаление корректировки") }
         TextButton(enabled = enabled, onClick = { deleting = null }) { Text("Отменить удаление корректировки") }
     }
     state.transactions.filter { it.kind == "adjustment" }.forEach { item ->

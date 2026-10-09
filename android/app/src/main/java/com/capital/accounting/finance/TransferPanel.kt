@@ -19,6 +19,7 @@ fun TransferPanel(model: AuthViewModel) {
     val state = model.state
     val enabled = !state.busy && !state.financeBlocked && state.persisted
     val accounts = state.accounts.filter { it.deleted_at == null && it.archived_at == null }
+    var handledReceipt by remember { mutableStateOf(state.transactionReceipt?.commandId) }
     var editingId by remember { mutableStateOf<String?>(null) }
     var editingVersion by remember { mutableStateOf("") }
     var expectedFeeVersion by remember { mutableStateOf<String?>(null) }
@@ -52,13 +53,22 @@ fun TransferPanel(model: AuthViewModel) {
     val feeAccount = accounts.find { it.id == feeAccountId } ?: if (feeAccountId == null) source else null
     val sameCurrency = source != null && source.currency == target?.currency
     val receivingAmount = if (sameCurrency) sourceAmount else targetAmount
-    LaunchedEffect(state.financialCommand?.commandId, state.accounts, state.transactions) {
+    LaunchedEffect(state.financialCommand?.commandId, state.transactionReceipt?.commandId, state.accounts, state.transactions) {
         val command = state.financialCommand
         if (command == null) {
-            if (editingId != null && state.message == "Операция сохранена" && state.transactions.none { it.id == editingId }) {
-                editingId = null; expectedFeeVersion = null; feeAnchorId = null
-                sourceCurrency = null; targetCurrency = null; feeCurrency = null
-                preservedInstant = null; preservedZone = null; sourceAmount = ""; targetAmount = ""; note = ""; feeEnabled = false
+            val receipt = state.transactionReceipt
+            if (receipt?.commandId != handledReceipt) {
+                handledReceipt = receipt?.commandId
+                if (receipt != null && receipt.transactionId == editingId && receipt.deleted) {
+                    editingId = null; expectedFeeVersion = null; feeAnchorId = null
+                    sourceCurrency = null; targetCurrency = null; feeCurrency = null
+                    preservedInstant = null; preservedZone = null; sourceAmount = ""; targetAmount = ""; note = ""; feeEnabled = false
+                } else if (receipt != null && receipt.transactionId == editingId) {
+                    receipt.transaction?.let { current ->
+                        editingVersion = current.version; feeAnchorId = current.fee_transaction_id
+                        expectedFeeVersion = if (feeAnchorId == null) null else receipt.version(feeAnchorId) ?: expectedFeeVersion
+                    }
+                }
             }
             return@LaunchedEffect
         }
@@ -148,7 +158,8 @@ fun TransferPanel(model: AuthViewModel) {
         }
     }
     if (error.isNotEmpty()) Text(error)
-    Button(enabled = enabled && source != null && target != null && source.id != target.id && (!feeEnabled || feeAccount != null), onClick = {
+    if (editingId != null && state.transactionsLoaded && state.transactions.none { it.id == editingId }) Text("Перевод удален на сервере. Черновик сохранен; отмените редактирование.")
+    Button(enabled = enabled && (editingId == null || state.transactions.any { it.id == editingId }) && source != null && target != null && source.id != target.id && (!feeEnabled || feeAccount != null), onClick = {
         try {
             val from = requireNotNull(source); val to = requireNotNull(target)
             require(from.id != to.id && note.length <= 2000 && payee.length <= 200 && tags.size <= 50)
@@ -198,7 +209,7 @@ fun TransferPanel(model: AuthViewModel) {
         Text("Списание и зачисление будут исключены из остатков.")
         deletingFee?.let { Text("Вместе с переводом будет удалена комиссия: ${it.note}; ${it.entries.joinToString { entry -> Money.display(entry.amount_minor, entry.currency) }}") }
         state.transactions.filter { it.kind == "refund" && it.parent_transaction_id in listOf(transfer.id, transfer.fee_transaction_id) }.forEach { Text("Зависимый возврат: ${it.note}. Сначала удалите возврат.") }
-        Button(enabled = enabled && (transfer.fee_transaction_id == null || deletingFee?.id == transfer.fee_transaction_id), onClick = {
+        Button(enabled = enabled && state.transactions.any { it.id == transfer.id } && (transfer.fee_transaction_id == null || deletingFee?.id == transfer.fee_transaction_id), onClick = {
             val related = deletingFee?.let { listOf(VersionExpectation(it.id, it.version)) } ?: emptyList()
             model.submitTransaction(ApiClient.json.encodeToString(TransactionDelete(transfer.version, related)), transfer.id, delete = true)
             deleting = null; deletingFee = null

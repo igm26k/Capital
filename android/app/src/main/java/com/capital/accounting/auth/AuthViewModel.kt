@@ -15,7 +15,14 @@ import com.capital.accounting.normalizedOrigin
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import java.util.TimeZone
+
+data class TransactionReceipt(val commandId: String, val transactionId: String, val deleted: Boolean, val created: Boolean, val kind: String?, val records: List<Transaction>) {
+    fun version(id: String?): String? = records.find { it.id == id }?.version
+    val transaction get() = records.find { it.id == transactionId }
+}
 
 data class AuthState(
     val origin: String = "", val busy: Boolean = true, val message: String = "",
@@ -23,6 +30,7 @@ data class AuthState(
     val logoutPending: Boolean = false, val persisted: Boolean = true,
     val sessions: List<Session> = emptyList(), val revokePendingId: String? = null,
     val accounts: List<Account> = emptyList(), val transactions: List<Transaction> = emptyList(), val categories: List<Category> = emptyList(), val tags: List<Tag> = emptyList(), val financialCommand: FinancialCommand? = null,
+    val transactionsLoaded: Boolean = false, val transactionReceipt: TransactionReceipt? = null,
     val historyFilter: TransactionFilter? = null, val historyItems: List<Transaction>? = null,
     val historyLimit: Int = 50, val historyNextCursor: String? = null, val historyCursors: List<String> = emptyList(), val historyError: String = "",
     val financeBlocked: Boolean = true, val accountConflict: Account? = null, val transactionConflict: Transaction? = null, val categoryConflict: Category? = null, val tagConflict: Tag? = null,
@@ -233,7 +241,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val history = ApiClient(saved.origin).transactions(saved)
                 val page = previous.historyFilter?.let { ApiClient(saved.origin).transactionPage(saved, it, previous.historyLimit) }
-                state = previous.copy(busy = false, transactions = history, historyItems = page?.items, historyNextCursor = page?.next_cursor,
+                state = previous.copy(busy = false, transactions = history, transactionsLoaded = true, historyItems = page?.items, historyNextCursor = page?.next_cursor,
                     historyCursors = listOfNotNull(page?.next_cursor), historyError = "")
             }
             catch (e: CancellationException) { throw e }
@@ -251,7 +259,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val history = ApiClient(saved.origin).transactions(saved)
                 val page = ApiClient(saved.origin).transactionPage(saved, filter, limit)
-                state = previous.copy(busy = false, transactions = history, historyFilter = filter, historyItems = page.items,
+                state = previous.copy(busy = false, transactions = history, transactionsLoaded = true, historyFilter = filter, historyItems = page.items,
                     historyLimit = limit, historyNextCursor = page.next_cursor, historyCursors = listOfNotNull(page.next_cursor), historyError = "")
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) { if (!financialFailure(saved, e)) state = previous.copy(busy = false, historyError = "Не удалось применить фильтры. Предыдущие результаты сохранены.") }
@@ -348,9 +356,10 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             val categories = ApiClient(saved.origin).categories(saved)
             val tags = ApiClient(saved.origin).tags(saved)
             val page = state.historyFilter?.let { ApiClient(saved.origin).transactionPage(saved, it, state.historyLimit) }
+            val receipt = transactionReceipt(result) ?: state.transactionReceipt
             require(app.database.commands().remove(result.commandId, "confirmed") == 1)
-            state = state.copy(busy = false, accounts = accounts, transactions = history, categories = categories, tags = tags, financialCommand = null, financeBlocked = false, historyItems = page?.items, historyNextCursor = page?.next_cursor,
-                historyCursors = listOfNotNull(page?.next_cursor), historyError = "", message = savedMessage(result.path))
+            state = state.copy(busy = false, accounts = accounts, transactions = history, transactionsLoaded = true, categories = categories, tags = tags, financialCommand = null, financeBlocked = false, historyItems = page?.items, historyNextCursor = page?.next_cursor,
+                historyCursors = listOfNotNull(page?.next_cursor), historyError = "", transactionReceipt = receipt, message = savedMessage(result.path))
         } else {
             var current: Account? = null
             var transaction: Transaction? = null
@@ -397,9 +406,11 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                 val categories = ApiClient(saved.origin).categories(saved)
                 val tags = ApiClient(saved.origin).tags(saved)
                 val page = state.historyFilter?.let { ApiClient(saved.origin).transactionPage(saved, it, state.historyLimit) }
+                val receipt = if (command.state == "confirmed") transactionReceipt(command) ?: state.transactionReceipt else state.transactionReceipt
                 require(app.database.commands().remove(command.commandId, command.state) == 1)
-                state = state.copy(busy = false, accounts = accounts, transactions = history, categories = categories, tags = tags, financialCommand = null, financeBlocked = false,
+                state = state.copy(busy = false, accounts = accounts, transactions = history, transactionsLoaded = true, categories = categories, tags = tags, financialCommand = null, financeBlocked = false,
                     historyItems = page?.items, historyNextCursor = page?.next_cursor, historyCursors = listOfNotNull(page?.next_cursor), historyError = "",
+                    transactionReceipt = receipt,
                     accountConflict = null, transactionConflict = null, categoryConflict = null, tagConflict = null, message = if (command.state == "confirmed") savedMessage(command.path) else "Данные обновлены. Проверьте поля перед новой командой.")
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) { if (!financialFailure(saved, e)) state = state.copy(busy = false, message = "Не удалось обновить данные. Команда сохранена.") }
@@ -465,4 +476,15 @@ private fun savedMessage(path: String): String = when {
     path.contains("/categories") -> "Категория сохранена"
     path.contains("/tags") -> "Тег сохранен"
     else -> "Операция сохранена"
+}
+
+private fun transactionReceipt(command: FinancialCommand): TransactionReceipt? {
+    if (!command.path.contains("/transactions") && !command.path.endsWith("/adjustments")) return null
+    val id = if (command.method == "POST") ApiClient.json.parseToJsonElement(command.body).jsonObject.getValue("id").jsonPrimitive.content
+        else command.path.substringAfterLast('/')
+    val kind = ApiClient.json.parseToJsonElement(command.body).jsonObject["kind"]?.jsonPrimitive?.content
+        ?: if (command.path.endsWith("/adjustments")) "adjustment" else null
+    val records = decodeResponse<MutationResult>(requireNotNull(command.result)).transactions
+    require(command.method == "DELETE" || records.any { it.id == id })
+    return TransactionReceipt(command.commandId, id, command.method == "DELETE", command.method == "POST", kind, records)
 }
