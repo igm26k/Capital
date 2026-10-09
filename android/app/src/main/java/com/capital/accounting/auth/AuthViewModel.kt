@@ -23,6 +23,8 @@ data class AuthState(
     val logoutPending: Boolean = false, val persisted: Boolean = true,
     val sessions: List<Session> = emptyList(), val revokePendingId: String? = null,
     val accounts: List<Account> = emptyList(), val transactions: List<Transaction> = emptyList(), val categories: List<Category> = emptyList(), val tags: List<Tag> = emptyList(), val financialCommand: FinancialCommand? = null,
+    val historyFilter: TransactionFilter? = null, val historyItems: List<Transaction>? = null,
+    val historyLimit: Int = 50, val historyNextCursor: String? = null, val historyCursors: List<String> = emptyList(), val historyError: String = "",
     val financeBlocked: Boolean = true, val accountConflict: Account? = null, val transactionConflict: Transaction? = null, val categoryConflict: Category? = null, val tagConflict: Tag? = null,
 
 )
@@ -228,10 +230,57 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         val previous = state
         state = state.copy(busy = true)
         viewModelScope.launch {
-            try { state = previous.copy(busy = false, transactions = ApiClient(saved.origin).transactions(saved)) }
+            try {
+                val history = ApiClient(saved.origin).transactions(saved)
+                val page = previous.historyFilter?.let { ApiClient(saved.origin).transactionPage(saved, it, previous.historyLimit) }
+                state = previous.copy(busy = false, transactions = history, historyItems = page?.items, historyNextCursor = page?.next_cursor,
+                    historyCursors = listOfNotNull(page?.next_cursor), historyError = "")
+            }
             catch (e: CancellationException) { throw e }
             catch (e: Exception) { if (!financialFailure(saved, e)) state = previous.copy(busy = false, message = "Не удалось загрузить историю. Повторите обновление.") }
         }
+    }
+
+    fun applyHistoryFilter(filter: TransactionFilter, limit: Int = 50) {
+        require(limit in 1..100)
+        val saved = candidate ?: return
+        if (state.busy || state.auth == null || !state.persisted || state.logoutPending || state.revokePendingId != null) return
+        val previous = state
+        state = state.copy(busy = true, historyError = "")
+        viewModelScope.launch {
+            try {
+                val history = ApiClient(saved.origin).transactions(saved)
+                val page = ApiClient(saved.origin).transactionPage(saved, filter, limit)
+                state = previous.copy(busy = false, transactions = history, historyFilter = filter, historyItems = page.items,
+                    historyLimit = limit, historyNextCursor = page.next_cursor, historyCursors = listOfNotNull(page.next_cursor), historyError = "")
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { if (!financialFailure(saved, e)) state = previous.copy(busy = false, historyError = "Не удалось применить фильтры. Предыдущие результаты сохранены.") }
+        }
+    }
+
+    fun nextHistoryPage() {
+        val saved = candidate ?: return
+        val filter = state.historyFilter ?: return
+        val cursor = state.historyNextCursor ?: return
+        if (state.busy || state.auth == null || !state.persisted || state.logoutPending || state.revokePendingId != null) return
+        val previous = state
+        state = state.copy(busy = true, historyError = "")
+        viewModelScope.launch {
+            try {
+                val page = ApiClient(saved.origin).transactionPage(saved, filter, previous.historyLimit, cursor)
+                require(page.next_cursor == null || page.next_cursor !in previous.historyCursors)
+                state = previous.copy(busy = false, historyItems = (previous.historyItems.orEmpty() + page.items).associateBy { it.id }.values.toList(),
+                    transactions = (previous.transactions + page.items).associateBy { it.id }.values.toList(), historyNextCursor = page.next_cursor,
+                    historyCursors = previous.historyCursors + listOfNotNull(page.next_cursor), historyError = "")
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { if (!financialFailure(saved, e)) state = previous.copy(busy = false, historyError = "Не удалось загрузить следующую страницу. Повторите загрузку.") }
+        }
+    }
+
+    fun clearHistoryFilters() {
+        if (state.busy) return
+        state = state.copy(historyFilter = null, historyItems = null, historyNextCursor = null, historyCursors = emptyList(), historyError = "")
+        loadTransactions()
     }
 
     fun loadCatalog() {
@@ -298,8 +347,10 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             val history = ApiClient(saved.origin).transactions(saved)
             val categories = ApiClient(saved.origin).categories(saved)
             val tags = ApiClient(saved.origin).tags(saved)
+            val page = state.historyFilter?.let { ApiClient(saved.origin).transactionPage(saved, it, state.historyLimit) }
             require(app.database.commands().remove(result.commandId, "confirmed") == 1)
-            state = state.copy(busy = false, accounts = accounts, transactions = history, categories = categories, tags = tags, financialCommand = null, financeBlocked = false, message = savedMessage(result.path))
+            state = state.copy(busy = false, accounts = accounts, transactions = history, categories = categories, tags = tags, financialCommand = null, financeBlocked = false, historyItems = page?.items, historyNextCursor = page?.next_cursor,
+                historyCursors = listOfNotNull(page?.next_cursor), historyError = "", message = savedMessage(result.path))
         } else {
             var current: Account? = null
             var transaction: Transaction? = null
@@ -345,8 +396,10 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                 val history = ApiClient(saved.origin).transactions(saved)
                 val categories = ApiClient(saved.origin).categories(saved)
                 val tags = ApiClient(saved.origin).tags(saved)
+                val page = state.historyFilter?.let { ApiClient(saved.origin).transactionPage(saved, it, state.historyLimit) }
                 require(app.database.commands().remove(command.commandId, command.state) == 1)
                 state = state.copy(busy = false, accounts = accounts, transactions = history, categories = categories, tags = tags, financialCommand = null, financeBlocked = false,
+                    historyItems = page?.items, historyNextCursor = page?.next_cursor, historyCursors = listOfNotNull(page?.next_cursor), historyError = "",
                     accountConflict = null, transactionConflict = null, categoryConflict = null, tagConflict = null, message = if (command.state == "confirmed") savedMessage(command.path) else "Данные обновлены. Проверьте поля перед новой командой.")
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) { if (!financialFailure(saved, e)) state = state.copy(busy = false, message = "Не удалось обновить данные. Команда сохранена.") }

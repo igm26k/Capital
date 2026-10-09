@@ -155,7 +155,8 @@ fun TransactionPanel(model: AuthViewModel) {
     }
     Text("История операций", style = MaterialTheme.typography.titleLarge)
     Button(enabled = !state.busy, onClick = model::loadTransactions) { Text("Обновить историю") }
-    state.transactions.forEach { transaction ->
+    HistoryFilters(model)
+    (state.historyItems ?: state.transactions).forEach { transaction ->
         val label = when (transaction.kind) {
             "expense" -> "Расход"
             "income" -> "Доход"
