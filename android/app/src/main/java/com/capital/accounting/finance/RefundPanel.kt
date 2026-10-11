@@ -18,6 +18,7 @@ import java.util.*
 fun RefundPanel(model: AuthViewModel) {
     val state = model.state
     val enabled = !state.busy && !state.financeBlocked && state.persisted
+    val guard = rememberDraftGuard("refund", enabled)
     var handledReceipt by remember { mutableStateOf(state.transactionReceipt?.commandId) }
     var editingId by rememberFinancialDraft<String?>("refund.editingId") { null }
     var editingVersion by rememberFinancialDraft("refund.editingVersion") { "" }
@@ -51,6 +52,7 @@ fun RefundPanel(model: AuthViewModel) {
             val receipt = state.transactionReceipt
             if (receipt?.commandId != handledReceipt) {
                 handledReceipt = receipt?.commandId
+                val affectsDraft = receipt != null && (receipt.transactionId == editingId || (receipt.created && receipt.kind == "refund" && editingId == null))
                 if (receipt != null && receipt.transactionId == editingId) {
                     if (receipt.deleted) { editingId = null; parentId = null; parts = emptyList() }
                     else {
@@ -59,6 +61,7 @@ fun RefundPanel(model: AuthViewModel) {
                         transferVersion = receipt.version(transfer?.id) ?: transferVersion
                     }
                 }
+                if (affectsDraft) guard.markClean()
             }
             return@LaunchedEffect
         }
@@ -86,12 +89,12 @@ fun RefundPanel(model: AuthViewModel) {
     Text(if (editingId == null) "Новый возврат" else "Изменение возврата", style = MaterialTheme.typography.titleLarge)
     state.transactions.filter { it.kind == "expense" && it.status == "posted" }.forEach { expense ->
         val linked = state.transactions.find { it.id == expense.parent_transaction_id }
-        TextButton(enabled = enabled && editingId == null && (expense.parent_transaction_id == null || linked?.kind == "transfer"), onClick = {
+        TextButton(enabled = enabled && editingId == null && (expense.parent_transaction_id == null || linked?.kind == "transfer"), onClick = { guard.request {
             preservedInstant = null; preservedZone = null
             parentId = expense.id; parentVersion = expense.version; transferVersion = linked?.version
             accountId = expense.entries.single().account_id; parts = expense.allocations.map { RefundDraft(it.id) }
             note = ""; payee = expense.payee; tags = emptyList(); error = ""
-        }) { Text(if (expense.parent_transaction_id == null) "Создать возврат расхода ${expense.note}" else "Создать возврат комиссии ${expense.note}") }
+         } }) { Text(if (expense.parent_transaction_id == null) "Создать возврат расхода ${expense.note}" else "Создать возврат комиссии ${expense.note}") }
     }
     if (parentId == null) Text("Выберите исходный расход или комиссию.")
     else {
@@ -140,7 +143,7 @@ fun RefundPanel(model: AuthViewModel) {
             Button(enabled = enabled, onClick = { editingVersion = edited.version }) { Text("Использовать обновленную версию возврата") }
         }
         state.transactionConflict?.takeIf { it.kind == "refund" }?.let { Text("Возврат на сервере: ${it.note}; версия ${it.version}") }
-        TextButton(enabled = enabled, onClick = { editingId = null; parentId = null; parts = emptyList(); note = ""; preservedInstant = null; preservedZone = null; error = "" }) { Text(if (editingId == null) "Отменить создание возврата" else "Отменить изменение возврата") }
+        TextButton(enabled = enabled, onClick = { guard.request { editingId = null; editingVersion = ""; parentId = null; parentVersion = ""; transferVersion = null; accountId = null; parts = emptyList(); note = ""; payee = ""; tags = emptyList(); zone = TimeZone.getDefault().id; occurred = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.ROOT).format(Date()); preservedInstant = null; preservedZone = null; error = ""  } }) { Text(if (editingId == null) "Отменить создание возврата" else "Отменить изменение возврата") }
     }
     deleting?.let { refund ->
         Text("Удалить возврат: ${refund.note}")
@@ -156,7 +159,7 @@ fun RefundPanel(model: AuthViewModel) {
         val original = state.transactions.find { it.id == refund.parent_transaction_id }
         val linked = state.transactions.find { it.id == original?.parent_transaction_id }
         val available = original != null && (original.parent_transaction_id == null || linked != null)
-        TextButton(enabled = enabled && available, onClick = {
+        TextButton(enabled = enabled && available, onClick = { guard.request {
             editingId = refund.id; editingVersion = refund.version; parentId = original!!.id; parentVersion = original.version; transferVersion = linked?.version
             accountId = refund.entries.single().account_id; note = refund.note; payee = refund.payee; tags = refund.tag_ids; zone = refund.occurred_timezone; occurred = openingLocal(refund.occurred_at, zone)
             preservedInstant = refund.occurred_at; preservedZone = zone
@@ -166,7 +169,7 @@ fun RefundPanel(model: AuthViewModel) {
                 if (existing == null) RefundDraft(part.id) else RefundDraft(part.id, existing.id, Money.display(existing.amount_minor, refund.entries.single().currency).removeSuffix(" ${refund.entries.single().currency}"))
             }
             error = ""
-        }) { Text("Изменить возврат ${refund.note}") }
+         } }) { Text("Изменить возврат ${refund.note}") }
         TextButton(enabled = enabled && available, onClick = { deleting = refund; deletingParent = original; deletingTransfer = linked }) { Text("Удалить возврат ${refund.note}") }
     }
 

@@ -83,14 +83,15 @@ class DraftGuard internal constructor(private val scope: FinancialDraftScope, pr
 @Composable
 fun rememberDraftGuard(prefix: String, enabled: Boolean): DraftGuard {
     val scope = LocalFinancialDraftScope.current
+    val noun = when (prefix) { "transfer" -> "перевода"; "refund" -> "возврата"; "adjustment" -> "корректировки"; else -> "операции" }
     val guard = remember(scope, prefix) { DraftGuard(scope, prefix) }
     SideEffect {
         android.os.Handler(android.os.Looper.getMainLooper()).post { guard.initialize() }
     }
-    if (guard.dirty || guard.saved.any { it.fields == scope.snapshot(prefix) }) Text("Несохраненный черновик операции")
+    if (guard.dirty || guard.saved.any { it.fields == scope.snapshot(prefix) }) Text("Несохраненный черновик $noun")
     guard.saved.forEachIndexed { index, item ->
-        TextButton(enabled = enabled && !scope.saving && !scope.failed, onClick = { guard.restore(item.id) }) { Text("Восстановить черновик операции ${index + 1}") }
-        TextButton(enabled = enabled && !scope.saving, onClick = { guard.remove(item.id) }) { Text("Отбросить сохраненный черновик операции ${index + 1}") }
+        TextButton(enabled = enabled && !scope.saving && !scope.failed, onClick = { guard.restore(item.id) }) { Text("Восстановить черновик $noun ${index + 1}") }
+        TextButton(enabled = enabled && !scope.saving, onClick = { guard.remove(item.id) }) { Text("Отбросить сохраненный черновик $noun ${index + 1}") }
     }
     if (guard.pending != null) AlertDialog(
         onDismissRequest = guard::stay,

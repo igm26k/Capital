@@ -15,6 +15,7 @@ import java.util.UUID
 fun AdjustmentPanel(model: AuthViewModel) {
     val state = model.state
     val enabled = !state.busy && !state.financeBlocked && state.persisted
+    val guard = rememberDraftGuard("adjustment", enabled)
     var accountId by rememberFinancialDraft<String?>("adjustment.accountId") { null }
     var balanceVersion by rememberFinancialDraft("adjustment.balanceVersion") { "" }
     var target by rememberFinancialDraft("adjustment.target") { "" }
@@ -37,9 +38,11 @@ fun AdjustmentPanel(model: AuthViewModel) {
             val receipt = state.transactionReceipt
             if (receipt?.commandId != handledReceipt) {
                 handledReceipt = receipt?.commandId
+                val affectsDraft = receipt != null && (receipt.transactionId == editingId || (receipt.created && receipt.kind == "adjustment" && editingId == null))
                 if (receipt != null && receipt.transactionId == editingId) {
                     if (receipt.deleted) editingId = null else editingVersion = receipt.version(editingId) ?: editingVersion
                 }
+                if (affectsDraft) guard.markClean()
             }
             return@LaunchedEffect
         }
@@ -59,11 +62,11 @@ fun AdjustmentPanel(model: AuthViewModel) {
     if (editingId == null) {
         Text("Укажите фактический остаток. Сервер вычислит разницу и зафиксирует текущее время.")
         state.accounts.filter { it.archived_at == null && it.deleted_at == null }.forEach { item ->
-            TextButton(enabled = enabled, onClick = {
+            TextButton(enabled = enabled, onClick = { guard.request {
                 accountId = item.id; balanceVersion = item.balance_version
                 target = Money.display(item.posted_balance_minor, item.currency).removeSuffix(" ${item.currency}").replace('−', '-')
                 error = ""
-            }) { Text("Корректировать счет ${item.name} · ${item.currency}") }
+             } }) { Text("Корректировать счет ${item.name} · ${item.currency}") }
         }
         if (account != null) {
             Text("Корректируемый счет: ${account.name}")
@@ -109,7 +112,7 @@ fun AdjustmentPanel(model: AuthViewModel) {
                 error = ""
             } catch (_: Exception) { error = "Проверьте остаток, причину, часовой пояс и длину текста. Остаток должен измениться." }
         }) { Text(if (editingId == null) "Сохранить корректировку" else "Сохранить примечание корректировки") }
-        TextButton(enabled = enabled, onClick = { accountId = null; editingId = null; note = ""; reason = ""; error = "" }) { Text("Отменить корректировку") }
+        TextButton(enabled = enabled, onClick = { guard.request { accountId = null; balanceVersion = ""; editingId = null; editingVersion = ""; target = ""; note = ""; reason = ""; zone = TimeZone.getDefault().id; error = ""  } }) { Text("Отменить корректировку") }
     }
     deleting?.let { item ->
         Text("Удалить корректировку: ${item.note}")
@@ -119,7 +122,7 @@ fun AdjustmentPanel(model: AuthViewModel) {
     }
     state.transactions.filter { it.kind == "adjustment" }.forEach { item ->
         val active = state.accounts.any { it.id == item.entries.single().account_id && it.archived_at == null && it.deleted_at == null }
-        TextButton(enabled = enabled && active, onClick = { editingId = item.id; editingVersion = item.version; accountId = item.entries.single().account_id; note = item.note; error = "" }) { Text("Изменить корректировку ${item.note}") }
+        TextButton(enabled = enabled && active, onClick = { guard.request { editingId = item.id; editingVersion = item.version; accountId = item.entries.single().account_id; note = item.note; error = ""  } }) { Text("Изменить корректировку ${item.note}") }
         TextButton(enabled = enabled && active, onClick = { deleting = item }) { Text("Удалить корректировку ${item.note}") }
     }
 }

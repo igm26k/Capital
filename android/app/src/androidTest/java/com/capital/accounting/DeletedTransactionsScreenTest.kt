@@ -58,7 +58,7 @@ class DeletedTransactionsScreenTest {
         mutate("transactions/${item.id}", "DELETE", ApiClient.json.encodeToString(TransactionDelete(item.version, parents.map { VersionExpectation(it.id, it.version) })))
     }
     private fun click(text: String) = compose.onNodeWithText(text).performScrollTo().performClick().also {
-            if (text == "Отменить изменение операции" || text.startsWith("Изменить операцию ")) {
+            if (listOf("Изменить операцию ", "Изменить перевод ", "Изменить возврат ", "Изменить корректировку ", "Создать возврат расхода ", "Создать возврат комиссии ", "Корректировать счет ").any { text.startsWith(it) } || text in listOf("Отменить изменение операции", "Отменить изменение перевода", "Отменить создание возврата", "Отменить изменение возврата", "Отменить корректировку")) {
                 if (compose.onAllNodesWithText("Сохранить измененный черновик?").fetchSemanticsNodes().isNotEmpty()) {
                     compose.waitUntil(10000) { compose.onAllNodes(hasText("Отбросить черновик и продолжить") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
                     compose.onNodeWithText("Отбросить черновик и продолжить").performClick()

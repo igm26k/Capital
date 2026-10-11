@@ -18,6 +18,7 @@ import java.util.*
 fun TransferPanel(model: AuthViewModel) {
     val state = model.state
     val enabled = !state.busy && !state.financeBlocked && state.persisted
+    val guard = rememberDraftGuard("transfer", enabled)
     val accounts = state.accounts.filter { it.deleted_at == null && it.archived_at == null }
     var handledReceipt by remember { mutableStateOf(state.transactionReceipt?.commandId) }
     var editingId by rememberFinancialDraft<String?>("transfer.editingId") { null }
@@ -59,6 +60,7 @@ fun TransferPanel(model: AuthViewModel) {
             val receipt = state.transactionReceipt
             if (receipt?.commandId != handledReceipt) {
                 handledReceipt = receipt?.commandId
+                val affectsDraft = receipt != null && (receipt.transactionId == editingId || (receipt.created && receipt.kind == "transfer" && editingId == null))
                 if (receipt != null && receipt.transactionId == editingId && receipt.deleted) {
                     editingId = null; expectedFeeVersion = null; feeAnchorId = null
                     sourceCurrency = null; targetCurrency = null; feeCurrency = null
@@ -69,6 +71,7 @@ fun TransferPanel(model: AuthViewModel) {
                         expectedFeeVersion = if (feeAnchorId == null) null else receipt.version(feeAnchorId) ?: expectedFeeVersion
                     }
                 }
+                if (affectsDraft) guard.markClean()
             }
             return@LaunchedEffect
         }
@@ -195,13 +198,13 @@ fun TransferPanel(model: AuthViewModel) {
         state.transactionConflict?.takeIf { it.id == editingId }?.let {
             Text("Ваш черновик перевода: $note; списание $sourceAmount; зачисление $receivingAmount")
         }
-        TextButton(enabled = enabled, onClick = {
+        TextButton(enabled = enabled, onClick = { guard.request {
             editingId = null; editingVersion = ""; expectedFeeVersion = null; feeAnchorId = null
             sourceCurrency = null; targetCurrency = null; feeCurrency = null
             preservedInstant = null; preservedZone = null; sourceId = null; targetId = null
-            sourceAmount = ""; targetAmount = ""; note = ""; payee = ""; tags = emptyList()
+            sourceAmount = ""; targetAmount = ""; note = ""; payee = ""; tags = emptyList(); zone = TimeZone.getDefault().id; occurred = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.ROOT).format(Date())
             feeEnabled = false; feeAccountId = null; feeAmount = ""; feeNote = ""; feeTags = emptyList(); feeParts = listOf(AllocationDraft()); feeDraftId = UUID.randomUUID().toString(); error = ""
-        }) { Text("Отменить изменение перевода") }
+         } }) { Text("Отменить изменение перевода") }
     }
     state.transactionConflict?.takeIf { it.kind == "transfer" }?.let { Text("Перевод на сервере: ${it.note}; версия ${it.version}") }
     deleting?.let { transfer ->
@@ -217,7 +220,7 @@ fun TransferPanel(model: AuthViewModel) {
         TextButton(enabled = enabled, onClick = { deleting = null; deletingFee = null }) { Text("Отменить удаление перевода") }
     }
     state.transactions.filter { it.kind == "transfer" }.forEach { transfer ->
-        TextButton(enabled = enabled && (transfer.fee_transaction_id == null || state.transactions.any { it.id == transfer.fee_transaction_id }), onClick = {
+        TextButton(enabled = enabled && (transfer.fee_transaction_id == null || state.transactions.any { it.id == transfer.fee_transaction_id }), onClick = { guard.request {
             val from = transfer.entries.single { it.amount_minor.startsWith("-") }
             val to = transfer.entries.single { !it.amount_minor.startsWith("-") }
             val fee = state.transactions.find { it.id == transfer.fee_transaction_id }
@@ -232,7 +235,7 @@ fun TransferPanel(model: AuthViewModel) {
             feeNote = fee?.note ?: ""; feeTags = fee?.tag_ids ?: emptyList()
             feeParts = fee?.allocations?.map { AllocationDraft(it.id, it.category_id, Money.display(it.amount_minor, fee.entries.single().currency).removeSuffix(" ${fee.entries.single().currency}")) } ?: listOf(AllocationDraft())
             error = ""
-        }) { Text("Изменить перевод ${transfer.note}") }
+         } }) { Text("Изменить перевод ${transfer.note}") }
         TextButton(enabled = enabled, onClick = { deleting = transfer; deletingFee = state.transactions.find { it.id == transfer.fee_transaction_id } }) { Text("Удалить перевод ${transfer.note}") }
     }
 }
