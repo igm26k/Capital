@@ -68,9 +68,10 @@ fun AccountPanel(model: AuthViewModel) {
             balance = Money.display(draft.opening_balance_minor, draft.currency).removeSuffix(" ${draft.currency}").replace('−', '-')
         }
     }
-    if (!editorOpen) {
+    if (navigation.value == null) Button(enabled = !state.busy, onClick = model::loadAccounts) { Text("Обновить счета") }
+    if (navigation.value == null) FinancialCommandStatus(model, "Ваш черновик: $name, $type; ${if (archived) "в архив" else "активен"}")
+    if (!editorOpen && LocalFinancialSection.current.value == "accounts") {
         Text("Счета", style = MaterialTheme.typography.titleLarge)
-        if (navigation.value == null) Button(enabled = !state.busy, onClick = model::loadAccounts) { Text("Обновить счета") }
         state.accounts.forEach { account ->
             Text("${account.name}${if (account.archived_at != null) " · В архиве" else ""}")
             Text(Money.display(account.posted_balance_minor, account.currency))
@@ -79,8 +80,7 @@ fun AccountPanel(model: AuthViewModel) {
         Button(enabled = enabled && !scope.saving, onClick = { guard.request { reset(); navigation.value = "account" } }) { Text("Добавить счет") }
         TextButton(enabled = enabled && !scope.saving, onClick = { navigation.value = "account" }) { Text("Открыть черновик счета") }
         DraftGuardControls(guard, "account", enabled) { navigation.value = "account" }
-        if (navigation.value == null) FinancialCommandStatus(model, "Ваш черновик: $name, $type; ${if (archived) "в архив" else "активен"}")
-    } else Dialog(onDismissRequest = ::close, properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)) {
+    } else if (editorOpen) Dialog(onDismissRequest = ::close, properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)) {
         Surface(Modifier.fillMaxSize()) {
             Column(Modifier.safeDrawingPadding().imePadding().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Редактор счета", style = MaterialTheme.typography.headlineLarge)

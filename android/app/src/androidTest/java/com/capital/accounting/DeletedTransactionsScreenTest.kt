@@ -61,15 +61,15 @@ class DeletedTransactionsScreenTest {
             if (listOf("Изменить операцию ", "Изменить перевод ", "Изменить возврат ", "Изменить корректировку ", "Создать возврат расхода ", "Создать возврат комиссии ", "Корректировать счет ").any { text.startsWith(it) } || text in listOf("Отменить изменение операции", "Отменить изменение перевода", "Отменить создание возврата", "Отменить изменение возврата", "Отменить корректировку")) {
                 if (compose.onAllNodesWithText("Сохранить измененный черновик?").fetchSemanticsNodes().isNotEmpty()) {
                     compose.waitUntil(10000) { compose.onAllNodes(hasText("Отбросить черновик и продолжить") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
-                    compose.onNodeWithText("Отбросить черновик и продолжить").performClick()
+                    compose.financialNode("Отбросить черновик и продолжить").performClick()
                 }
             }
         }
     private fun field(label: String, value: String) {
         compose.operationField(label).performScrollTo().performTextClearance()
-        compose.onNodeWithText(label).performTextInput(value)
+        compose.financialNode(label).performTextInput(value)
     }
-    private fun waitFor(text: String) = compose.waitUntil(30000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
+    private fun waitFor(text: String) = run { compose.prepareFinancialSection(text); compose.waitUntil(30000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() } }
     private fun load() {
         waitFor("Вы вошли: ${auth.profile.email}")
         click("Обновить счета"); waitFor("Для операции: Deleted cash · KWD")
@@ -88,11 +88,11 @@ class DeletedTransactionsScreenTest {
         assertEquals(income.allocations.single().id, replacement.allocations.single().id)
         assertEquals(income.occurred_at, replacement.occurred_at)
         compose.activityRule.scenario.recreate()
-        compose.onNodeWithText("Примечание операции").assertTextContains("Kept income draft")
+        compose.financialNode("Примечание операции").assertTextContains("Kept income draft")
         click("Обновить данные для новой команды")
         waitFor("Операция удалена на сервере. Черновик сохранен; отмените редактирование.")
-        compose.onNodeWithText("Сохранить изменения операции").assertIsNotEnabled()
-        compose.onNodeWithText("Примечание операции").assertTextContains("Kept income draft")
+        compose.financialNode("Сохранить изменения операции").assertIsNotEnabled()
+        compose.financialNode("Примечание операции").assertTextContains("Kept income draft")
         assertNull(runBlocking { app.database.commands().get(origin, auth.profile.id, auth.workspace.id) })
         click("Отменить изменение операции")
         click("Изменить корректировку Original adjustment")
@@ -114,22 +114,22 @@ class DeletedTransactionsScreenTest {
         click("Принять подтвержденный результат")
         click("Открыть черновик корректировки")
         waitFor("Версия корректировки на сервере: 4; черновика: 3")
-        compose.onNodeWithText("Примечание корректировки").assertTextContains("Recovered own adjustment")
-        compose.onNodeWithText("Использовать обновленную версию корректировки").assertIsEnabled()
+        compose.financialNode("Примечание корректировки").assertTextContains("Recovered own adjustment")
+        compose.financialNode("Использовать обновленную версию корректировки").assertIsEnabled()
         assertEquals("3", written.version)
         assertNull(runBlocking { app.database.commands().get(origin, auth.profile.id, auth.workspace.id) })
         field("Примечание корректировки", "Kept adjustment draft")
         click("Вернуться к истории корректировок")
         compose.waitUntil(10000) { compose.onAllNodes(hasText("Сохранить черновик и продолжить") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithText("Сохранить черновик и продолжить").performClick()
+        compose.financialNode("Сохранить черновик и продолжить").performClick()
         click("Удалить корректировку Concurrent adjustment")
         click("Восстановить черновик корректировки 1")
         remove(history().single { it.id == adjustment.id })
         click("Обновить историю")
         waitFor("Корректировка удалена на сервере. Черновик сохранен; отмените редактирование.")
-        compose.onNodeWithText("Примечание корректировки").assertTextContains("Kept adjustment draft")
-        compose.onNodeWithText("Сохранить примечание корректировки").assertIsNotEnabled()
-        compose.onNodeWithText("Подтвердить удаление корректировки").assertIsNotEnabled()
+        compose.financialNode("Примечание корректировки").assertTextContains("Kept adjustment draft")
+        compose.financialNode("Сохранить примечание корректировки").assertIsNotEnabled()
+        compose.financialNode("Подтвердить удаление корректировки").assertIsNotEnabled()
         click("Отменить удаление корректировки")
         click("Восстановить черновик корректировки 1")
         click("Отменить корректировку")
@@ -148,7 +148,7 @@ class DeletedTransactionsScreenTest {
         field("Примечание перевода", "Kept transfer draft")
         click("Вернуться к истории переводов")
         compose.waitUntil(10000) { compose.onAllNodes(hasText("Сохранить черновик и продолжить") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithText("Сохранить черновик и продолжить").performClick()
+        compose.financialNode("Сохранить черновик и продолжить").performClick()
         click("Удалить перевод Own transfer saved")
         click("Восстановить черновик перевода 1")
         val snapshot = history().associateBy { it.id }
@@ -156,9 +156,9 @@ class DeletedTransactionsScreenTest {
         remove(current, listOf(snapshot[current.fee_transaction_id]!!))
         click("Обновить историю")
         waitFor("Перевод удален на сервере. Черновик сохранен; отмените редактирование.")
-        compose.onNodeWithText("Примечание перевода").assertTextContains("Kept transfer draft")
-        compose.onNodeWithText("Сохранить изменения перевода").assertIsNotEnabled()
-        compose.onNodeWithText("Подтвердить удаление перевода").assertIsNotEnabled()
+        compose.financialNode("Примечание перевода").assertTextContains("Kept transfer draft")
+        compose.financialNode("Сохранить изменения перевода").assertIsNotEnabled()
+        compose.financialNode("Подтвердить удаление перевода").assertIsNotEnabled()
         click("Отменить удаление перевода")
         click("Восстановить черновик перевода 1")
         click("Отменить изменение перевода")
@@ -169,16 +169,16 @@ class DeletedTransactionsScreenTest {
         field("Примечание возврата", "Kept refund draft")
         click("Вернуться к истории возвратов")
         compose.waitUntil(10000) { compose.onAllNodes(hasText("Сохранить черновик и продолжить") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithText("Сохранить черновик и продолжить").performClick()
+        compose.financialNode("Сохранить черновик и продолжить").performClick()
         click("Удалить возврат Own refund saved")
         click("Восстановить черновик возврата 1")
         val latest = history().associateBy { it.id }
         remove(latest[refund.id]!!, listOf(latest[expense.id]!!))
         click("Обновить историю")
         waitFor("Возврат удален на сервере. Черновик сохранен; отмените редактирование.")
-        compose.onNodeWithText("Примечание возврата").assertTextContains("Kept refund draft")
-        compose.onNodeWithText("Сохранить изменения возврата").assertIsNotEnabled()
-        compose.onNodeWithText("Подтвердить удаление возврата").assertIsNotEnabled()
+        compose.financialNode("Примечание возврата").assertTextContains("Kept refund draft")
+        compose.financialNode("Сохранить изменения возврата").assertIsNotEnabled()
+        compose.financialNode("Подтвердить удаление возврата").assertIsNotEnabled()
         click("Отменить удаление возврата")
         click("Восстановить черновик возврата 1")
         click("Отменить изменение возврата")

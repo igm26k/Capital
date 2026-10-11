@@ -54,16 +54,17 @@ class DraftGuardScreenTest {
     @get:Rule(order = 1) val compose = createAndroidComposeRule<MainActivity>()
     private suspend fun mutate(path: String, method: String, body: String) = decodeResponse<MutationResult>(api.request("/workspaces/${auth.workspace.id}/$path", method, body, auth.credential(origin), UUID.randomUUID().toString(), auth.workspace.sync_generation_id))
     private fun click(text: String) {
+        compose.prepareFinancialSection(text)
         compose.waitUntil(10000) { compose.onAllNodes(hasText(text) and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
-        if (text == "Вернуться к истории операций") compose.onNodeWithText(text).performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick) { it() }
-        else if (text == "Остаться в редакторе") compose.onNodeWithText(text).performClick()
-        else compose.onNodeWithText(text).performScrollTo().performClick()
+        if (text == "Вернуться к истории операций") compose.financialNode(text).performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick) { it() }
+        else if (text == "Остаться в редакторе") compose.financialNode(text).performClick()
+        else compose.financialNode(text).performScrollTo().performClick()
     }
     private fun field(label: String, value: String) {
-        compose.onNodeWithText(label).performScrollTo().performTextClearance()
-        compose.onNodeWithText(label).performTextInput(value)
+        compose.financialNode(label).performScrollTo().performTextClearance()
+        compose.financialNode(label).performTextInput(value)
     }
-    private fun waitFor(text: String) = compose.waitUntil(30000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
+    private fun waitFor(text: String) = run { compose.prepareFinancialSection(text); compose.waitUntil(30000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() } }
     @Test fun realDraftChoicesRetainSeparateRawAndEditedRecordsWithoutSending() {
         waitFor("Вы вошли: ${auth.profile.email}")
         click("Обновить счета"); waitFor("Для операции: Detail cash · KWD")
@@ -74,33 +75,33 @@ class DraftGuardScreenTest {
         click("Вернуться к истории операций")
         waitFor("Сохранить измененный черновик?")
         click("Остаться в редакторе")
-        compose.onNodeWithText("Примечание операции").assertTextContains("Local unsent draft")
+        compose.financialNode("Примечание операции").assertTextContains("Local unsent draft")
         click("Вернуться к истории операций")
         waitFor("Сохранить измененный черновик?")
         compose.waitUntil(10000) { compose.onAllNodes(hasText("Сохранить черновик и продолжить") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithText("Сохранить черновик и продолжить").performClick()
+        compose.financialNode("Сохранить черновик и продолжить").performClick()
         click("Изменить операцию Detail expense")
         waitFor("Изменение операции")
-        compose.onNodeWithText("Примечание операции").assertTextContains("Detail expense")
+        compose.financialNode("Примечание операции").assertTextContains("Detail expense")
         field("Примечание операции", "Edited unsent expense")
         click("Отменить изменение операции")
         waitFor("Сохранить измененный черновик?")
         compose.waitUntil(10000) { compose.onAllNodes(hasText("Сохранить черновик и продолжить") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithText("Сохранить черновик и продолжить").performClick()
+        compose.financialNode("Сохранить черновик и продолжить").performClick()
         waitFor("Новая операция")
         click("Восстановить черновик операции 1")
-        compose.onNodeWithText("Сумма операции").assertTextContains("invalid amount")
-        compose.onNodeWithText("Примечание операции").assertTextContains("Local unsent draft")
+        compose.financialNode("Сумма операции").assertTextContains("invalid amount")
+        compose.financialNode("Примечание операции").assertTextContains("Local unsent draft")
         click("Восстановить черновик операции 2")
         waitFor("Изменение операции")
-        compose.onNodeWithText("Примечание операции").assertTextContains("Edited unsent expense")
+        compose.financialNode("Примечание операции").assertTextContains("Edited unsent expense")
         compose.activityRule.scenario.recreate()
-        compose.onNodeWithText("Примечание операции").assertTextContains("Edited unsent expense")
+        compose.financialNode("Примечание операции").assertTextContains("Edited unsent expense")
         field("Примечание операции", "Discard this edit")
         click("Отменить изменение операции")
         waitFor("Сохранить измененный черновик?")
         compose.waitUntil(10000) { compose.onAllNodes(hasText("Отбросить черновик и продолжить") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithText("Отбросить черновик и продолжить").performClick()
+        compose.financialNode("Отбросить черновик и продолжить").performClick()
         waitFor("Новая операция")
         assertNull(runBlocking { app.database.commands().get(origin, auth.profile.id, auth.workspace.id) })
         assertEquals(6, runBlocking { api.transactions(auth.credential(origin)) }.size)

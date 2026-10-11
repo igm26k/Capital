@@ -46,6 +46,7 @@ fun ComposeContentTestRule.prepareOperationNavigation(text: String) {
             onNodeWithText("Отбросить черновик и продолжить").performClick()
         }
     }
+    prepareFinancialSection(text)
     val opened = onAllNodesWithText("Вернуться к истории операций").fetchSemanticsNodes().isNotEmpty()
     if (!opened && (operationField || operationButton) && !(text in setOf("Расход", "Доход") || text.startsWith("Для операции: "))) {
         waitUntil(10000) { onAllNodes(hasText("Открыть черновик операции") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }

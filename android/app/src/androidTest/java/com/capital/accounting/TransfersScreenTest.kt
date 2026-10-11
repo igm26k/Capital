@@ -52,13 +52,13 @@ class TransfersScreenTest {
     private fun click(text: String) = compose.operationNode(text).performScrollTo().performClick()
     private fun field(label: String, value: String) {
         compose.operationField(label).performScrollTo().performTextClearance()
-        compose.onNodeWithText(label).performTextInput(value)
+        compose.financialNode(label).performTextInput(value)
     }
-    private fun waitFor(text: String) = compose.waitUntil(30000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
+    private fun waitFor(text: String) = run { compose.prepareFinancialSection(text); compose.waitUntil(30000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() } }
     private fun history() = runBlocking { api.transactions(auth.credential(origin)) }
     @Test fun separateTransferEditorGuardsBackAndReturnsAfterAggregateConfirmation() {
         waitFor("Вы вошли: ${auth.profile.email}"); waitFor("Новый перевод")
-        compose.onNodeWithText("Сумма списания перевода").assertDoesNotExist()
+        compose.financialNode("Сумма списания перевода").assertDoesNotExist()
         click("Обновить счета"); waitFor("Списать со счета: Transfer source · KWD")
         click("Списать со счета: Transfer source · KWD")
         click("Зачислить на счет: Transfer target · USD")
@@ -75,29 +75,29 @@ class TransfersScreenTest {
         back(); android.os.SystemClock.sleep(500)
         if (compose.onAllNodesWithText("Сохранить измененный черновик?").fetchSemanticsNodes().isEmpty()) back()
         waitFor("Сохранить измененный черновик?")
-        compose.onNodeWithText("Остаться в редакторе").performClick()
+        compose.financialNode("Остаться в редакторе").performClick()
         compose.activityRule.scenario.recreate()
         waitFor("Вернуться к истории переводов")
-        compose.onNodeWithText("Примечание комиссии перевода").assertTextContains("Retained fee")
+        compose.financialNode("Примечание комиссии перевода").assertTextContains("Retained fee")
         fun choose(text: String) {
             waitFor("Сохранить измененный черновик?")
             compose.waitUntil(10000) { compose.onAllNodes(hasText(text) and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
-            compose.onNodeWithText(text).performClick()
+            compose.financialNode(text).performClick()
         }
         compose.waitUntil(10000) { compose.onAllNodes(hasText("Вернуться к истории переводов") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithText("Вернуться к истории переводов").performScrollTo().performClick()
+        compose.financialNode("Вернуться к истории переводов").performScrollTo().performClick()
         choose("Сохранить черновик и продолжить")
         assertEquals(3, history().size)
         click("Восстановить черновик перевода 1")
         field("Примечание перевода", "Discard transfer")
         compose.waitUntil(10000) { compose.onAllNodes(hasText("Вернуться к истории переводов") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithText("Вернуться к истории переводов").performScrollTo().performClick()
+        compose.financialNode("Вернуться к истории переводов").performScrollTo().performClick()
         choose("Отбросить черновик и продолжить")
         click("Восстановить черновик перевода 1")
         field("Сумма списания перевода", "1.234")
         click("Сохранить перевод")
         waitFor("Изменить перевод Retained transfer")
-        compose.onNodeWithText("Вернуться к истории переводов").assertDoesNotExist()
+        compose.financialNode("Вернуться к истории переводов").assertDoesNotExist()
         val accounts = runBlocking { api.accounts(auth.credential(origin)).associateBy { it.id } }
         assertEquals("98665", accounts[source.id]!!.posted_balance_minor)
         assertEquals("3234", accounts[target.id]!!.posted_balance_minor)
@@ -115,15 +115,15 @@ class TransfersScreenTest {
             if (listOf("Изменить операцию ", "Изменить перевод ", "Изменить возврат ", "Изменить корректировку ", "Создать возврат расхода ", "Создать возврат комиссии ", "Корректировать счет ").any { text.startsWith(it) } || text in listOf("Отменить изменение операции", "Отменить изменение перевода", "Отменить создание возврата", "Отменить изменение возврата", "Отменить корректировку")) {
                 if (compose.onAllNodesWithText("Сохранить измененный черновик?").fetchSemanticsNodes().isNotEmpty()) {
                     compose.waitUntil(10000) { compose.onAllNodes(hasText("Отбросить черновик и продолжить") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
-                    compose.onNodeWithText("Отбросить черновик и продолжить").performClick()
+                    compose.financialNode("Отбросить черновик и продолжить").performClick()
                 }
             }
         }
         fun field(label: String, value: String) {
             compose.operationField(label).performScrollTo().performTextClearance()
-            compose.onNodeWithText(label).performTextInput(value)
+            compose.financialNode(label).performTextInput(value)
         }
-        fun waitFor(text: String) = compose.waitUntil(30000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
+        fun waitFor(text: String) = run { compose.prepareFinancialSection(text); compose.waitUntil(30000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() } }
         fun waitTransfer(note: String) = compose.waitUntil(30000) {
             compose.onAllNodes(hasText("Перевод ·", substring = true) and hasText(note, substring = true)).fetchSemanticsNodes().isNotEmpty()
         }
@@ -140,7 +140,7 @@ class TransfersScreenTest {
         field("Примечание перевода", "Same transfer")
         field("Дата перевода (YYYY-MM-DDTHH:MM:SS)", "2026-10-06T11:05:00")
         field("Часовой пояс перевода", "Europe/Nicosia")
-        compose.onNodeWithText("Сумма зачисления перевода").assertIsNotEnabled()
+        compose.financialNode("Сумма зачисления перевода").assertIsNotEnabled()
         click("Сохранить перевод")
         waitTransfer("Same transfer")
         val sameTransfer = history().single { it.note == "Same transfer" }
@@ -195,11 +195,11 @@ class TransfersScreenTest {
         compose.activityRule.scenario.recreate()
         click("Обновить счета")
         waitFor("Сохраненная команда: ${command.commandId}")
-        compose.onNodeWithText("Сумма списания перевода").assertTextContains("1,000")
-        compose.onNodeWithText("Сумма зачисления перевода").assertTextContains("3,34")
-        compose.onNodeWithText("Примечание комиссии перевода").assertTextContains("Replay fee")
-        compose.onNodeWithText("Дата перевода (YYYY-MM-DDTHH:MM:SS)").assertTextContains("2026-10-06T12:15:30")
-        compose.onNodeWithText("Выйти").assertIsNotEnabled()
+        compose.financialNode("Сумма списания перевода").assertTextContains("1,000")
+        compose.financialNode("Сумма зачисления перевода").assertTextContains("3,34")
+        compose.financialNode("Примечание комиссии перевода").assertTextContains("Replay fee")
+        compose.financialNode("Дата перевода (YYYY-MM-DDTHH:MM:SS)").assertTextContains("2026-10-06T12:15:30")
+        compose.financialNode("Выйти").assertIsNotEnabled()
         assertEquals(body, runBlocking { app.database.commands().get(origin, auth.profile.id, auth.workspace.id)!!.body })
         click("Повторить сохраненную команду")
         waitTransfer("Replay transfer")
@@ -212,31 +212,32 @@ class TransfersScreenTest {
         assertEquals("2026-10-06T09:15:30.123456Z", history().single { it.id == replay.id }.occurred_at)
         assertEquals(replayFee.allocations.map { it.id }.toSet(), history().single { it.id == replayFee.id }.allocations.map { it.id }.toSet())
         compose.activityRule.scenario.recreate()
-        compose.onNodeWithText("76,053 KWD").assertExists()
+        compose.financialNode("76,053 KWD").assertExists()
         click("Списать со счета: Transfer source · KWD")
         val latest = accounts()[source.id]!!
         runBlocking { api.request("/workspaces/${auth.workspace.id}/accounts/${source.id}", "PUT", ApiClient.json.encodeToString(AccountUpdate(latest.version, latest.name, latest.type, true)), auth.credential(origin), UUID.randomUUID().toString(), auth.workspace.sync_generation_id) }
         click("Обновить счета")
-        waitFor("Transfer source · В архиве")
-        compose.onNodeWithText("Сохранить перевод").assertIsNotEnabled()
+        compose.waitUntil(30000) { compose.onAllNodesWithText("Списать со счета: Transfer source · KWD").fetchSemanticsNodes().isEmpty() }
+        assertNotNull(accounts()[source.id]!!.archived_at)
+        compose.financialNode("Сохранить перевод").assertIsNotEnabled()
     }
     @Test fun aggregateEditConflictFeeRemovalAdditionAndConfirmedDelete() {
         fun click(text: String) = compose.operationNode(text).performScrollTo().performClick().also {
             if (listOf("Изменить операцию ", "Изменить перевод ", "Изменить возврат ", "Изменить корректировку ", "Создать возврат расхода ", "Создать возврат комиссии ", "Корректировать счет ").any { text.startsWith(it) } || text in listOf("Отменить изменение операции", "Отменить изменение перевода", "Отменить создание возврата", "Отменить изменение возврата", "Отменить корректировку")) {
                 if (compose.onAllNodesWithText("Сохранить измененный черновик?").fetchSemanticsNodes().isNotEmpty()) {
                     compose.waitUntil(10000) { compose.onAllNodes(hasText("Отбросить черновик и продолжить") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
-                    compose.onNodeWithText("Отбросить черновик и продолжить").performClick()
+                    compose.financialNode("Отбросить черновик и продолжить").performClick()
                 }
             }
         }
         fun field(label: String, value: String) {
             compose.operationField(label).performScrollTo().performTextClearance()
-            compose.onNodeWithText(label).performTextInput(value)
+            compose.financialNode(label).performTextInput(value)
         }
-        fun waitFor(text: String) = compose.waitUntil(30000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
+        fun waitFor(text: String) = run { compose.prepareFinancialSection(text); compose.waitUntil(30000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() } }
         fun history() = runBlocking { api.transactions(auth.credential(origin)) }
         fun account(id: String) = runBlocking { api.accounts(auth.credential(origin)).single { it.id == id } }
-        fun waitTransfer(note: String) = compose.waitUntil(30000) { compose.onAllNodes(hasText("Перевод ·", substring = true) and hasText(note, substring = true)).fetchSemanticsNodes().isNotEmpty() }
+        fun waitTransfer(note: String) = run { compose.prepareFinancialSection("История операций"); compose.waitUntil(30000) { compose.onAllNodes(hasText("Перевод ·", substring = true) and hasText(note, substring = true)).fetchSemanticsNodes().isNotEmpty() } }
         val initialFee = FeeInput(UUID.randomUUID().toString(), source.id, "501", listOf(AllocationInput(UUID.randomUUID().toString(), category.id, "200"), AllocationInput(UUID.randomUUID().toString(), null, "301")), "Original fee", listOf(tag.id))
         val initial = TransferCreate(UUID.randomUUID().toString(), "2026-10-06T08:20:30.123456Z", "Europe/Nicosia", "Original aggregate", "Recipient", listOf(tag.id), "transfer", source.id, target.id, "10000", "300", Rate("3", "10"), initialFee)
         runBlocking { api.request("/workspaces/${auth.workspace.id}/transactions", "POST", ApiClient.json.encodeToString(initial), auth.credential(origin), UUID.randomUUID().toString(), auth.workspace.sync_generation_id) }
@@ -250,9 +251,9 @@ class TransfersScreenTest {
         val original = history().single { it.id == initial.id }
         val changingFeePart = history().single { it.id == initialFee.id }.allocations.indexOfFirst { it.id == initialFee.allocations.last().id } + 1
         click("Изменить перевод Original aggregate")
-        compose.onNodeWithText("Списать со счета: Transfer target · USD").assertIsNotEnabled()
-        compose.onNodeWithText("Зачислить на счет: Transfer same · KWD").assertIsNotEnabled()
-        compose.onNodeWithText("Счет комиссии: Transfer target · USD").assertIsNotEnabled()
+        compose.financialNode("Списать со счета: Transfer target · USD").assertIsNotEnabled()
+        compose.financialNode("Зачислить на счет: Transfer same · KWD").assertIsNotEnabled()
+        compose.financialNode("Счет комиссии: Transfer target · USD").assertIsNotEnabled()
         field("Сумма списания перевода", "12.000")
         field("Сумма зачисления перевода", "4.00")
         field("Сумма комиссии перевода", "0.601")
@@ -290,10 +291,10 @@ class TransfersScreenTest {
         assertEquals("2", draft.expected_fee_version)
         assertEquals(initialFee.id, draft.fee!!.id)
         assertEquals("Local aggregate", draft.note)
-        compose.onNodeWithText("Выйти").assertIsNotEnabled()
+        compose.financialNode("Выйти").assertIsNotEnabled()
         compose.activityRule.scenario.recreate()
-        compose.onNodeWithText("Примечание перевода").assertTextContains("Local aggregate")
-        compose.onNodeWithText("Сумма комиссии перевода").assertTextContains("0,701")
+        compose.financialNode("Примечание перевода").assertTextContains("Local aggregate")
+        compose.financialNode("Сумма комиссии перевода").assertTextContains("0,701")
         click("Обновить данные для новой команды")
         waitFor("Данные обновлены. Проверьте поля перед новой командой.")
         assertEquals("Server aggregate", history().single { it.id == initial.id }.note)
@@ -325,7 +326,7 @@ class TransfersScreenTest {
         assertEquals("86899", account(source.id).posted_balance_minor)
         assertEquals(initial.occurred_at, history().single { it.id == initial.id }.occurred_at)
         click("Удалить перевод Local aggregate")
-        compose.onNodeWithText("Вместе с переводом будет удалена комиссия: Replacement fee; −0,101 KWD").assertExists()
+        compose.financialNode("Вместе с переводом будет удалена комиссия: Replacement fee; −0,101 KWD").assertExists()
         click("Отменить удаление перевода")
         assertEquals(5, history().size)
         click("Удалить перевод Local aggregate")
@@ -336,7 +337,7 @@ class TransfersScreenTest {
         assertEquals("3000", account(target.id).posted_balance_minor)
         assertNull(runBlocking { app.database.commands().get(origin, auth.profile.id, auth.workspace.id) })
         compose.activityRule.scenario.recreate()
-        compose.onNodeWithText("100,000 KWD").assertExists()
+        compose.financialNode("100,000 KWD").assertExists()
     }
 
     @Test fun staleDeleteAndFeeRefundDependencyNeverRemoveFinancialMovements() {
@@ -344,11 +345,11 @@ class TransfersScreenTest {
             if (listOf("Изменить операцию ", "Изменить перевод ", "Изменить возврат ", "Изменить корректировку ", "Создать возврат расхода ", "Создать возврат комиссии ", "Корректировать счет ").any { text.startsWith(it) } || text in listOf("Отменить изменение операции", "Отменить изменение перевода", "Отменить создание возврата", "Отменить изменение возврата", "Отменить корректировку")) {
                 if (compose.onAllNodesWithText("Сохранить измененный черновик?").fetchSemanticsNodes().isNotEmpty()) {
                     compose.waitUntil(10000) { compose.onAllNodes(hasText("Отбросить черновик и продолжить") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
-                    compose.onNodeWithText("Отбросить черновик и продолжить").performClick()
+                    compose.financialNode("Отбросить черновик и продолжить").performClick()
                 }
             }
         }
-        fun waitFor(text: String) = compose.waitUntil(30000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
+        fun waitFor(text: String) = run { compose.prepareFinancialSection(text); compose.waitUntil(30000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() } }
         fun history() = runBlocking { api.transactions(auth.credential(origin)) }
         fun balance(id: String) = runBlocking { api.accounts(auth.credential(origin)).single { it.id == id }.posted_balance_minor }
         val fee = FeeInput(UUID.randomUUID().toString(), source.id, "501", listOf(AllocationInput(UUID.randomUUID().toString(), category.id, "501")), "Dependency fee", emptyList())
@@ -375,7 +376,7 @@ class TransfersScreenTest {
         click("Обновить данные для новой команды")
         waitFor("Данные обновлены. Проверьте поля перед новой командой.")
         click("Удалить перевод Dependency transfer")
-        compose.onNodeWithText("Зависимый возврат: Fee refund. Сначала удалите возврат.").assertExists()
+        compose.financialNode("Зависимый возврат: Fee refund. Сначала удалите возврат.").assertExists()
         click("Подтвердить удаление перевода")
         waitFor("Изменение отклонено: dependent_transactions. Обновите данные и проверьте черновик.")
         assertEquals(6, history().size)

@@ -165,6 +165,8 @@ inline fun <reified T> rememberFinancialDraft(key: String, noinline initial: () 
     return value
 }
 
+val LocalFinancialSection = staticCompositionLocalOf<MutableState<String>> { error("Financial section required") }
+
 val LocalFinancialEditor = staticCompositionLocalOf<MutableState<String?>> { error("Financial editor scope required") }
 
 @Composable
@@ -180,6 +182,14 @@ fun FinancialDraftContent(context: Context, origin: String, owner: String, works
         catch (_: Exception) { failed = true }
     }
     val editor = rememberSaveable(origin, owner, workspace) { mutableStateOf<String?>(null) }
+    val section = LocalFinancialSection.current
+    LaunchedEffect(editor.value) {
+        when (editor.value) {
+            "account" -> section.value = "accounts"
+            "catalog" -> section.value = "more"
+            "transaction", "transfer", "refund", "adjustment" -> section.value = "operations"
+        }
+    }
     val loaded = scope
     if (loaded != null) {
         CompositionLocalProvider(LocalFinancialDraftScope provides loaded, LocalFinancialEditor provides editor) {

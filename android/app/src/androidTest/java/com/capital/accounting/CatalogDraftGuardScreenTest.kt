@@ -54,19 +54,20 @@ class CatalogDraftGuardScreenTest {
     @get:Rule(order = 1) val compose = createAndroidComposeRule<MainActivity>()
     private suspend fun mutate(path: String, method: String, body: String) = decodeResponse<MutationResult>(api.request("/workspaces/${auth.workspace.id}/$path", method, body, auth.credential(origin), UUID.randomUUID().toString(), auth.workspace.sync_generation_id))
     private fun click(text: String) {
+        compose.prepareFinancialSection(text)
         compose.waitUntil(10000) { compose.onAllNodes(hasText(text) and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
-        if (text == "Остаться в редакторе") compose.onNodeWithText(text).performClick()
-        else compose.onNodeWithText(text).performScrollTo().performClick()
+        if (text == "Остаться в редакторе") compose.financialNode(text).performClick()
+        else compose.financialNode(text).performScrollTo().performClick()
     }
     private fun field(label: String, value: String) {
-        compose.onNodeWithText(label).performScrollTo().performTextClearance()
-        compose.onNodeWithText(label).performTextInput(value)
+        compose.financialNode(label).performScrollTo().performTextClearance()
+        compose.financialNode(label).performTextInput(value)
     }
-    private fun waitFor(text: String) = compose.waitUntil(30000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
+    private fun waitFor(text: String) = run { compose.prepareFinancialSection(text); compose.waitUntil(30000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() } }
     private fun choose(text: String) {
         waitFor("Сохранить измененный черновик?")
         compose.waitUntil(10000) { compose.onAllNodes(hasText(text) and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithText(text).performClick()
+        compose.financialNode(text).performClick()
     }
     @Test fun accountAndCatalogDraftChoicesSurviveRecreationAndOwnReceipts() {
         waitFor("Вы вошли: ${auth.profile.email}"); waitFor("Обновить счета")
@@ -77,7 +78,7 @@ class CatalogDraftGuardScreenTest {
         field("Начальный остаток", "invalid")
         click("KWD")
         click("Вернуться к счетам"); choose("Остаться в редакторе")
-        compose.onNodeWithText("Название счета").assertTextContains("Unsent account")
+        compose.financialNode("Название счета").assertTextContains("Unsent account")
         click("Вернуться к счетам"); choose("Сохранить черновик и продолжить")
         click("Изменить счет Detail cash")
         field("Новое название счета", "Own account")
@@ -89,9 +90,9 @@ class CatalogDraftGuardScreenTest {
         click("Обновить счета")
         waitFor("Текущая версия на сервере: ${foreign.version}; ваш черновик: ${own.version}")
         click("Новый счет вместо изменения")
-        compose.onNodeWithText("Сохранить измененный черновик?").assertDoesNotExist()
+        compose.financialNode("Сохранить измененный черновик?").assertDoesNotExist()
         click("Восстановить черновик счета 1")
-        compose.onNodeWithText("Начальный остаток").assertTextContains("invalid")
+        compose.financialNode("Начальный остаток").assertTextContains("invalid")
         click("Вернуться к счетам")
         click("Новая категория")
         field("Название категории", "Unsent category")
@@ -109,20 +110,20 @@ class CatalogDraftGuardScreenTest {
         click("Обновить категории и теги")
         waitFor("Версия классификации на сервере: 3; версия черновика: 2")
         click("Восстановить черновик классификации 1")
-        compose.onNodeWithText("Сохранить измененный черновик?").assertDoesNotExist()
-        compose.onNodeWithText("Название категории").assertTextContains("Unsent category")
-        compose.onNodeWithText("Родитель: Detail group").assertExists()
+        compose.financialNode("Сохранить измененный черновик?").assertDoesNotExist()
+        compose.financialNode("Название категории").assertTextContains("Unsent category")
+        compose.financialNode("Родитель: Detail group").assertExists()
         click("Восстановить черновик классификации 2")
-        compose.onNodeWithText("Название тега").assertTextContains("Unsent tag")
+        compose.financialNode("Название тега").assertTextContains("Unsent tag")
         field("Название тега", "Discard tag")
         click("Новая категория"); choose("Отбросить черновик и продолжить")
         click("Восстановить черновик классификации 2")
         compose.activityRule.scenario.recreate()
         waitFor("Вернуться к категориям и тегам")
-        compose.onNodeWithText("Название тега").assertTextContains("Unsent tag")
+        compose.financialNode("Название тега").assertTextContains("Unsent tag")
         click("Вернуться к категориям и тегам")
         click("Восстановить черновик счета 1")
-        compose.onNodeWithText("Начальный остаток").assertTextContains("invalid")
+        compose.financialNode("Начальный остаток").assertTextContains("invalid")
         waitFor("Локальные черновики сохранены. Отправка операций выполняется отдельно.")
         assertEquals(6, runBlocking { api.transactions(auth.credential(origin)).size })
         assertNull(runBlocking { app.database.commands().get(origin, auth.profile.id, auth.workspace.id) })

@@ -39,13 +39,14 @@ class FinancialOutageTest {
     @Test fun nativeCreatePersistsExactCommandWhenActualApiIsStopped() {
         compose.waitUntil(30000) { compose.onAllNodesWithText("Вы вошли: ${auth.profile.email}").fetchSemanticsNodes().isNotEmpty() }
         fun field(label: String, value: String) {
-            compose.onNodeWithText(label).performScrollTo().performTextClearance()
-            compose.onNodeWithText(label).performTextInput(value)
+            compose.financialNode(label).performScrollTo().performTextClearance()
+            compose.financialNode(label).performTextInput(value)
         }
-        compose.waitUntil(30000) { compose.onAllNodesWithText("Добавить счет").fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithText("Добавить счет").performScrollTo().performClick()
+        compose.prepareFinancialSection("Добавить счет")
+        compose.waitUntil(30000) { compose.onAllNodes(hasText("Добавить счет") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+        compose.financialNode("Добавить счет").performScrollTo().performClick()
         field("Название счета", "Outage pocket")
-        compose.onNodeWithText("KWD").performScrollTo().performClick()
+        compose.financialNode("KWD").performScrollTo().performClick()
         field("Начальный остаток", "123.456")
         field("Дата открытия (YYYY-MM-DDTHH:MM:SS)", "2026-10-06T11:00:00")
         field("Часовой пояс открытия", "Europe/Nicosia")
@@ -54,10 +55,10 @@ class FinancialOutageTest {
         val output = File(app.filesDir, "financial-outage-proof.json")
         output.writeText(proof.toString())
         compose.waitUntil(60000) { File(app.filesDir, "financial-outage-gate").exists() }
-        compose.onNodeWithText("Создать счет").performScrollTo().performClick()
+        compose.financialNode("Создать счет").performScrollTo().performClick()
         compose.waitUntil(45000) { compose.onAllNodesWithText("Результат не подтвержден. Повторите ту же команду.").fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithText("Выйти").assertIsNotEnabled()
-        compose.onNodeWithText("Создать счет").assertIsNotEnabled()
+        compose.financialNode("Выйти").assertIsNotEnabled()
+        compose.financialNode("Создать счет").assertIsNotEnabled()
         val command = runBlocking { app.database.commands().get(origin, auth.profile.id, auth.workspace.id)!! }
         val draft = decodeResponse<AccountCreate>(command.body)
         assertEquals("pending", command.state)

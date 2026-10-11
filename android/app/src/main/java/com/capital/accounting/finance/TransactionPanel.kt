@@ -108,7 +108,8 @@ fun TransactionPanel(model: AuthViewModel) {
             }
         }
     }
-    if (!editorOpen) {
+    if (navigation.value == null) Button(enabled = !state.busy, onClick = model::loadTransactions) { Text("Обновить историю") }
+    if (!editorOpen && LocalFinancialSection.current.value == "operations") {
         Text("Новая операция", style = MaterialTheme.typography.titleLarge)
         Row {
             TextButton(enabled = enabled && !scope.saving, onClick = { guard.request { reset("expense"); navigation.value = "transaction" } }) { Text("Расход") }
@@ -119,7 +120,7 @@ fun TransactionPanel(model: AuthViewModel) {
         }
         TextButton(enabled = enabled && !scope.saving, onClick = { navigation.value = "transaction" }) { Text("Открыть черновик операции") }
         DraftGuardControls(guard, "transaction", enabled) { navigation.value = "transaction" }
-    } else Dialog(onDismissRequest = ::close, properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)) {
+    } else if (editorOpen) Dialog(onDismissRequest = ::close, properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)) {
         Surface(Modifier.fillMaxSize()) {
             Column(Modifier.safeDrawingPadding().imePadding().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Button(enabled = enabled && !scope.saving, onClick = ::close) { Text("Вернуться к истории операций") }
@@ -207,39 +208,40 @@ fun TransactionPanel(model: AuthViewModel) {
             }
         }
     }
-    deleting?.let { target ->
-        Text("Удаление: ${target.note}; ${target.entries.joinToString { Money.display(it.amount_minor, it.currency) }}")
-        Text("Движение будет исключено из остатка. Историю зависимых операций проверит сервер.")
-        Button(enabled = enabled && state.transactions.any { it.id == target.id }, onClick = { model.submitTransaction(ApiClient.json.encodeToString(TransactionDelete(target.version, emptyList())), target.id, delete = true); deleting = null }) { Text("Подтвердить удаление операции") }
-        TextButton(enabled = enabled, onClick = { deleting = null }) { Text("Отменить удаление") }
-    }
-    Text("История операций", style = MaterialTheme.typography.titleLarge)
-    if (navigation.value == null) Button(enabled = !state.busy, onClick = model::loadTransactions) { Text("Обновить историю") }
-    HistoryFilters(model)
-    (state.historyItems ?: state.transactions).forEach { transaction ->
-        val label = when (transaction.kind) {
-            "expense" -> "Расход"
-            "income" -> "Доход"
-            "opening" -> "Начальный остаток"
-            "transfer" -> "Перевод"
-            "refund" -> "Возврат"
-            else -> "Корректировка"
+    if (LocalFinancialSection.current.value == "operations") {
+        deleting?.let { target ->
+            Text("Удаление: ${target.note}; ${target.entries.joinToString { Money.display(it.amount_minor, it.currency) }}")
+            Text("Движение будет исключено из остатка. Историю зависимых операций проверит сервер.")
+            Button(enabled = enabled && state.transactions.any { it.id == target.id }, onClick = { model.submitTransaction(ApiClient.json.encodeToString(TransactionDelete(target.version, emptyList())), target.id, delete = true); deleting = null }) { Text("Подтвердить удаление операции") }
+            TextButton(enabled = enabled, onClick = { deleting = null }) { Text("Отменить удаление") }
         }
-        Text("$label · ${transaction.entries.joinToString { Money.display(it.amount_minor, it.currency) }} · ${transaction.note}")
-        TextButton(enabled = !state.busy && state.persisted, onClick = { model.openTransactionDetails(transaction.id) }) { Text("Детали операции ${transaction.note.ifEmpty { label }}") }
-        if (transaction.kind in listOf("income", "expense") && transaction.parent_transaction_id == null) {
-            TextButton(enabled = enabled, onClick = {
-                guard.request {
-                    original = transaction; editingId = transaction.id; editingVersion = transaction.version; kind = transaction.kind
-                    accountId = transaction.entries.first().account_id
-                    amount = Money.display(transaction.allocations.fold(BigInteger.ZERO) { sum, item -> sum + BigInteger(item.amount_minor) }.toString(), transaction.entries.first().currency).removeSuffix(" ${transaction.entries.first().currency}")
-                    parts = transaction.allocations.map { AllocationDraft(it.id, it.category_id, Money.display(it.amount_minor, transaction.entries.first().currency).removeSuffix(" ${transaction.entries.first().currency}")) }
-                    selectedTags = transaction.tag_ids
-                    note = transaction.note; payee = transaction.payee; zone = transaction.occurred_timezone; occurred = openingLocal(transaction.occurred_at, zone); error = ""; navigation.value = "transaction"
-                }
-            }) { Text("Изменить операцию ${transaction.note}") }
-            TextButton(enabled = enabled, onClick = { deleting = transaction }) { Text("Удалить операцию ${transaction.note}") }
+        Text("История операций", style = MaterialTheme.typography.titleLarge)
+        HistoryFilters(model)
+        (state.historyItems ?: state.transactions).forEach { transaction ->
+            val label = when (transaction.kind) {
+                "expense" -> "Расход"
+                "income" -> "Доход"
+                "opening" -> "Начальный остаток"
+                "transfer" -> "Перевод"
+                "refund" -> "Возврат"
+                else -> "Корректировка"
+            }
+            Text("$label · ${transaction.entries.joinToString { Money.display(it.amount_minor, it.currency) }} · ${transaction.note}")
+            TextButton(enabled = !state.busy && state.persisted, onClick = { model.openTransactionDetails(transaction.id) }) { Text("Детали операции ${transaction.note.ifEmpty { label }}") }
+            if (transaction.kind in listOf("income", "expense") && transaction.parent_transaction_id == null) {
+                TextButton(enabled = enabled, onClick = {
+                    guard.request {
+                        original = transaction; editingId = transaction.id; editingVersion = transaction.version; kind = transaction.kind
+                        accountId = transaction.entries.first().account_id
+                        amount = Money.display(transaction.allocations.fold(BigInteger.ZERO) { sum, item -> sum + BigInteger(item.amount_minor) }.toString(), transaction.entries.first().currency).removeSuffix(" ${transaction.entries.first().currency}")
+                        parts = transaction.allocations.map { AllocationDraft(it.id, it.category_id, Money.display(it.amount_minor, transaction.entries.first().currency).removeSuffix(" ${transaction.entries.first().currency}")) }
+                        selectedTags = transaction.tag_ids
+                        note = transaction.note; payee = transaction.payee; zone = transaction.occurred_timezone; occurred = openingLocal(transaction.occurred_at, zone); error = ""; navigation.value = "transaction"
+                    }
+                }) { Text("Изменить операцию ${transaction.note}") }
+                TextButton(enabled = enabled, onClick = { deleting = transaction }) { Text("Удалить операцию ${transaction.note}") }
+            }
+            Text("${transaction.occurred_at} · ${transaction.occurred_timezone} · ${if (transaction.status == "posted") "Проведена" else "Ожидает проведения"}")
         }
-        Text("${transaction.occurred_at} · ${transaction.occurred_timezone} · ${if (transaction.status == "posted") "Проведена" else "Ожидает проведения"}")
     }
 }

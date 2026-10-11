@@ -73,9 +73,9 @@ fun CatalogPanel(model: AuthViewModel) {
             }
         }
     }
-    if (!editorOpen) {
+    if (navigation.value == null) Button(enabled = !state.busy, onClick = model::loadCatalog) { Text("Обновить категории и теги") }
+    if (!editorOpen && LocalFinancialSection.current.value == "more") {
         Text("Категории и теги", style = MaterialTheme.typography.titleLarge)
-        if (navigation.value == null) Button(enabled = !state.busy, onClick = model::loadCatalog) { Text("Обновить категории и теги") }
         TextButton(enabled = enabled && !scope.saving, onClick = { guard.request { reset(); navigation.value = "catalog" } }) { Text("Новая категория") }
         TextButton(enabled = enabled && !scope.saving, onClick = { guard.request { reset("tags"); navigation.value = "catalog" } }) { Text("Новый тег") }
         TextButton(enabled = enabled && !scope.saving, onClick = { navigation.value = "catalog" }) { Text("Открыть черновик классификации") }
@@ -88,7 +88,7 @@ fun CatalogPanel(model: AuthViewModel) {
             Text("Тег: ${item.name}${if (item.archived_at != null) " · В архиве" else ""}")
             TextButton(enabled = enabled, onClick = { guard.request { collection = "tags"; id = item.id; version = item.version; name = item.name; parentId = null; archived = item.archived_at != null; error = ""; navigation.value = "catalog"  } }) { Text("Изменить тег ${item.name}") }
         }
-    } else Dialog(onDismissRequest = ::close, properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)) {
+    } else if (editorOpen) Dialog(onDismissRequest = ::close, properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)) {
         Surface(Modifier.fillMaxSize()) {
             Column(Modifier.safeDrawingPadding().imePadding().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Button(enabled = enabled && !scope.saving, onClick = ::close) { Text("Вернуться к категориям и тегам") }

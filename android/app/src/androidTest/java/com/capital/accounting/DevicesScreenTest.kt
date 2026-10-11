@@ -56,9 +56,9 @@ class DevicesScreenTest {
             }
         }
         compose.waitUntil(30000) { compose.onAllNodesWithText("Вы вошли: ${primary.profile.email}").fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithText("Обновить устройства").performScrollTo().performClick()
+        compose.financialNode("Обновить устройства").performScrollTo().performClick()
         compose.waitUntil(30000) { compose.onAllNodesWithText("Отключить устройство Other device").fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithText("Отключить устройство Other device").performScrollTo().performClick()
+        compose.financialNode("Отключить устройство Other device").performScrollTo().performClick()
         compose.waitUntil(30000) { compose.onAllNodesWithText("Устройство отключено").fetchSemanticsNodes().isNotEmpty() }
         runBlocking {
             try { api.request("/auth/session", session = other.credential(origin)); fail("Other credential still active") }
@@ -66,8 +66,8 @@ class DevicesScreenTest {
             api.request("/auth/session", session = primary.credential(origin))
             assertTrue(decodeResponse<Acknowledgement>(api.request("/sessions/${other.session.id}", "DELETE", session = primary.credential(origin))).ok)
         }
-        compose.onNodeWithText("Отключить устройство Other device").assertDoesNotExist()
-        compose.onNodeWithText("Завершить текущую сессию").performScrollTo().performClick()
+        compose.financialNode("Отключить устройство Other device").assertDoesNotExist()
+        compose.financialNode("Завершить текущую сессию").performScrollTo().performClick()
         compose.waitUntil(30000) { compose.onAllNodesWithText("Вы вышли из аккаунта").fetchSemanticsNodes().isNotEmpty() }
         runBlocking {
             try { api.request("/auth/session", session = primary.credential(origin)); fail("Current credential still active") }

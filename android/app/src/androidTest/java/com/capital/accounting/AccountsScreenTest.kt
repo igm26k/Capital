@@ -42,23 +42,24 @@ class AccountsScreenTest {
     }
     @get:Rule(order = 1) val compose = createAndroidComposeRule<MainActivity>()
     private fun click(text: String) {
+        compose.prepareFinancialSection(text)
         compose.waitUntil(10000) { compose.onAllNodes(hasText(text) and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithText(text).performScrollTo().performClick()
+        compose.financialNode(text).performScrollTo().performClick()
         if (text.startsWith("Изменить счет ") || text == "Новый счет вместо изменения") {
             if (compose.onAllNodesWithText("Сохранить измененный черновик?").fetchSemanticsNodes().isNotEmpty()) {
                 compose.waitUntil(10000) { compose.onAllNodes(hasText("Отбросить черновик и продолжить") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
-                compose.onNodeWithText("Отбросить черновик и продолжить").performClick()
+                compose.financialNode("Отбросить черновик и продолжить").performClick()
             }
         }
     }
     private fun field(label: String, value: String) {
-        compose.onNodeWithText(label).performScrollTo().performTextClearance()
-        compose.onNodeWithText(label).performTextInput(value)
+        compose.financialNode(label).performScrollTo().performTextClearance()
+        compose.financialNode(label).performTextInput(value)
     }
-    private fun waitFor(text: String) = compose.waitUntil(30000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
+    private fun waitFor(text: String) = run { compose.prepareFinancialSection(text); compose.waitUntil(30000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() } }
     @Test fun separateAccountEditorGuardsSystemBackAndReturnsOnlyAfterConfirmation() {
         waitFor("Вы вошли: ${auth.profile.email}"); waitFor("Добавить счет")
-        compose.onNodeWithText("Название счета").assertDoesNotExist()
+        compose.financialNode("Название счета").assertDoesNotExist()
         click("Добавить счет")
         field("Название счета", "Retained account")
         field("Начальный остаток", "invalid")
@@ -71,30 +72,30 @@ class AccountsScreenTest {
         android.os.SystemClock.sleep(500)
         if (compose.onAllNodesWithText("Сохранить измененный черновик?").fetchSemanticsNodes().isEmpty()) systemBack()
         waitFor("Сохранить измененный черновик?")
-        compose.onNodeWithText("Остаться в редакторе").performClick()
-        compose.onNodeWithText("Название счета").assertTextContains("Retained account")
+        compose.financialNode("Остаться в редакторе").performClick()
+        compose.financialNode("Название счета").assertTextContains("Retained account")
         compose.activityRule.scenario.recreate()
         waitFor("Редактор счета")
-        compose.onNodeWithText("Начальный остаток").assertTextContains("invalid")
+        compose.financialNode("Начальный остаток").assertTextContains("invalid")
         click("Вернуться к счетам")
         compose.waitUntil(10000) { compose.onAllNodes(hasText("Сохранить черновик и продолжить") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithText("Сохранить черновик и продолжить").performClick()
+        compose.financialNode("Сохранить черновик и продолжить").performClick()
         waitFor("Добавить счет")
-        compose.onNodeWithText("Редактор счета").assertDoesNotExist()
+        compose.financialNode("Редактор счета").assertDoesNotExist()
         assertEquals(0, runBlocking { api.accounts(auth.credential(origin)).size })
         click("Восстановить черновик счета 1")
-        compose.onNodeWithText("Название счета").assertTextContains("Retained account")
+        compose.financialNode("Название счета").assertTextContains("Retained account")
         field("Название счета", "Discarded account")
         click("Вернуться к счетам")
         compose.waitUntil(10000) { compose.onAllNodes(hasText("Отбросить черновик и продолжить") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithText("Отбросить черновик и продолжить").performClick()
+        compose.financialNode("Отбросить черновик и продолжить").performClick()
         waitFor("Добавить счет")
         click("Восстановить черновик счета 1")
         field("Начальный остаток", "123.456")
         click("Создать счет")
         waitFor("Изменить счет Retained account")
-        compose.onNodeWithText("Редактор счета").assertDoesNotExist()
-        compose.onNodeWithText("123,456 KWD").assertExists()
+        compose.financialNode("Редактор счета").assertDoesNotExist()
+        compose.financialNode("123,456 KWD").assertExists()
         val account = runBlocking { api.accounts(auth.credential(origin)).single() }
         assertEquals("123456", account.posted_balance_minor)
         assertNull(runBlocking { app.database.commands().get(origin, auth.profile.id, auth.workspace.id) })
@@ -115,9 +116,9 @@ class AccountsScreenTest {
             waitFor("Повторить локальное сохранение")
             click("Вернуться к счетам")
             waitFor("Сохранить измененный черновик?")
-            compose.onNodeWithText("Сохранить черновик и продолжить").assertIsNotEnabled()
-            compose.onNodeWithText("Остаться в редакторе").performClick()
-            compose.onNodeWithText("Название счета").assertTextContains("Retained during disk failure")
+            compose.financialNode("Сохранить черновик и продолжить").assertIsNotEnabled()
+            compose.financialNode("Остаться в редакторе").performClick()
+            compose.financialNode("Название счета").assertTextContains("Retained during disk failure")
             assertTrue(obstruction.delete()); assertTrue(file.delete()); assertTrue(backup.renameTo(file))
             click("Повторить локальное сохранение")
             compose.waitUntil(10000) { compose.onAllNodesWithText("Повторить локальное сохранение").fetchSemanticsNodes().isEmpty() }
@@ -138,7 +139,7 @@ class AccountsScreenTest {
         field("Начальный остаток", "123.456")
         click("Создать счет")
         waitFor("Изменить счет Android pocket")
-        compose.onNodeWithText("123,456 KWD").assertExists()
+        compose.financialNode("123,456 KWD").assertExists()
         val initial = runBlocking { api.accounts(auth.credential(origin), limit = 1).single() }
         assertEquals("123456", initial.posted_balance_minor)
         click("Изменить счет Android pocket")
@@ -160,8 +161,8 @@ class AccountsScreenTest {
         }
         click("Сохранить счет")
         waitFor("Обновить данные для новой команды")
-        compose.onNodeWithText("Выйти").assertIsNotEnabled()
-        compose.onNodeWithText("Ваш черновик: Local proposal, cash; в архив").assertExists()
+        compose.financialNode("Выйти").assertIsNotEnabled()
+        compose.financialNode("Ваш черновик: Local proposal, cash; в архив").assertExists()
         val app = ApplicationProvider.getApplicationContext<CapitalApplication>()
         val rejected = runBlocking { app.database.commands().get(origin, auth.profile.id, auth.workspace.id)!! }
         assertEquals("rejected", rejected.state)
@@ -192,8 +193,8 @@ class AccountsScreenTest {
         field("Пароль", "synthetic accounts password")
         click("Войти")
         waitFor("Продолжить сохраненную команду в этой сессии")
-        compose.onNodeWithText("Повторить сохраненную команду").assertIsNotEnabled()
-        compose.onNodeWithText("Выйти").assertIsNotEnabled()
+        compose.financialNode("Повторить сохраненную команду").assertIsNotEnabled()
+        compose.financialNode("Выйти").assertIsNotEnabled()
         click("Продолжить сохраненную команду в этой сессии")
         waitFor("Команда сохранена для текущей сессии. Проверьте черновик перед повтором.")
         val rebound = runBlocking { app.database.commands().get(origin, auth.profile.id, auth.workspace.id)!! }

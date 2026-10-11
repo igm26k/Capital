@@ -42,15 +42,15 @@ class AdjustmentsScreenTest {
             if (listOf("Изменить операцию ", "Изменить перевод ", "Изменить возврат ", "Изменить корректировку ", "Создать возврат расхода ", "Создать возврат комиссии ", "Корректировать счет ").any { text.startsWith(it) } || text in listOf("Отменить изменение операции", "Отменить изменение перевода", "Отменить создание возврата", "Отменить изменение возврата", "Отменить корректировку")) {
                 if (compose.onAllNodesWithText("Сохранить измененный черновик?").fetchSemanticsNodes().isNotEmpty()) {
                     compose.waitUntil(10000) { compose.onAllNodes(hasText("Отбросить черновик и продолжить") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
-                    compose.onNodeWithText("Отбросить черновик и продолжить").performClick()
+                    compose.financialNode("Отбросить черновик и продолжить").performClick()
                 }
             }
         }
     private fun field(label: String, value: String) {
         compose.operationField(label).performScrollTo().performTextClearance()
-        compose.onNodeWithText(label).performTextInput(value)
+        compose.financialNode(label).performTextInput(value)
     }
-    private fun waitFor(text: String) = compose.waitUntil(30000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
+    private fun waitFor(text: String) = run { compose.prepareFinancialSection(text); compose.waitUntil(30000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() } }
     private fun history() = runBlocking { api.transactions(auth.credential(origin)) }
     private fun current() = runBlocking { api.accounts(auth.credential(origin)).single { it.id == account.id } }
     private fun load() {
@@ -62,7 +62,7 @@ class AdjustmentsScreenTest {
     }
     @Test fun separateAdjustmentEditorGuardsBackAndReturnsAfterConfirmation() {
         load()
-        compose.onNodeWithText("Фактический остаток").assertDoesNotExist()
+        compose.financialNode("Фактический остаток").assertDoesNotExist()
         click("Корректировать счет Adjustment cash · KWD")
         field("Фактический остаток", "invalid")
         field("Причина корректировки", "Retained count")
@@ -74,27 +74,27 @@ class AdjustmentsScreenTest {
         fun choose(text: String) {
             waitFor("Сохранить измененный черновик?")
             compose.waitUntil(10000) { compose.onAllNodes(hasText(text) and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
-            compose.onNodeWithText(text).performClick()
+            compose.financialNode(text).performClick()
         }
         back(); android.os.SystemClock.sleep(500)
         if (compose.onAllNodesWithText("Сохранить измененный черновик?").fetchSemanticsNodes().isEmpty()) back()
         choose("Остаться в редакторе")
         compose.activityRule.scenario.recreate()
         waitFor("Вернуться к истории корректировок")
-        compose.onNodeWithText("Причина корректировки").assertTextContains("Retained count")
+        compose.financialNode("Причина корректировки").assertTextContains("Retained count")
         click("Вернуться к истории корректировок"); choose("Сохранить черновик и продолжить")
         assertEquals(1, history().size)
         assertEquals("100000", current().posted_balance_minor)
         assertNull(runBlocking { app.database.commands().get(origin, auth.profile.id, auth.workspace.id) })
         click("Восстановить черновик корректировки 1")
-        compose.onNodeWithText("Фактический остаток").assertTextContains("invalid")
+        compose.financialNode("Фактический остаток").assertTextContains("invalid")
         field("Примечание корректировки", "Discard adjustment")
         click("Вернуться к истории корректировок"); choose("Отбросить черновик и продолжить")
         click("Восстановить черновик корректировки 1")
         field("Фактический остаток", "-1.234")
         click("Сохранить корректировку")
         waitFor("Изменить корректировку Retained adjustment")
-        compose.onNodeWithText("Вернуться к истории корректировок").assertDoesNotExist()
+        compose.financialNode("Вернуться к истории корректировок").assertDoesNotExist()
         assertEquals("-1234", current().posted_balance_minor)
         val saved = history().single { it.kind == "adjustment" }
         assertEquals("-101234", saved.entries.single().amount_minor)
@@ -105,7 +105,7 @@ class AdjustmentsScreenTest {
         field("Примечание корректировки", "Edited adjustment")
         click("Сохранить примечание корректировки")
         waitFor("Изменить корректировку Edited adjustment")
-        compose.onNodeWithText("Вернуться к истории корректировок").assertDoesNotExist()
+        compose.financialNode("Вернуться к истории корректировок").assertDoesNotExist()
         val edited = history().single { it.id == saved.id }
         assertEquals(saved.entries, edited.entries)
         assertEquals(saved.reason, edited.reason)
@@ -123,7 +123,7 @@ class AdjustmentsScreenTest {
         waitFor("Проверьте остаток, причину, часовой пояс и длину текста. Остаток должен измениться.")
         assertEquals(0, history().count { it.kind == "adjustment" })
         field("Фактический остаток", "-1.234")
-        compose.onNodeWithText("Разница нового остатка: −101,234 KWD").assertExists()
+        compose.financialNode("Разница нового остатка: −101,234 KWD").assertExists()
         field("Примечание корректировки", "Negative cash")
         field("Часовой пояс корректировки", "Europe/Nicosia")
         click("Сохранить корректировку")
@@ -145,13 +145,13 @@ class AdjustmentsScreenTest {
         assertEquals("2", decodeResponse<AdjustmentCreate>(command.body).expected_balance_version)
         assertEquals("0", decodeResponse<AdjustmentCreate>(command.body).target_balance_minor)
         assertEquals("-234", current().posted_balance_minor)
-        compose.onNodeWithText("Выйти").assertIsNotEnabled()
+        compose.financialNode("Выйти").assertIsNotEnabled()
         compose.activityRule.scenario.recreate()
-        compose.onNodeWithText("Фактический остаток").assertTextContains("0,000")
-        compose.onNodeWithText("Причина корректировки").assertTextContains("Cash count")
+        compose.financialNode("Фактический остаток").assertTextContains("0,000")
+        compose.financialNode("Причина корректировки").assertTextContains("Cash count")
         click("Обновить данные для новой команды")
         waitFor("Версия остатка на сервере: 3; черновика: 2")
-        compose.onNodeWithText("Разница нового остатка: 0,234 KWD").assertExists()
+        compose.financialNode("Разница нового остатка: 0,234 KWD").assertExists()
         assertEquals(1, history().count { it.kind == "adjustment" })
         click("Использовать обновленную версию остатка")
         click("Сохранить корректировку")
@@ -185,8 +185,8 @@ class AdjustmentsScreenTest {
         click("Обновить счета")
         waitFor("Сохраненная команда: ${command.commandId}")
         waitFor("Корректируемый счет: Adjustment cash")
-        compose.onNodeWithText("Фактический остаток").assertTextContains("120,000")
-        compose.onNodeWithText("Причина корректировки").assertTextContains("Repeated count")
+        compose.financialNode("Фактический остаток").assertTextContains("120,000")
+        compose.financialNode("Причина корректировки").assertTextContains("Repeated count")
         assertEquals(body, runBlocking { app.database.commands().get(origin, auth.profile.id, auth.workspace.id)!!.body })
         click("Повторить сохраненную команду")
         waitFor("Изменить корректировку Replay adjustment")
@@ -194,14 +194,14 @@ class AdjustmentsScreenTest {
         assertEquals(applied.occurred_at, history().single { it.id == draft.id }.occurred_at)
         assertEquals("120000", current().posted_balance_minor)
         click("Изменить корректировку Replay adjustment")
-        compose.onNodeWithText("Фактический остаток").assertDoesNotExist()
+        compose.financialNode("Фактический остаток").assertDoesNotExist()
         val balanceVersion = current().balance_version
         runBlocking { mutate("transactions/${draft.id}", "PUT", ApiClient.json.encodeToString(AdjustmentReplace("adjustment", applied.version, "Remote adjustment note"))) }
         field("Примечание корректировки", "Local adjustment note")
         click("Сохранить примечание корректировки")
         waitFor("Изменение отклонено: version_conflict. Обновите данные и проверьте черновик.")
         compose.activityRule.scenario.recreate()
-        compose.onNodeWithText("Примечание корректировки").assertTextContains("Local adjustment note")
+        compose.financialNode("Примечание корректировки").assertTextContains("Local adjustment note")
         click("Обновить данные для новой команды")
         waitFor("Версия корректировки на сервере: 2; черновика: 1")
         click("Использовать обновленную версию корректировки")

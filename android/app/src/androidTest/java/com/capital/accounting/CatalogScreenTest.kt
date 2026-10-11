@@ -48,25 +48,27 @@ class CatalogScreenTest {
             assertEquals(2, api.tags(auth.credential(origin), limit = 1).size)
         }
         compose.waitUntil(30000) { compose.onAllNodesWithText("Вы вошли: ${auth.profile.email}").fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithText("Обновить категории и теги").performScrollTo().performClick()
+        compose.financialNode("Обновить категории и теги").performScrollTo().performClick()
+        compose.prepareFinancialSection("Категория: Home / Food")
         compose.waitUntil(30000) { compose.onAllNodesWithText("Категория: Home / Food").fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithText("Тег: <svg onload=alert(1)>").assertExists()
-        compose.onNodeWithText("Тег: Shared").assertExists()
+        compose.financialNode("Тег: <svg onload=alert(1)>").assertExists()
+        compose.financialNode("Тег: Shared").assertExists()
         compose.activityRule.scenario.recreate()
-        compose.onNodeWithText("Категория: Home / Food").assertExists()
+        compose.financialNode("Категория: Home / Food").assertExists()
         fun click(text: String) = compose.operationNode(text).performScrollTo().performClick().also {
             if (text == "Отменить изменение операции" || text.startsWith("Изменить операцию ") || text.startsWith("Изменить категорию ") || text.startsWith("Изменить тег ") || text == "Новая категория" || text == "Новый тег") {
                 if (compose.onAllNodesWithText("Сохранить измененный черновик?").fetchSemanticsNodes().isNotEmpty()) {
                     compose.waitUntil(10000) { compose.onAllNodes(hasText("Отбросить черновик и продолжить") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
-                    compose.onNodeWithText("Отбросить черновик и продолжить").performClick()
+                    compose.financialNode("Отбросить черновик и продолжить").performClick()
                 }
             }
         }
         fun field(label: String, value: String) {
             compose.operationField(label).performScrollTo().performTextClearance()
-            compose.onNodeWithText(label).performTextInput(value)
+            compose.financialNode(label).performTextInput(value)
         }
         click("Обновить счета")
+        compose.prepareFinancialSection("Для операции: Split cash · KWD")
         compose.waitUntil(30000) { compose.onAllNodesWithText("Для операции: Split cash · KWD").fetchSemanticsNodes().isNotEmpty() }
         field("Сумма операции", "12.345")
         field("Примечание операции", "Split expense")
@@ -119,16 +121,16 @@ class CatalogScreenTest {
         }
         fun field(label: String, value: String) {
             compose.operationField(label).performScrollTo().performTextClearance()
-            compose.onNodeWithText(label).performTextInput(value)
+            compose.financialNode(label).performTextInput(value)
         }
-        fun waitFor(text: String) = compose.waitUntil(30000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
+        fun waitFor(text: String) = run { compose.prepareFinancialSection(text); compose.waitUntil(30000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() } }
         fun choose(text: String) {
             waitFor("Сохранить измененный черновик?")
             compose.waitUntil(10000) { compose.onAllNodes(hasText(text) and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
             compose.operationNode(text).performClick()
         }
         waitFor("Вы вошли: ${auth.profile.email}"); waitFor("Новая категория")
-        compose.onNodeWithText("Название категории").assertDoesNotExist()
+        compose.financialNode("Название категории").assertDoesNotExist()
         click("Обновить категории и теги"); waitFor("Категория: Home / Food")
         click("Новая категория")
         field("Название категории", "Retained category")
@@ -142,11 +144,11 @@ class CatalogScreenTest {
         choose("Остаться в редакторе")
         compose.activityRule.scenario.recreate()
         waitFor("Редактор категории")
-        compose.onNodeWithText("Название категории").assertTextContains("Retained category")
-        compose.onNodeWithText("Родитель: Home").assertExists()
+        compose.financialNode("Название категории").assertTextContains("Retained category")
+        compose.financialNode("Родитель: Home").assertExists()
         click("Вернуться к категориям и тегам"); choose("Сохранить черновик и продолжить")
         waitFor("Открыть черновик классификации")
-        compose.onNodeWithText("Редактор категории").assertDoesNotExist()
+        compose.financialNode("Редактор категории").assertDoesNotExist()
         assertEquals(2, runBlocking { api.categories(auth.credential(origin)).size })
         click("Восстановить черновик классификации 1")
         field("Название категории", "Discard category")
@@ -154,15 +156,15 @@ class CatalogScreenTest {
         click("Восстановить черновик классификации 1")
         click("Сохранить категорию")
         waitFor("Категория: Home / Retained category")
-        compose.onNodeWithText("Редактор категории").assertDoesNotExist()
+        compose.financialNode("Редактор категории").assertDoesNotExist()
         click("Новый тег")
         field("Название тега", "Retained tag")
         click("Вернуться к категориям и тегам"); choose("Сохранить черновик и продолжить")
         click("Восстановить черновик классификации 2")
-        compose.onNodeWithText("Название тега").assertTextContains("Retained tag")
+        compose.financialNode("Название тега").assertTextContains("Retained tag")
         click("Сохранить тег")
         waitFor("Тег: Retained tag")
-        compose.onNodeWithText("Редактор тега").assertDoesNotExist()
+        compose.financialNode("Редактор тега").assertDoesNotExist()
         assertEquals(3, runBlocking { api.categories(auth.credential(origin)).size })
         assertEquals(3, runBlocking { api.tags(auth.credential(origin)).size })
         val app = ApplicationProvider.getApplicationContext<CapitalApplication>()
@@ -173,15 +175,15 @@ class CatalogScreenTest {
             if (text == "Отменить изменение операции" || text.startsWith("Изменить операцию ") || text.startsWith("Изменить категорию ") || text.startsWith("Изменить тег ") || text == "Новая категория" || text == "Новый тег") {
                 if (compose.onAllNodesWithText("Сохранить измененный черновик?").fetchSemanticsNodes().isNotEmpty()) {
                     compose.waitUntil(10000) { compose.onAllNodes(hasText("Отбросить черновик и продолжить") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
-                    compose.onNodeWithText("Отбросить черновик и продолжить").performClick()
+                    compose.financialNode("Отбросить черновик и продолжить").performClick()
                 }
             }
         }
         fun field(label: String, value: String) {
             compose.operationField(label).performScrollTo().performTextClearance()
-            compose.onNodeWithText(label).performTextInput(value)
+            compose.financialNode(label).performTextInput(value)
         }
-        fun waitFor(text: String) = compose.waitUntil(30000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
+        fun waitFor(text: String) = run { compose.prepareFinancialSection(text); compose.waitUntil(30000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() } }
         fun categories() = runBlocking { api.categories(auth.credential(origin)) }
         fun tags() = runBlocking { api.tags(auth.credential(origin)) }
         waitFor("Вы вошли: ${auth.profile.email}")
@@ -226,9 +228,9 @@ class CatalogScreenTest {
         val draft = decodeResponse<TagUpdate>(rejected.body)
         assertEquals(tag.version, draft.expected_version)
         assertEquals("Local tag", draft.name)
-        compose.onNodeWithText("Выйти").assertIsNotEnabled()
+        compose.financialNode("Выйти").assertIsNotEnabled()
         compose.activityRule.scenario.recreate()
-        compose.onNodeWithText("Название тега").assertTextContains("Local tag")
+        compose.financialNode("Название тега").assertTextContains("Local tag")
         click("Обновить данные для новой команды")
         waitFor("Данные обновлены. Проверьте поля перед новой командой.")
         click("Использовать обновленную версию классификации")
@@ -245,7 +247,7 @@ class CatalogScreenTest {
         assertNull(tags().single { it.id == tag.id }.archived_at)
         assertNull(runBlocking { app.database.commands().get(origin, auth.profile.id, auth.workspace.id) })
         compose.activityRule.scenario.recreate()
-        compose.onNodeWithText("Тег: Local tag").assertExists()
+        compose.financialNode("Тег: Local tag").assertExists()
     }
 
     @Test fun categoryConflictAndCycleKeepRejectedDraftWithoutAutomaticWrite() {
@@ -253,11 +255,11 @@ class CatalogScreenTest {
             if (text == "Отменить изменение операции" || text.startsWith("Изменить операцию ") || text.startsWith("Изменить категорию ") || text.startsWith("Изменить тег ") || text == "Новая категория" || text == "Новый тег") {
                 if (compose.onAllNodesWithText("Сохранить измененный черновик?").fetchSemanticsNodes().isNotEmpty()) {
                     compose.waitUntil(10000) { compose.onAllNodes(hasText("Отбросить черновик и продолжить") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
-                    compose.onNodeWithText("Отбросить черновик и продолжить").performClick()
+                    compose.financialNode("Отбросить черновик и продолжить").performClick()
                 }
             }
         }
-        fun waitFor(text: String) = compose.waitUntil(30000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
+        fun waitFor(text: String) = run { compose.prepareFinancialSection(text); compose.waitUntil(30000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() } }
         fun categories() = runBlocking { api.categories(auth.credential(origin)) }
         waitFor("Вы вошли: ${auth.profile.email}")
         click("Обновить категории и теги")
@@ -265,8 +267,8 @@ class CatalogScreenTest {
         val home = categories().single { it.name == "Home" }
         val food = categories().single { it.name == "Food" }
         click("Изменить категорию Home / Food")
-        compose.onNodeWithText("Название категории").performScrollTo().performTextClearance()
-        compose.onNodeWithText("Название категории").performTextInput("Local food")
+        compose.financialNode("Название категории").performScrollTo().performTextClearance()
+        compose.financialNode("Название категории").performTextInput("Local food")
         runBlocking {
             api.request("/workspaces/${auth.workspace.id}/categories/${food.id}", "PUT", ApiClient.json.encodeToString(CategoryUpdate(food.version, "Server food", false, home.id)), auth.credential(origin), UUID.randomUUID().toString(), auth.workspace.sync_generation_id)
         }
@@ -278,7 +280,7 @@ class CatalogScreenTest {
         assertEquals("Local food", decodeResponse<CategoryUpdate>(rejected.body).name)
         assertEquals("Server food", categories().single { it.id == food.id }.name)
         compose.activityRule.scenario.recreate()
-        compose.onNodeWithText("Название категории").assertTextContains("Local food")
+        compose.financialNode("Название категории").assertTextContains("Local food")
         click("Обновить данные для новой команды")
         waitFor("Данные обновлены. Проверьте поля перед новой командой.")
         assertEquals("2", categories().single { it.id == food.id }.version)

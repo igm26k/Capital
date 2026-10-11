@@ -26,14 +26,14 @@ def wait_text(text, seconds=45):
     deadline = time.monotonic() + seconds
     while time.monotonic() < deadline:
         tree = screen()
-        matches = [node for node in tree.iter('node') if node.get('text') == text]
+        matches = [node for node in tree.iter('node') if (node.get('text') == text or node.get('content-desc') == text)]
         if matches: return matches[0]
         time.sleep(1)
     raise RuntimeError('Expected auth UI state was not reached; no credential/body logged')
 def tap(text, scroll=False):
     if scroll:
         for _ in range(8):
-            matches = [node for node in screen().iter('node') if node.get('text') == text and node.get('enabled') == 'true']
+            matches = [node for node in screen().iter('node') if (node.get('text') == text or node.get('content-desc') == text) and node.get('enabled') == 'true']
             if matches: break
             device('shell', 'input', 'swipe', '500', '1500', '500', '500', '400')
         else: raise RuntimeError('Device action not visible')
@@ -45,6 +45,7 @@ def restart():
     device('shell', 'am', 'start', '-W', '-n', package+'/.MainActivity')
 restart()
 wait_text('Вы вошли: '+proof['email'])
+tap('Раздел Еще')
 tap('Обновить устройства', scroll=True)
 # Save the exact target before a real outage; cold restart must retain it.
 time.sleep(2)

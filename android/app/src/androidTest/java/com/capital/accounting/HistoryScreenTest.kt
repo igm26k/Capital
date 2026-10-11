@@ -54,15 +54,15 @@ class HistoryScreenTest {
             if (text == "Отменить изменение операции" || text.startsWith("Изменить операцию ")) {
                 if (compose.onAllNodesWithText("Сохранить измененный черновик?").fetchSemanticsNodes().isNotEmpty()) {
                     compose.waitUntil(10000) { compose.onAllNodes(hasText("Отбросить черновик и продолжить") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
-                    compose.onNodeWithText("Отбросить черновик и продолжить").performClick()
+                    compose.financialNode("Отбросить черновик и продолжить").performClick()
                 }
             }
         }
     private fun field(label: String, value: String) {
         compose.operationField(label).performScrollTo().performTextClearance()
-        compose.onNodeWithText(label).performTextInput(value)
+        compose.financialNode(label).performTextInput(value)
     }
-    private fun waitFor(text: String) = compose.waitUntil(30000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
+    private fun waitFor(text: String) = run { compose.prepareFinancialSection(text); compose.waitUntil(30000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() } }
     private fun filter() = TransactionFilter(cash.id, category.id, tag.id, first.occurred_at, "2026-10-06T08:10:00.000003Z", "expense", "posted", "Поиск & +%")
     @Test fun realCombinedFilterPagesExactBoundsAndForeignResourceRejection() = runBlocking<Unit> {
         val page = api.transactionPage(auth.credential(origin), filter(), 1)
@@ -105,14 +105,14 @@ class HistoryScreenTest {
         field("Операций на странице (1–100)", "1")
         click("Применить фильтры истории")
         waitFor("Показано операций: 1")
-        compose.onNodeWithText("Расход · −2,000 KWD · Поиск & +% B").assertExists()
-        compose.onNodeWithText("Расход · −1,000 KWD · Поиск & +% A").assertDoesNotExist()
-        compose.onNodeWithText("Доход · 0,500 KWD · History salary").assertDoesNotExist()
-        compose.onNodeWithText("Создать возврат расхода Поиск & +% A").assertExists()
+        compose.financialNode("Расход · −2,000 KWD · Поиск & +% B").assertExists()
+        compose.financialNode("Расход · −1,000 KWD · Поиск & +% A").assertDoesNotExist()
+        compose.financialNode("Доход · 0,500 KWD · History salary").assertDoesNotExist()
+        compose.financialNode("Создать возврат расхода Поиск & +% A").assertExists()
         click("Следующая страница истории")
         waitFor("Показано операций: 2")
-        compose.onNodeWithText("Расход · −1,000 KWD · Поиск & +% A").assertExists()
-        compose.onNodeWithText("Следующая страница истории").assertDoesNotExist()
+        compose.financialNode("Расход · −1,000 KWD · Поиск & +% A").assertExists()
+        compose.financialNode("Следующая страница истории").assertDoesNotExist()
         click("Изменить операцию Поиск & +% A")
         field("Примечание операции", "Поиск & +% Changed")
         click("Сохранить изменения операции")
@@ -120,23 +120,23 @@ class HistoryScreenTest {
         assertEquals("Поиск & +% Changed", runBlocking { api.transactions(auth.credential(origin)).single { it.id == first.id }.note })
         click("Следующая страница истории")
         waitFor("Показано операций: 2")
-        compose.onNodeWithText("Расход · −1,000 KWD · Поиск & +% Changed").assertExists()
+        compose.financialNode("Расход · −1,000 KWD · Поиск & +% Changed").assertExists()
         compose.activityRule.scenario.recreate()
         waitFor("Показано операций: 2")
         click("Фильтры истории")
-        compose.onNodeWithText("Поиск по примечанию и получателю").assertTextContains("Поиск & +%")
+        compose.financialNode("Поиск по примечанию и получателю").assertTextContains("Поиск & +%")
         field("История от (UTC)", "2026-10-06T08:10:00.000003Z")
         click("Применить фильтры истории")
         waitFor("Проверьте UTC-период, длину поиска и размер страницы. Начало должно быть раньше окончания.")
-        compose.onNodeWithText("Показано операций: 2").assertExists()
+        compose.financialNode("Показано операций: 2").assertExists()
         field("История от (UTC)", first.occurred_at)
         field("Поиск по примечанию и получателю", "No matching transaction")
         click("Применить фильтры истории")
         waitFor("По фильтрам операций нет. Измените или сбросьте фильтры.")
         click("Сбросить фильтры истории")
         waitFor("Доход · 0,500 KWD · History salary")
-        compose.onNodeWithText("Расход · −1,000 KWD · Поиск & +% Changed").assertExists()
-        compose.onNodeWithText("Расход · −1,00 USD · Поиск & +% USD").assertExists()
+        compose.financialNode("Расход · −1,000 KWD · Поиск & +% Changed").assertExists()
+        compose.financialNode("Расход · −1,00 USD · Поиск & +% USD").assertExists()
         assertEquals("97500", runBlocking { api.accounts(auth.credential(origin)).single { it.id == cash.id }.posted_balance_minor })
     }
 }

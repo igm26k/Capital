@@ -64,7 +64,7 @@ fun AdjustmentPanel(model: AuthViewModel) {
             accountId = state.transactions.find { it.id == editingId }?.entries?.singleOrNull()?.account_id
         }
     }
-    if (!editorOpen) {
+    if (!editorOpen && LocalFinancialSection.current.value == "operations") {
         Text("Корректировки", style = MaterialTheme.typography.titleLarge)
         TextButton(enabled = enabled && !scope.saving, onClick = { navigation.value = "adjustment" }) { Text("Открыть черновик корректировки") }
         DraftGuardControls(guard, "adjustment", enabled) { navigation.value = "adjustment" }
@@ -76,7 +76,7 @@ fun AdjustmentPanel(model: AuthViewModel) {
                 error = ""
              } }) { Text("Корректировать счет ${item.name} · ${item.currency}") }
         }
-    } else FinancialEditorScreen(model, "adjustment", guard, "Вернуться к истории корректировок", ::close) {
+    } else if (editorOpen) FinancialEditorScreen(model, "adjustment", guard, "Вернуться к истории корректировок", ::close) {
         Text(if (editingId == null) "Корректировка остатка" else "Изменение примечания корректировки", style = MaterialTheme.typography.titleLarge)
         if (editingId == null) {
             Text("Укажите фактический остаток. Сервер вычислит разницу и зафиксирует текущее время.")
@@ -127,15 +127,17 @@ fun AdjustmentPanel(model: AuthViewModel) {
             TextButton(enabled = enabled, onClick = { guard.request { reset(); navigation.value = null } }) { Text("Отменить корректировку") }
         }
     }
-    deleting?.let { item ->
-        Text("Удалить корректировку: ${item.note}")
-        Text("Разница корректировки будет исключена из остатка счета.")
-        Button(enabled = enabled && state.transactions.any { it.id == item.id }, onClick = { model.submitTransaction(ApiClient.json.encodeToString(TransactionDelete(item.version, emptyList())), item.id, delete = true); deleting = null }) { Text("Подтвердить удаление корректировки") }
-        TextButton(enabled = enabled, onClick = { deleting = null }) { Text("Отменить удаление корректировки") }
-    }
-    state.transactions.filter { it.kind == "adjustment" }.forEach { item ->
-        val active = state.accounts.any { it.id == item.entries.single().account_id && it.archived_at == null && it.deleted_at == null }
-        TextButton(enabled = enabled && active, onClick = { guard.request { editingId = item.id; editingVersion = item.version; accountId = item.entries.single().account_id; note = item.note; error = ""; navigation.value = "adjustment"  } }) { Text("Изменить корректировку ${item.note}") }
-        TextButton(enabled = enabled && active, onClick = { deleting = item }) { Text("Удалить корректировку ${item.note}") }
+    if (LocalFinancialSection.current.value == "operations") {
+        deleting?.let { item ->
+            Text("Удалить корректировку: ${item.note}")
+            Text("Разница корректировки будет исключена из остатка счета.")
+            Button(enabled = enabled && state.transactions.any { it.id == item.id }, onClick = { model.submitTransaction(ApiClient.json.encodeToString(TransactionDelete(item.version, emptyList())), item.id, delete = true); deleting = null }) { Text("Подтвердить удаление корректировки") }
+            TextButton(enabled = enabled, onClick = { deleting = null }) { Text("Отменить удаление корректировки") }
+        }
+        state.transactions.filter { it.kind == "adjustment" }.forEach { item ->
+            val active = state.accounts.any { it.id == item.entries.single().account_id && it.archived_at == null && it.deleted_at == null }
+            TextButton(enabled = enabled && active, onClick = { guard.request { editingId = item.id; editingVersion = item.version; accountId = item.entries.single().account_id; note = item.note; error = ""; navigation.value = "adjustment"  } }) { Text("Изменить корректировку ${item.note}") }
+            TextButton(enabled = enabled && active, onClick = { deleting = item }) { Text("Удалить корректировку ${item.note}") }
+        }
     }
 }

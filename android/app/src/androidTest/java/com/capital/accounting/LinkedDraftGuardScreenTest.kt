@@ -54,18 +54,19 @@ class LinkedDraftGuardScreenTest {
     @get:Rule(order = 1) val compose = createAndroidComposeRule<MainActivity>()
     private suspend fun mutate(path: String, method: String, body: String) = decodeResponse<MutationResult>(api.request("/workspaces/${auth.workspace.id}/$path", method, body, auth.credential(origin), UUID.randomUUID().toString(), auth.workspace.sync_generation_id))
     private fun click(text: String) {
-        if (text == "Остаться в редакторе") compose.onNodeWithText(text).performClick()
-        else compose.onNodeWithText(text).performScrollTo().performClick()
+        compose.prepareFinancialSection(text)
+        if (text == "Остаться в редакторе") compose.financialNode(text).performClick()
+        else compose.financialNode(text).performScrollTo().performClick()
     }
     private fun field(label: String, value: String) {
-        compose.onNodeWithText(label).performScrollTo().performTextClearance()
-        compose.onNodeWithText(label).performTextInput(value)
+        compose.financialNode(label).performScrollTo().performTextClearance()
+        compose.financialNode(label).performTextInput(value)
     }
-    private fun waitFor(text: String) = compose.waitUntil(30000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
+    private fun waitFor(text: String) = run { compose.prepareFinancialSection(text); compose.waitUntil(30000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() } }
     private fun choose(text: String) {
         waitFor("Сохранить измененный черновик?")
         compose.waitUntil(10000) { compose.onAllNodes(hasText(text) and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithText(text).performClick()
+        compose.financialNode(text).performClick()
     }
     @Test fun realLinkedDraftsKeepFeeParentAndBalanceVersionsAcrossSaveRestoreDiscard() {
         waitFor("Вы вошли: ${auth.profile.email}"); waitFor("Обновить счета")
@@ -77,8 +78,8 @@ class LinkedDraftGuardScreenTest {
         click("Отменить изменение перевода")
         choose("Сохранить черновик и продолжить")
         click("Восстановить черновик перевода 1")
-        compose.onNodeWithText("Примечание комиссии перевода").assertTextContains("Retained fee")
-        compose.onNodeWithText("Примечание перевода").assertTextContains("Retained transfer")
+        compose.financialNode("Примечание комиссии перевода").assertTextContains("Retained fee")
+        compose.financialNode("Примечание перевода").assertTextContains("Retained transfer")
         field("Примечание перевода", "Discard transfer")
         click("Отменить изменение перевода"); choose("Отбросить черновик и продолжить")
         click("Изменить возврат Detail refund")
@@ -86,21 +87,21 @@ class LinkedDraftGuardScreenTest {
         field("Сумма части возврата 1", "0.001")
         click("Отменить изменение возврата"); choose("Сохранить черновик и продолжить")
         click("Восстановить черновик возврата 1")
-        compose.onNodeWithText("Примечание возврата").assertTextContains("Retained refund")
-        compose.onNodeWithText("Сумма части возврата 1").assertTextContains("0.001")
+        compose.financialNode("Примечание возврата").assertTextContains("Retained refund")
+        compose.financialNode("Сумма части возврата 1").assertTextContains("0.001")
         click("Вернуться к истории возвратов")
         click("Корректировать счет Detail cash · KWD")
         field("Фактический остаток", "-1.234")
         field("Причина корректировки", "Retained reason")
         click("Отменить корректировку"); choose("Сохранить черновик и продолжить")
         click("Восстановить черновик корректировки 1")
-        compose.onNodeWithText("Фактический остаток").assertTextContains("-1.234")
-        compose.onNodeWithText("Причина корректировки").assertTextContains("Retained reason")
+        compose.financialNode("Фактический остаток").assertTextContains("-1.234")
+        compose.financialNode("Причина корректировки").assertTextContains("Retained reason")
         click("Вернуться к истории корректировок")
         click("Восстановить черновик перевода 1")
         compose.activityRule.scenario.recreate()
-        compose.onNodeWithText("Примечание перевода").assertTextContains("Retained transfer")
-        compose.onNodeWithText("Примечание комиссии перевода").assertTextContains("Retained fee")
+        compose.financialNode("Примечание перевода").assertTextContains("Retained transfer")
+        compose.financialNode("Примечание комиссии перевода").assertTextContains("Retained fee")
         waitFor("Локальные черновики сохранены. Отправка операций выполняется отдельно.")
         val scope = runBlocking { com.capital.accounting.finance.FinancialDrafts(app).open(origin, auth.profile.id, auth.workspace.id) }
         val original = runBlocking { api.transactions(auth.credential(origin)).associateBy { it.id } }

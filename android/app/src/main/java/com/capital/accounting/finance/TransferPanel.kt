@@ -126,7 +126,7 @@ fun TransferPanel(model: AuthViewModel) {
             if (currency != null) feeParts = fee.allocations.map { AllocationDraft(it.id, it.category_id, Money.display(it.amount_minor, currency).removeSuffix(" $currency")) }
         }
     }
-    if (!editorOpen) {
+    if (!editorOpen && LocalFinancialSection.current.value == "operations") {
         Text("Переводы", style = MaterialTheme.typography.titleLarge)
         Button(enabled = enabled && !scope.saving, onClick = { guard.request { reset(); navigation.value = "transfer" } }) { Text("Новый перевод") }
         TextButton(enabled = enabled && !scope.saving, onClick = { navigation.value = "transfer" }) { Text("Открыть черновик перевода") }
@@ -134,7 +134,7 @@ fun TransferPanel(model: AuthViewModel) {
             TextButton(enabled = enabled && !scope.saving, onClick = { guard.request { reset(); sourceId = item.id; navigation.value = "transfer" } }) { Text("Списать со счета: ${item.name} · ${item.currency}") }
         }
         DraftGuardControls(guard, "transfer", enabled) { navigation.value = "transfer" }
-    } else FinancialEditorScreen(model, "transfer", guard, "Вернуться к истории переводов", ::close) {
+    } else if (editorOpen) FinancialEditorScreen(model, "transfer", guard, "Вернуться к истории переводов", ::close) {
         Text(if (editingId == null) "Новый перевод" else "Изменение перевода", style = MaterialTheme.typography.titleLarge)
         accounts.forEach { item ->
             TextButton(enabled = enabled && (editingId == null || sourceCurrency == item.currency), onClick = { sourceId = item.id }) { Text("Списать со счета: ${item.name} · ${item.currency}") }
@@ -228,35 +228,37 @@ fun TransferPanel(model: AuthViewModel) {
         }
         state.transactionConflict?.takeIf { it.kind == "transfer" }?.let { Text("Перевод на сервере: ${it.note}; версия ${it.version}") }
     }
-    deleting?.let { transfer ->
-        Text("Удалить перевод: ${transfer.note}")
-        Text("Списание и зачисление будут исключены из остатков.")
-        deletingFee?.let { Text("Вместе с переводом будет удалена комиссия: ${it.note}; ${it.entries.joinToString { entry -> Money.display(entry.amount_minor, entry.currency) }}") }
-        state.transactions.filter { it.kind == "refund" && it.parent_transaction_id in listOf(transfer.id, transfer.fee_transaction_id) }.forEach { Text("Зависимый возврат: ${it.note}. Сначала удалите возврат.") }
-        Button(enabled = enabled && state.transactions.any { it.id == transfer.id } && (transfer.fee_transaction_id == null || deletingFee?.id == transfer.fee_transaction_id), onClick = {
-            val related = deletingFee?.let { listOf(VersionExpectation(it.id, it.version)) } ?: emptyList()
-            model.submitTransaction(ApiClient.json.encodeToString(TransactionDelete(transfer.version, related)), transfer.id, delete = true)
-            deleting = null; deletingFee = null
-        }) { Text("Подтвердить удаление перевода") }
-        TextButton(enabled = enabled, onClick = { deleting = null; deletingFee = null }) { Text("Отменить удаление перевода") }
-    }
-    state.transactions.filter { it.kind == "transfer" }.forEach { transfer ->
-        TextButton(enabled = enabled && (transfer.fee_transaction_id == null || state.transactions.any { it.id == transfer.fee_transaction_id }), onClick = { guard.request {
-                val from = transfer.entries.single { it.amount_minor.startsWith("-") }
-                val to = transfer.entries.single { !it.amount_minor.startsWith("-") }
-                val fee = state.transactions.find { it.id == transfer.fee_transaction_id }
-                editingId = transfer.id; editingVersion = transfer.version; expectedFeeVersion = fee?.version; feeAnchorId = transfer.fee_transaction_id
-                sourceId = from.account_id; targetId = to.account_id; sourceCurrency = from.currency; targetCurrency = to.currency
-                sourceAmount = Money.display(from.amount_minor.removePrefix("-"), from.currency).removeSuffix(" ${from.currency}")
-                targetAmount = Money.display(to.amount_minor, to.currency).removeSuffix(" ${to.currency}")
-                note = transfer.note; payee = transfer.payee; tags = transfer.tag_ids; zone = transfer.occurred_timezone; occurred = openingLocal(transfer.occurred_at, zone)
-                preservedInstant = transfer.occurred_at; preservedZone = zone
-                feeEnabled = fee != null; feeCurrency = fee?.entries?.single()?.currency; feeDraftId = fee?.id ?: UUID.randomUUID().toString()
-                feeAccountId = fee?.entries?.single()?.account_id; feeAmount = if (fee == null) "" else Money.display(fee.entries.single().amount_minor.removePrefix("-"), fee.entries.single().currency).removeSuffix(" ${fee.entries.single().currency}")
-                feeNote = fee?.note ?: ""; feeTags = fee?.tag_ids ?: emptyList()
-                feeParts = fee?.allocations?.map { AllocationDraft(it.id, it.category_id, Money.display(it.amount_minor, fee.entries.single().currency).removeSuffix(" ${fee.entries.single().currency}")) } ?: listOf(AllocationDraft())
-                error = ""; navigation.value = "transfer"
-            } }) { Text("Изменить перевод ${transfer.note}") }
-        TextButton(enabled = enabled, onClick = { deleting = transfer; deletingFee = state.transactions.find { it.id == transfer.fee_transaction_id } }) { Text("Удалить перевод ${transfer.note}") }
+    if (LocalFinancialSection.current.value == "operations") {
+        deleting?.let { transfer ->
+            Text("Удалить перевод: ${transfer.note}")
+            Text("Списание и зачисление будут исключены из остатков.")
+            deletingFee?.let { Text("Вместе с переводом будет удалена комиссия: ${it.note}; ${it.entries.joinToString { entry -> Money.display(entry.amount_minor, entry.currency) }}") }
+            state.transactions.filter { it.kind == "refund" && it.parent_transaction_id in listOf(transfer.id, transfer.fee_transaction_id) }.forEach { Text("Зависимый возврат: ${it.note}. Сначала удалите возврат.") }
+            Button(enabled = enabled && state.transactions.any { it.id == transfer.id } && (transfer.fee_transaction_id == null || deletingFee?.id == transfer.fee_transaction_id), onClick = {
+                val related = deletingFee?.let { listOf(VersionExpectation(it.id, it.version)) } ?: emptyList()
+                model.submitTransaction(ApiClient.json.encodeToString(TransactionDelete(transfer.version, related)), transfer.id, delete = true)
+                deleting = null; deletingFee = null
+            }) { Text("Подтвердить удаление перевода") }
+            TextButton(enabled = enabled, onClick = { deleting = null; deletingFee = null }) { Text("Отменить удаление перевода") }
+        }
+        state.transactions.filter { it.kind == "transfer" }.forEach { transfer ->
+            TextButton(enabled = enabled && (transfer.fee_transaction_id == null || state.transactions.any { it.id == transfer.fee_transaction_id }), onClick = { guard.request {
+                    val from = transfer.entries.single { it.amount_minor.startsWith("-") }
+                    val to = transfer.entries.single { !it.amount_minor.startsWith("-") }
+                    val fee = state.transactions.find { it.id == transfer.fee_transaction_id }
+                    editingId = transfer.id; editingVersion = transfer.version; expectedFeeVersion = fee?.version; feeAnchorId = transfer.fee_transaction_id
+                    sourceId = from.account_id; targetId = to.account_id; sourceCurrency = from.currency; targetCurrency = to.currency
+                    sourceAmount = Money.display(from.amount_minor.removePrefix("-"), from.currency).removeSuffix(" ${from.currency}")
+                    targetAmount = Money.display(to.amount_minor, to.currency).removeSuffix(" ${to.currency}")
+                    note = transfer.note; payee = transfer.payee; tags = transfer.tag_ids; zone = transfer.occurred_timezone; occurred = openingLocal(transfer.occurred_at, zone)
+                    preservedInstant = transfer.occurred_at; preservedZone = zone
+                    feeEnabled = fee != null; feeCurrency = fee?.entries?.single()?.currency; feeDraftId = fee?.id ?: UUID.randomUUID().toString()
+                    feeAccountId = fee?.entries?.single()?.account_id; feeAmount = if (fee == null) "" else Money.display(fee.entries.single().amount_minor.removePrefix("-"), fee.entries.single().currency).removeSuffix(" ${fee.entries.single().currency}")
+                    feeNote = fee?.note ?: ""; feeTags = fee?.tag_ids ?: emptyList()
+                    feeParts = fee?.allocations?.map { AllocationDraft(it.id, it.category_id, Money.display(it.amount_minor, fee.entries.single().currency).removeSuffix(" ${fee.entries.single().currency}")) } ?: listOf(AllocationDraft())
+                    error = ""; navigation.value = "transfer"
+                } }) { Text("Изменить перевод ${transfer.note}") }
+            TextButton(enabled = enabled, onClick = { deleting = transfer; deletingFee = state.transactions.find { it.id == transfer.fee_transaction_id } }) { Text("Удалить перевод ${transfer.note}") }
+        }
     }
 }

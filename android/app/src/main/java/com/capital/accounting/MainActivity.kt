@@ -11,6 +11,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import com.capital.accounting.finance.LocalFinancialSection
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.KeyboardType
@@ -37,59 +41,73 @@ class MainActivity : ComponentActivity() {
             var email by remember { mutableStateOf("") }
             var password by remember { mutableStateOf("") }
             var device by remember { mutableStateOf("Android") }
+            val section = rememberSaveable(state.origin, state.auth?.profile?.id, state.auth?.workspace?.id) { mutableStateOf("operations") }
             LaunchedEffect(state.auth) { if (state.auth != null) password = "" }
             MaterialTheme(colorScheme = if (isSystemInDarkTheme()) darkColorScheme() else lightColorScheme()) {
                 if (state.auth != null && state.detailStack.isNotEmpty()) TransactionDetails(model)
-                Surface(Modifier.fillMaxSize()) {
-                    Column(Modifier.safeDrawingPadding().imePadding().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                        Text("Capital", style = MaterialTheme.typography.headlineLarge)
-                        Text("Ручной учет финансов")
-                        if (state.message.isNotEmpty()) Text(state.message)
-                        if (state.busy) CircularProgressIndicator()
-                        if (state.revokePendingId != null) {
-                            Text("Устройство: ${state.revokePendingId}")
-                            Button(enabled = !state.busy, onClick = { model.revokeSession(state.revokePendingId) }) { Text("Повторить отзыв устройства") }
-                        } else if (state.logoutPending) {
-                            Button(enabled = !state.busy, onClick = model::logout) { Text("Повторить выход") }
-                        } else if (state.auth != null) {
-                            Text("Вы вошли: ${state.auth.profile.email}")
-                            Text("Пространство: ${state.auth.workspace.name}")
-                            Text("Устройство: ${state.auth.session.device_name}")
-                            Text("Сессия действует до: ${state.auth.session.expires_at}")
-                            if (!state.persisted) Button(enabled = !state.busy, onClick = model::persist) { Text("Повторить сохранение сессии") }
-                            Button(enabled = !state.busy && !state.financeBlocked, onClick = model::renew) { Text("Продлить сессию") }
-                            Button(enabled = !state.busy && !state.financeBlocked, onClick = model::logout) { Text("Выйти") }
-                            Text("Устройства", style = MaterialTheme.typography.titleLarge)
-                            Button(enabled = !state.busy && state.persisted, onClick = model::loadSessions) { Text("Обновить устройства") }
-                            state.sessions.forEach { session ->
-                                Text(session.device_name)
-                                if (session.is_current) Text("Текущее устройство")
-                                Text("Последняя активность: ${session.last_seen_at}")
-                                Button(enabled = !state.busy && state.persisted && !state.financeBlocked, onClick = { model.revokeSession(session.id) }) {
-                                    Text(if (session.is_current) "Завершить текущую сессию" else "Отключить устройство ${session.device_name}")
+                CompositionLocalProvider(LocalFinancialSection provides section) {
+                    Surface(Modifier.fillMaxSize()) {
+                        Column(Modifier.fillMaxSize()) {
+                            Column(Modifier.weight(1f).safeDrawingPadding().imePadding().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                                Text("Capital", style = MaterialTheme.typography.headlineLarge)
+                                Text("Ручной учет финансов")
+                                if (state.message.isNotEmpty()) Text(state.message)
+                                if (state.busy) CircularProgressIndicator()
+                                if (state.revokePendingId != null) {
+                                    Text("Устройство: ${state.revokePendingId}")
+                                    Button(enabled = !state.busy, onClick = { model.revokeSession(state.revokePendingId) }) { Text("Повторить отзыв устройства") }
+                                } else if (state.logoutPending) {
+                                    Button(enabled = !state.busy, onClick = model::logout) { Text("Повторить выход") }
+                                } else if (state.auth != null) {
+                                    Text("Вы вошли: ${state.auth.profile.email}")
+                                    Text("Пространство: ${state.auth.workspace.name}")
+                                    Text("Устройство: ${state.auth.session.device_name}")
+                                    Text("Сессия действует до: ${state.auth.session.expires_at}")
+                                    if (!state.persisted) Button(enabled = !state.busy, onClick = model::persist) { Text("Повторить сохранение сессии") }
+                                    Button(enabled = !state.busy && !state.financeBlocked, onClick = model::renew) { Text("Продлить сессию") }
+                                    Button(enabled = !state.busy && !state.financeBlocked, onClick = model::logout) { Text("Выйти") }
+                                    if (section.value == "more") {
+                                        Text("Устройства", style = MaterialTheme.typography.titleLarge)
+                                        Button(enabled = !state.busy && state.persisted, onClick = model::loadSessions) { Text("Обновить устройства") }
+                                        state.sessions.forEach { session ->
+                                            Text(session.device_name)
+                                            if (session.is_current) Text("Текущее устройство")
+                                            Text("Последняя активность: ${session.last_seen_at}")
+                                            Button(enabled = !state.busy && state.persisted && !state.financeBlocked, onClick = { model.revokeSession(session.id) }) {
+                                                Text(if (session.is_current) "Завершить текущую сессию" else "Отключить устройство ${session.device_name}")
+                                            }
+                                        }
+                                    }
+                                    key(state.origin, state.auth.profile.id, state.auth.workspace.id) {
+                                        FinancialDraftContent(this@MainActivity, state.origin, state.auth.profile.id, state.auth.workspace.id) {
+                                            AccountPanel(model)
+                                            CatalogPanel(model)
+                                            TransactionPanel(model)
+                                            TransferPanel(model)
+                                            RefundPanel(model)
+                                            AdjustmentPanel(model)
+                                        }
+                                    }
+                                } else {
+                                    OutlinedTextField(origin, { origin = it }, label = { Text("Адрес сервера") }, singleLine = true, modifier = Modifier.fillMaxWidth(), enabled = !state.busy)
+                                    Button(enabled = !state.busy, onClick = { model.saveOrigin(origin) }) { Text("Сохранить адрес") }
+                                    if (state.restorePending) Button(enabled = !state.busy, onClick = model::restore) { Text("Проверить сохраненную сессию") }
+                                    if (state.origin.isNotEmpty()) {
+                                        Text("Сервер: ${state.origin}")
+                                        OutlinedTextField(email, { email = it }, label = { Text("Email") }, singleLine = true, modifier = Modifier.fillMaxWidth(), enabled = !state.busy)
+                                        OutlinedTextField(password, { password = it }, label = { Text("Пароль") }, visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, autoCorrectEnabled = false), singleLine = true, modifier = Modifier.fillMaxWidth(), enabled = !state.busy)
+                                        OutlinedTextField(device, { device = it }, label = { Text("Название устройства") }, singleLine = true, modifier = Modifier.fillMaxWidth(), enabled = !state.busy)
+                                        Button(enabled = !state.busy && origin == state.origin && email.isNotBlank() && password.isNotEmpty() && device.isNotBlank(), onClick = { model.authenticate(email, password, device, false); password = "" }) { Text("Войти") }
+                                        Button(enabled = !state.busy && origin == state.origin && email.isNotBlank() && password.isNotEmpty() && device.isNotBlank(), onClick = { model.authenticate(email, password, device, true); password = "" }) { Text("Зарегистрироваться") }
+                                    }
                                 }
                             }
-                            key(state.origin, state.auth.profile.id, state.auth.workspace.id) {
-                                FinancialDraftContent(this@MainActivity, state.origin, state.auth.profile.id, state.auth.workspace.id) {
-                                    AccountPanel(model)
-                                    CatalogPanel(model)
-                                    TransactionPanel(model)
-                                    TransferPanel(model)
-                                    RefundPanel(model)
-                                    AdjustmentPanel(model)
+                            if (state.auth != null && !state.logoutPending && state.revokePendingId == null) {
+                                NavigationBar {
+                                    listOf(Triple("accounts", "Счета", "◫"), Triple("operations", "Операции", "⇄"), Triple("more", "Еще", "⋯")).forEach { (id, label, symbol) ->
+                                        NavigationBarItem(selected = section.value == id, onClick = { section.value = id }, icon = { Text(symbol) }, label = { Text(label) }, modifier = Modifier.semantics { contentDescription = "Раздел $label" })
+                                    }
                                 }
-                            }
-                        } else {
-                            OutlinedTextField(origin, { origin = it }, label = { Text("Адрес сервера") }, singleLine = true, modifier = Modifier.fillMaxWidth(), enabled = !state.busy)
-                            Button(enabled = !state.busy, onClick = { model.saveOrigin(origin) }) { Text("Сохранить адрес") }
-                            if (state.restorePending) Button(enabled = !state.busy, onClick = model::restore) { Text("Проверить сохраненную сессию") }
-                            if (state.origin.isNotEmpty()) {
-                                Text("Сервер: ${state.origin}")
-                                OutlinedTextField(email, { email = it }, label = { Text("Email") }, singleLine = true, modifier = Modifier.fillMaxWidth(), enabled = !state.busy)
-                                OutlinedTextField(password, { password = it }, label = { Text("Пароль") }, visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, autoCorrectEnabled = false), singleLine = true, modifier = Modifier.fillMaxWidth(), enabled = !state.busy)
-                                OutlinedTextField(device, { device = it }, label = { Text("Название устройства") }, singleLine = true, modifier = Modifier.fillMaxWidth(), enabled = !state.busy)
-                                Button(enabled = !state.busy && origin == state.origin && email.isNotBlank() && password.isNotEmpty() && device.isNotBlank(), onClick = { model.authenticate(email, password, device, false); password = "" }) { Text("Войти") }
-                                Button(enabled = !state.busy && origin == state.origin && email.isNotBlank() && password.isNotEmpty() && device.isNotBlank(), onClick = { model.authenticate(email, password, device, true); password = "" }) { Text("Зарегистрироваться") }
                             }
                         }
                     }

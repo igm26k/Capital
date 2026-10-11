@@ -45,18 +45,18 @@ class TransactionsScreenTest {
             if (text == "Отменить изменение операции" || text.startsWith("Изменить операцию ")) {
                 if (compose.onAllNodesWithText("Сохранить измененный черновик?").fetchSemanticsNodes().isNotEmpty()) {
                     compose.waitUntil(10000) { compose.onAllNodes(hasText("Отбросить черновик и продолжить") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
-                    compose.onNodeWithText("Отбросить черновик и продолжить").performClick()
+                    compose.financialNode("Отбросить черновик и продолжить").performClick()
                 }
             }
         }
     private fun field(label: String, value: String) {
         compose.operationField(label).performScrollTo().performTextClearance()
-        compose.onNodeWithText(label).performTextInput(value)
+        compose.financialNode(label).performTextInput(value)
     }
-    private fun waitFor(text: String) = compose.waitUntil(30000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
+    private fun waitFor(text: String) = run { compose.prepareFinancialSection(text); compose.waitUntil(30000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() } }
     @Test fun separateOperationEditorGuardsBackAndReturnsAfterIncomeExpenseConfirmation() {
         waitFor("Вы вошли: ${auth.profile.email}"); waitFor("Открыть черновик операции")
-        compose.onNodeWithText("Сумма операции").assertDoesNotExist()
+        compose.financialNode("Сумма операции").assertDoesNotExist()
         click("Обновить счета"); waitFor("Для операции: KWD cash · KWD")
         click("Для операции: KWD cash · KWD")
         field("Сумма операции", "invalid")
@@ -68,37 +68,37 @@ class TransactionsScreenTest {
         back(); android.os.SystemClock.sleep(500)
         if (compose.onAllNodesWithText("Сохранить измененный черновик?").fetchSemanticsNodes().isEmpty()) back()
         waitFor("Сохранить измененный черновик?")
-        compose.onNodeWithText("Остаться в редакторе").performClick()
+        compose.financialNode("Остаться в редакторе").performClick()
         compose.activityRule.scenario.recreate()
         waitFor("Вернуться к истории операций")
-        compose.onNodeWithText("Сумма операции").assertTextContains("invalid")
+        compose.financialNode("Сумма операции").assertTextContains("invalid")
         fun choose(text: String) {
             waitFor("Сохранить измененный черновик?")
             compose.waitUntil(10000) { compose.onAllNodes(hasText(text) and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
-            compose.onNodeWithText(text).performClick()
+            compose.financialNode(text).performClick()
         }
         compose.waitUntil(10000) { compose.onAllNodes(hasText("Вернуться к истории операций") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithText("Вернуться к истории операций").performScrollTo().performClick()
+        compose.financialNode("Вернуться к истории операций").performScrollTo().performClick()
         choose("Сохранить черновик и продолжить")
         waitFor("Открыть черновик операции")
         assertEquals(1, runBlocking { api.transactions(auth.credential(origin)).size })
         click("Восстановить черновик операции 1")
         field("Примечание операции", "Discard operation")
         compose.waitUntil(10000) { compose.onAllNodes(hasText("Вернуться к истории операций") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithText("Вернуться к истории операций").performScrollTo().performClick()
+        compose.financialNode("Вернуться к истории операций").performScrollTo().performClick()
         choose("Отбросить черновик и продолжить")
         click("Восстановить черновик операции 1")
         field("Сумма операции", "1.234")
         click("Сохранить операцию")
         waitFor("Расход · −1,234 KWD · Retained operation")
-        compose.onNodeWithText("Вернуться к истории операций").assertDoesNotExist()
+        compose.financialNode("Вернуться к истории операций").assertDoesNotExist()
         assertEquals("98766", runBlocking { api.accounts(auth.credential(origin)).single().posted_balance_minor })
         click("Доход")
         field("Сумма операции", "2.345")
         field("Примечание операции", "Own income")
         click("Сохранить операцию")
         waitFor("Доход · 2,345 KWD · Own income")
-        compose.onNodeWithText("Вернуться к истории операций").assertDoesNotExist()
+        compose.financialNode("Вернуться к истории операций").assertDoesNotExist()
         assertEquals("101111", runBlocking { api.accounts(auth.credential(origin)).single().posted_balance_minor })
         assertEquals(3, runBlocking { api.transactions(auth.credential(origin)).size })
         assertNull(runBlocking { app.database.commands().get(origin, auth.profile.id, auth.workspace.id) })
@@ -144,9 +144,9 @@ class TransactionsScreenTest {
         click("Обновить счета")
         waitFor("Сохраненная команда: ${pending.commandId}")
         waitFor("1,000")
-        compose.onNodeWithText("2026-10-06T11:02:00").assertExists()
-        compose.onNodeWithText("Pending expense").assertExists()
-        compose.onNodeWithText("Сохранить операцию").assertIsNotEnabled()
+        compose.financialNode("2026-10-06T11:02:00").assertExists()
+        compose.financialNode("Pending expense").assertExists()
+        compose.financialNode("Сохранить операцию").assertIsNotEnabled()
         click("Повторить сохраненную команду")
         waitFor("Расход · −1,000 KWD · Pending expense")
         assertEquals("91656", runBlocking { api.accounts(auth.credential(origin)).single().posted_balance_minor })
@@ -169,8 +169,8 @@ class TransactionsScreenTest {
         }
         click("Сохранить изменения операции")
         waitFor("Обновить данные для новой команды")
-        compose.onNodeWithText("Выйти").assertIsNotEnabled()
-        compose.onNodeWithText("На сервере: Server edited; версия 2; −1,200 KWD").assertExists()
+        compose.financialNode("Выйти").assertIsNotEnabled()
+        compose.financialNode("На сервере: Server edited; версия 2; −1,200 KWD").assertExists()
         assertEquals("rejected", runBlocking { app.database.commands().get(origin, auth.profile.id, auth.workspace.id)!!.state })
         click("Обновить данные для новой команды")
         waitFor("Использовать обновленную версию операции")
@@ -202,11 +202,11 @@ class TransactionsScreenTest {
         click("Обновить счета")
         waitFor("KWD cash · В архиве")
         click("Открыть черновик операции")
-        compose.onNodeWithText("Сохранить операцию").assertIsNotEnabled()
+        compose.financialNode("Сохранить операцию").assertIsNotEnabled()
         compose.activityRule.scenario.recreate()
         waitFor("Вы вошли: ${auth.profile.email}")
         click("Обновить историю")
         waitFor("Расход · −12,345 KWD · <svg onload=alert(1)>")
-        compose.onNodeWithText("Доход · 6,001 KWD · Updated salary").assertDoesNotExist()
+        compose.financialNode("Доход · 6,001 KWD · Updated salary").assertDoesNotExist()
     }
 }

@@ -92,7 +92,7 @@ fun RefundPanel(model: AuthViewModel) {
             if (part == null) RefundDraft(original.id) else RefundDraft(original.id, part.id, Money.display(part.amount_minor, accountCurrency).removeSuffix(" $accountCurrency"))
         } + draft.allocations.filter { requestedPart -> originals.none { it.id == requestedPart.original_allocation_id } }.map { RefundDraft(it.original_allocation_id, it.id, Money.display(it.amount_minor, accountCurrency).removeSuffix(" $accountCurrency")) }
     }
-    if (!editorOpen) {
+    if (!editorOpen && LocalFinancialSection.current.value == "operations") {
         Text("Возвраты", style = MaterialTheme.typography.titleLarge)
         TextButton(enabled = enabled && !scope.saving, onClick = { navigation.value = "refund" }) { Text("Открыть черновик возврата") }
         DraftGuardControls(guard, "refund", enabled) { navigation.value = "refund" }
@@ -105,7 +105,7 @@ fun RefundPanel(model: AuthViewModel) {
                 note = ""; payee = expense.payee; tags = emptyList(); error = ""
              } }) { Text(if (expense.parent_transaction_id == null) "Создать возврат расхода ${expense.note}" else "Создать возврат комиссии ${expense.note}") }
         }
-    } else FinancialEditorScreen(model, "refund", guard, "Вернуться к истории возвратов", ::close) {
+    } else if (editorOpen) FinancialEditorScreen(model, "refund", guard, "Вернуться к истории возвратов", ::close) {
         Text(if (editingId == null) "Новый возврат" else "Изменение возврата", style = MaterialTheme.typography.titleLarge)
         if (parentId == null) Text("Выберите исходный расход или комиссию.")
         else {
@@ -157,32 +157,33 @@ fun RefundPanel(model: AuthViewModel) {
             TextButton(enabled = enabled, onClick = { guard.request { reset(); navigation.value = null } }) { Text(if (editingId == null) "Отменить создание возврата" else "Отменить изменение возврата") }
         }
     }
-    deleting?.let { refund ->
-        Text("Удалить возврат: ${refund.note}")
-        Text("Зачисление будет исключено из остатка, квота исходного расхода восстановится.")
-        Button(enabled = enabled && state.transactions.any { it.id == refund.id } && deletingParent != null && (deletingParent?.parent_transaction_id == null || deletingTransfer != null), onClick = {
-            val related = listOfNotNull(deletingParent, deletingTransfer).map { VersionExpectation(it.id, it.version) }
-            model.submitTransaction(ApiClient.json.encodeToString(TransactionDelete(refund.version, related)), refund.id, delete = true)
-            deleting = null; deletingParent = null; deletingTransfer = null
-        }) { Text("Подтвердить удаление возврата") }
-        TextButton(enabled = enabled, onClick = { deleting = null; deletingParent = null; deletingTransfer = null }) { Text("Отменить удаление возврата") }
+    if (LocalFinancialSection.current.value == "operations") {
+        deleting?.let { refund ->
+            Text("Удалить возврат: ${refund.note}")
+            Text("Зачисление будет исключено из остатка, квота исходного расхода восстановится.")
+            Button(enabled = enabled && state.transactions.any { it.id == refund.id } && deletingParent != null && (deletingParent?.parent_transaction_id == null || deletingTransfer != null), onClick = {
+                val related = listOfNotNull(deletingParent, deletingTransfer).map { VersionExpectation(it.id, it.version) }
+                model.submitTransaction(ApiClient.json.encodeToString(TransactionDelete(refund.version, related)), refund.id, delete = true)
+                deleting = null; deletingParent = null; deletingTransfer = null
+            }) { Text("Подтвердить удаление возврата") }
+            TextButton(enabled = enabled, onClick = { deleting = null; deletingParent = null; deletingTransfer = null }) { Text("Отменить удаление возврата") }
+        }
+        state.transactions.filter { it.kind == "refund" }.forEach { refund ->
+            val original = state.transactions.find { it.id == refund.parent_transaction_id }
+            val linked = state.transactions.find { it.id == original?.parent_transaction_id }
+            val available = original != null && (original.parent_transaction_id == null || linked != null)
+            TextButton(enabled = enabled && available, onClick = { guard.request {
+                editingId = refund.id; editingVersion = refund.version; parentId = original!!.id; parentVersion = original.version; transferVersion = linked?.version
+                accountId = refund.entries.single().account_id; note = refund.note; payee = refund.payee; tags = refund.tag_ids; zone = refund.occurred_timezone; occurred = openingLocal(refund.occurred_at, zone)
+                preservedInstant = refund.occurred_at; preservedZone = zone
+                val byOriginal = refund.allocations.associateBy { it.original_allocation_id }
+                parts = original.allocations.map { part ->
+                    val existing = byOriginal[part.id]
+                    if (existing == null) RefundDraft(part.id) else RefundDraft(part.id, existing.id, Money.display(existing.amount_minor, refund.entries.single().currency).removeSuffix(" ${refund.entries.single().currency}"))
+                }
+                error = ""; navigation.value = "refund"
+             } }) { Text("Изменить возврат ${refund.note}") }
+            TextButton(enabled = enabled && available, onClick = { deleting = refund; deletingParent = original; deletingTransfer = linked }) { Text("Удалить возврат ${refund.note}") }
+        }
     }
-    state.transactions.filter { it.kind == "refund" }.forEach { refund ->
-        val original = state.transactions.find { it.id == refund.parent_transaction_id }
-        val linked = state.transactions.find { it.id == original?.parent_transaction_id }
-        val available = original != null && (original.parent_transaction_id == null || linked != null)
-        TextButton(enabled = enabled && available, onClick = { guard.request {
-            editingId = refund.id; editingVersion = refund.version; parentId = original!!.id; parentVersion = original.version; transferVersion = linked?.version
-            accountId = refund.entries.single().account_id; note = refund.note; payee = refund.payee; tags = refund.tag_ids; zone = refund.occurred_timezone; occurred = openingLocal(refund.occurred_at, zone)
-            preservedInstant = refund.occurred_at; preservedZone = zone
-            val byOriginal = refund.allocations.associateBy { it.original_allocation_id }
-            parts = original.allocations.map { part ->
-                val existing = byOriginal[part.id]
-                if (existing == null) RefundDraft(part.id) else RefundDraft(part.id, existing.id, Money.display(existing.amount_minor, refund.entries.single().currency).removeSuffix(" ${refund.entries.single().currency}"))
-            }
-            error = ""; navigation.value = "refund"
-         } }) { Text("Изменить возврат ${refund.note}") }
-        TextButton(enabled = enabled && available, onClick = { deleting = refund; deletingParent = original; deletingTransfer = linked }) { Text("Удалить возврат ${refund.note}") }
-    }
-
 }

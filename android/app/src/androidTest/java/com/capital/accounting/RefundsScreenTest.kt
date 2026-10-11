@@ -55,15 +55,15 @@ class RefundsScreenTest {
             if (listOf("Изменить операцию ", "Изменить перевод ", "Изменить возврат ", "Изменить корректировку ", "Создать возврат расхода ", "Создать возврат комиссии ", "Корректировать счет ").any { text.startsWith(it) } || text in listOf("Отменить изменение операции", "Отменить изменение перевода", "Отменить создание возврата", "Отменить изменение возврата", "Отменить корректировку")) {
                 if (compose.onAllNodesWithText("Сохранить измененный черновик?").fetchSemanticsNodes().isNotEmpty()) {
                     compose.waitUntil(10000) { compose.onAllNodes(hasText("Отбросить черновик и продолжить") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
-                    compose.onNodeWithText("Отбросить черновик и продолжить").performClick()
+                    compose.financialNode("Отбросить черновик и продолжить").performClick()
                 }
             }
         }
     private fun field(label: String, value: String) {
         compose.operationField(label).performScrollTo().performTextClearance()
-        compose.onNodeWithText(label).performTextInput(value)
+        compose.financialNode(label).performTextInput(value)
     }
-    private fun waitFor(text: String) = compose.waitUntil(30000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
+    private fun waitFor(text: String) = run { compose.prepareFinancialSection(text); compose.waitUntil(30000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() } }
     private fun history() = runBlocking { api.transactions(auth.credential(origin)) }
     private fun accounts() = runBlocking { api.accounts(auth.credential(origin)).associateBy { it.id } }
     private fun load() {
@@ -78,7 +78,7 @@ class RefundsScreenTest {
 
     @Test fun separateRefundEditorGuardsBackAndReturnsAfterConfirmation() {
         load()
-        compose.onNodeWithText("Примечание возврата").assertDoesNotExist()
+        compose.financialNode("Примечание возврата").assertDoesNotExist()
         click("Создать возврат расхода Refund expense")
         field("Сумма части возврата 1", "invalid")
         field("Примечание возврата", "Retained refund")
@@ -89,25 +89,25 @@ class RefundsScreenTest {
         fun choose(text: String) {
             waitFor("Сохранить измененный черновик?")
             compose.waitUntil(10000) { compose.onAllNodes(hasText(text) and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
-            compose.onNodeWithText(text).performClick()
+            compose.financialNode(text).performClick()
         }
         back(); android.os.SystemClock.sleep(500)
         if (compose.onAllNodesWithText("Сохранить измененный черновик?").fetchSemanticsNodes().isEmpty()) back()
         choose("Остаться в редакторе")
         compose.activityRule.scenario.recreate()
         waitFor("Вернуться к истории возвратов")
-        compose.onNodeWithText("Примечание возврата").assertTextContains("Retained refund")
+        compose.financialNode("Примечание возврата").assertTextContains("Retained refund")
         click("Вернуться к истории возвратов"); choose("Сохранить черновик и продолжить")
         assertEquals(4, history().size)
         click("Восстановить черновик возврата 1")
-        compose.onNodeWithText("Сумма части возврата 1").assertTextContains("invalid")
+        compose.financialNode("Сумма части возврата 1").assertTextContains("invalid")
         field("Примечание возврата", "Discard refund")
         click("Вернуться к истории возвратов"); choose("Отбросить черновик и продолжить")
         click("Восстановить черновик возврата 1")
         field("Сумма части возврата 1", "0.123")
         click("Сохранить возврат")
         waitFor("Изменить возврат Retained refund")
-        compose.onNodeWithText("Вернуться к истории возвратов").assertDoesNotExist()
+        compose.financialNode("Вернуться к истории возвратов").assertDoesNotExist()
         val records = history()
         assertEquals(5, records.size)
         val saved = records.single { it.kind == "refund" }
@@ -130,7 +130,7 @@ class RefundsScreenTest {
         val firstIndex = expense.allocations.indexOfFirst { it.id == first.id } + 1
         val secondIndex = expense.allocations.indexOfFirst { it.id == second.id } + 1
         click("Создать возврат расхода Refund expense")
-        compose.onNodeWithText("Счет возврата: Refund USD · USD").assertDoesNotExist()
+        compose.financialNode("Счет возврата: Refund USD · USD").assertDoesNotExist()
         click("Счет возврата: Refund alternate · KWD")
         field("Сумма части возврата $firstIndex", "1.001")
         field("Сумма части возврата $secondIndex", "2.002")
@@ -176,10 +176,10 @@ class RefundsScreenTest {
         assertEquals("2", draft.expected_parent_version)
         assertNull(draft.expected_transfer_version)
         assertEquals(first.id, draft.allocations.single().original_allocation_id)
-        compose.onNodeWithText("Выйти").assertIsNotEnabled()
+        compose.financialNode("Выйти").assertIsNotEnabled()
         compose.activityRule.scenario.recreate()
-        compose.onNodeWithText("Примечание возврата").assertTextContains("Local concurrent refund")
-        compose.onNodeWithText("Сумма части возврата $firstIndex").assertTextContains("1,000")
+        compose.financialNode("Примечание возврата").assertTextContains("Local concurrent refund")
+        compose.financialNode("Сумма части возврата $firstIndex").assertTextContains("1,000")
         click("Обновить данные для новой команды")
         waitFor("Данные обновлены. Проверьте поля перед новой командой.")
         assertEquals(2, history().count { it.kind == "refund" })
@@ -192,14 +192,14 @@ class RefundsScreenTest {
         assertEquals("2000", history().single { it.id == expense.id }.allocations.single { it.id == first.id }.remaining_refundable_minor)
         assertNull(runBlocking { app.database.commands().get(origin, auth.profile.id, auth.workspace.id) })
         compose.activityRule.scenario.recreate()
-        compose.onNodeWithText("24,003 KWD").assertExists()
+        compose.financialNode("24,003 KWD").assertExists()
         val latest = accounts()[source.id]!!
         runBlocking { api.request("/workspaces/${auth.workspace.id}/accounts/${source.id}", "PUT", ApiClient.json.encodeToString(AccountUpdate(latest.version, latest.name, latest.type, true)), auth.credential(origin), UUID.randomUUID().toString(), auth.workspace.sync_generation_id) }
         click("Обновить счета")
         waitFor("Refund source · В архиве")
         click("Создать возврат расхода Refund expense")
         click("Счет возврата: Refund alternate · KWD")
-        compose.onNodeWithText("Сохранить возврат").assertIsNotEnabled()
+        compose.financialNode("Сохранить возврат").assertIsNotEnabled()
     }
 
     @Test fun realFeeRefundAndLostLocalReceiptRepeatOriginalBodyAndKey() {
@@ -234,11 +234,11 @@ class RefundsScreenTest {
         click("Обновить историю")
         waitFor("Исходный расход: Refund fee")
         waitFor("Версия расхода на сервере: 3; черновика: 2")
-        compose.onNodeWithText("Сумма части возврата 1").assertTextContains("0,100")
-        compose.onNodeWithText("Примечание возврата").assertTextContains("Replay fee refund")
-        compose.onNodeWithText("Дата возврата (YYYY-MM-DDTHH:MM:SS)").assertTextContains("2026-10-06T11:25:30")
-        compose.onNodeWithText("Использовать обновленные версии расхода и перевода").assertIsNotEnabled()
-        compose.onNodeWithText("Выйти").assertIsNotEnabled()
+        compose.financialNode("Сумма части возврата 1").assertTextContains("0,100")
+        compose.financialNode("Примечание возврата").assertTextContains("Replay fee refund")
+        compose.financialNode("Дата возврата (YYYY-MM-DDTHH:MM:SS)").assertTextContains("2026-10-06T11:25:30")
+        compose.financialNode("Использовать обновленные версии расхода и перевода").assertIsNotEnabled()
+        compose.financialNode("Выйти").assertIsNotEnabled()
         assertEquals(body, runBlocking { app.database.commands().get(origin, auth.profile.id, auth.workspace.id)!!.body })
         click("Повторить сохраненную команду")
         compose.waitUntil(30000) { compose.onAllNodesWithText("Сохраненная команда: ${command.commandId}").fetchSemanticsNodes().isEmpty() }
@@ -264,8 +264,8 @@ class RefundsScreenTest {
         load()
         click("Изменить возврат Editable refund")
         waitFor("Доступно для части возврата $index: 5,001 KWD")
-        compose.onNodeWithText("Вернуться к истории возвратов").assertExists()
-        compose.onNodeWithText("Счет возврата: Refund USD · USD").assertDoesNotExist()
+        compose.financialNode("Вернуться к истории возвратов").assertExists()
+        compose.financialNode("Счет возврата: Refund USD · USD").assertDoesNotExist()
         click("Счет возврата: Refund source · KWD")
         field("Сумма части возврата $index", "4.003")
         field("Примечание возврата", "Edited refund")
@@ -293,9 +293,9 @@ class RefundsScreenTest {
         assertEquals(edited.version, replacement.expected_version)
         assertEquals(partId, replacement.allocations.single().id)
         assertEquals(draft.occurred_at, replacement.occurred_at)
-        compose.onNodeWithText("Выйти").assertIsNotEnabled()
+        compose.financialNode("Выйти").assertIsNotEnabled()
         compose.activityRule.scenario.recreate()
-        compose.onNodeWithText("Примечание возврата").assertTextContains("Local refund edit")
+        compose.financialNode("Примечание возврата").assertTextContains("Local refund edit")
         click("Обновить данные для новой команды")
         waitFor("Данные обновлены. Проверьте поля перед новой командой.")
         click("Использовать обновленную версию возврата")

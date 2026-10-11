@@ -29,7 +29,7 @@ def screen():
 def find(text, seconds=45, scroll=False, row=False):
     deadline = time.monotonic() + seconds
     while time.monotonic() < deadline:
-        matches = [n for n in screen().iter('node') if n.get('text') == text and (not row or n.get('class') != 'android.widget.EditText')]
+        matches = [n for n in screen().iter('node') if (n.get('text') == text or n.get('content-desc') == text) and (not row or n.get('class') != 'android.widget.EditText')]
         if matches:
             return matches[0]
         if scroll:
@@ -95,6 +95,7 @@ tap('Повторить сохраненную команду', scroll=True)
 find('Outage pocket', scroll=True, row=True)
 restart()
 find('Вы вошли: '+data['email'])
+tap('Раздел Счета')
 tap('Обновить счета', scroll=True)
 find('Outage pocket', scroll=True)
 find('123,456 KWD', scroll=True)
