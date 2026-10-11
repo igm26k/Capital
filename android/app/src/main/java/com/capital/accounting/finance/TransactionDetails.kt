@@ -17,6 +17,7 @@ import java.math.BigInteger
 @Composable
 fun TransactionDetails(model: AuthViewModel) {
     val state = model.state
+    val router = LocalFinancialCreateRouter.current
     Dialog(onDismissRequest = { model.backTransactionDetails() }, properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)) {
         Surface(Modifier.fillMaxSize()) {
             Column(Modifier.safeDrawingPadding().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -28,6 +29,34 @@ fun TransactionDetails(model: AuthViewModel) {
                 if (state.detailMissing) Text("Операция удалена или недоступна.")
                 if (state.detailError.isNotEmpty()) Text(state.detailError)
                 state.detailTransaction?.let { item ->
+                    val isFee = item.kind == "expense" && item.parent_transaction_id != null
+                    val target = if (isFee) state.transactions.find { it.id == item.parent_transaction_id && it.kind == "transfer" } else item
+                    val parent = state.transactions.find { it.id == target?.parent_transaction_id }
+                    val fee = state.transactions.find { it.id == target?.fee_transaction_id }
+                    val transfer = state.transactions.find { it.id == parent?.parent_transaction_id && it.kind == "transfer" }
+                    val available = target != null && when (target.kind) {
+                        "income", "expense" -> target.parent_transaction_id == null
+                        "transfer" -> target.fee_transaction_id == null || fee != null
+                        "refund" -> parent != null && (parent.parent_transaction_id == null || transfer != null)
+                        "adjustment" -> state.accounts.any { account -> account.id == target.entries.single().account_id && account.archived_at == null && account.deleted_at == null }
+                        else -> false
+                    }
+                    val enabled = !state.busy && state.persisted && !state.financeBlocked && router.canCreate && router.request == null && router.transactionRequest == null
+                    if (item.kind in setOf("income", "expense", "transfer", "refund", "adjustment")) {
+                        fun act(action: FinancialTransactionAction) {
+                            router.transactionRequest = FinancialTransactionRequest(action, requireNotNull(target), parent, fee, transfer)
+                            model.closeTransactionDetails()
+                        }
+                        Button(enabled = enabled && available, onClick = { act(FinancialTransactionAction.EDIT) }) { Text(if (isFee) "Редактировать перевод с этой комиссией" else "Редактировать операцию") }
+                        TextButton(enabled = enabled && available, onClick = { act(FinancialTransactionAction.DELETE) }) { Text(if (isFee) "Удалить перевод с этой комиссией" else "Удалить операцию") }
+                    }
+                    if (item.kind == "expense") {
+                        val linked = state.transactions.find { it.id == item.parent_transaction_id && it.kind == "transfer" }
+                        Button(enabled = enabled && item.status == "posted" && (!isFee || linked != null), onClick = {
+                            router.request = FinancialCreationRequest(FinancialCreation.REFUND, expense = item, transfer = linked)
+                            model.closeTransactionDetails()
+                        }) { Text("Добавить возврат по этой операции") }
+                    }
                     Text("Тип: ${TransactionFilter.kinds[item.kind] ?: item.kind}")
                     Text("Статус детали: ${TransactionFilter.statuses[item.status] ?: item.status}")
                     Text("Версия операции: ${item.version}")

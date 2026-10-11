@@ -58,6 +58,16 @@ fun TransactionPanel(model: AuthViewModel) {
     }
     fun createOperation(targetKind: String) { guard.request { reset(targetKind); navigation.value = "transaction" } }
     HandleFinancialCreate("transaction", enabled) { createOperation(if (it.kind == FinancialCreation.INCOME) "income" else "expense") }
+    fun editOperation(transaction: Transaction) { guard.request {
+        original = transaction; editingId = transaction.id; editingVersion = transaction.version; kind = transaction.kind
+        accountId = transaction.entries.first().account_id
+        amount = Money.display(transaction.allocations.fold(BigInteger.ZERO) { sum, item -> sum + BigInteger(item.amount_minor) }.toString(), transaction.entries.first().currency).removeSuffix(" ${transaction.entries.first().currency}")
+        parts = transaction.allocations.map { AllocationDraft(it.id, it.category_id, Money.display(it.amount_minor, transaction.entries.first().currency).removeSuffix(" ${transaction.entries.first().currency}")) }
+        selectedTags = transaction.tag_ids
+        note = transaction.note; payee = transaction.payee; zone = transaction.occurred_timezone; occurred = openingLocal(transaction.occurred_at, zone); error = ""; navigation.value = "transaction"
+    } }
+    fun deleteOperation(transaction: Transaction) { deleting = transaction }
+    HandleFinancialTransaction("transaction", enabled) { if (it.action == FinancialTransactionAction.EDIT) editOperation(it.transaction) else deleteOperation(it.transaction) }
     LaunchedEffect(state.financialCommand?.commandId, state.transactionReceipt?.commandId, state.accounts, state.transactions) {
         val command = state.financialCommand
         if (command == null && state.transactionReceipt?.commandId != handledReceipt) {
@@ -232,16 +242,9 @@ fun TransactionPanel(model: AuthViewModel) {
             TextButton(enabled = !state.busy && state.persisted, onClick = { model.openTransactionDetails(transaction.id) }) { Text("Детали операции ${transaction.note.ifEmpty { label }}") }
             if (transaction.kind in listOf("income", "expense") && transaction.parent_transaction_id == null) {
                 TextButton(enabled = enabled, onClick = {
-                    guard.request {
-                        original = transaction; editingId = transaction.id; editingVersion = transaction.version; kind = transaction.kind
-                        accountId = transaction.entries.first().account_id
-                        amount = Money.display(transaction.allocations.fold(BigInteger.ZERO) { sum, item -> sum + BigInteger(item.amount_minor) }.toString(), transaction.entries.first().currency).removeSuffix(" ${transaction.entries.first().currency}")
-                        parts = transaction.allocations.map { AllocationDraft(it.id, it.category_id, Money.display(it.amount_minor, transaction.entries.first().currency).removeSuffix(" ${transaction.entries.first().currency}")) }
-                        selectedTags = transaction.tag_ids
-                        note = transaction.note; payee = transaction.payee; zone = transaction.occurred_timezone; occurred = openingLocal(transaction.occurred_at, zone); error = ""; navigation.value = "transaction"
-                    }
+                    editOperation(transaction)
                 }) { Text("Изменить операцию ${transaction.note}") }
-                TextButton(enabled = enabled, onClick = { deleting = transaction }) { Text("Удалить операцию ${transaction.note}") }
+                TextButton(enabled = enabled, onClick = { deleteOperation(transaction) }) { Text("Удалить операцию ${transaction.note}") }
             }
             Text("${transaction.occurred_at} · ${transaction.occurred_timezone} · ${if (transaction.status == "posted") "Проведена" else "Ожидает проведения"}")
         }

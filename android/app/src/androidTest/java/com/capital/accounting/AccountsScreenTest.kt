@@ -195,8 +195,9 @@ class AccountsScreenTest {
         click("Наличные")
         compose.onNode(isToggleable()).performScrollTo().performClick()
         click("Сохранить счет")
+        waitFor("Добавить счет")
         compose.onNodeWithContentDescription("Раздел Счета").performClick()
-        compose.onNodeWithText("Архивные счета").performScrollTo().performClick()
+        click("Архивные счета")
         waitFor("Archived pocket · В архиве")
         val archived = runBlocking { api.accounts(auth.credential(origin)).single() }
         assertNotNull(archived.archived_at)

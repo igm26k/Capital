@@ -48,8 +48,8 @@ class MainActivity : ComponentActivity() {
             val createRouter = remember(state.origin, state.auth?.profile?.id, state.auth?.workspace?.id) { FinancialCreateRouter() }
             LaunchedEffect(state.auth) { if (state.auth != null) password = "" }
             MaterialTheme(colorScheme = if (isSystemInDarkTheme()) darkColorScheme() else lightColorScheme()) {
-                if (state.auth != null && state.detailStack.isNotEmpty()) TransactionDetails(model)
                 CompositionLocalProvider(LocalFinancialSection provides section, LocalFinancialCreateRouter provides createRouter) {
+                    if (state.auth != null && state.detailStack.isNotEmpty()) TransactionDetails(model)
                     Surface(Modifier.fillMaxSize()) {
                         Column(Modifier.fillMaxSize()) {
                             Column(Modifier.weight(1f).safeDrawingPadding().imePadding().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {

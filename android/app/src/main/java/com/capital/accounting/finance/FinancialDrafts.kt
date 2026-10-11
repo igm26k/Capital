@@ -199,7 +199,7 @@ fun FinancialDraftContent(context: Context, origin: String, owner: String, works
         createRouter.editorOpen = editorOpen
     }
     DisposableEffect(createRouter) {
-        onDispose { createRouter.canCreate = false; createRouter.editorOpen = false; createRouter.request = null }
+        onDispose { createRouter.canCreate = false; createRouter.editorOpen = false; createRouter.request = null; createRouter.transactionRequest = null }
     }
     if (loaded != null) {
         CompositionLocalProvider(LocalFinancialDraftScope provides loaded, LocalFinancialEditor provides editor) {

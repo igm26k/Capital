@@ -44,6 +44,9 @@ fun AdjustmentPanel(model: AuthViewModel) {
         error = ""
     } }
     HandleFinancialCreate("adjustment", enabled) { createAdjustment(requireNotNull(it.account)) }
+    fun editAdjustment(item: Transaction) { guard.request { editingId = item.id; editingVersion = item.version; accountId = item.entries.single().account_id; note = item.note; error = ""; navigation.value = "adjustment" } }
+    fun deleteAdjustment(item: Transaction) { deleting = item }
+    HandleFinancialTransaction("adjustment", enabled) { if (it.action == FinancialTransactionAction.EDIT) editAdjustment(it.transaction) else deleteAdjustment(it.transaction) }
     LaunchedEffect(state.financialCommand?.commandId, state.transactionReceipt?.commandId, state.accounts, state.transactions) {
         val command = state.financialCommand
         if (command == null) {
@@ -138,8 +141,8 @@ fun AdjustmentPanel(model: AuthViewModel) {
         }
         state.transactions.filter { it.kind == "adjustment" }.forEach { item ->
             val active = state.accounts.any { it.id == item.entries.single().account_id && it.archived_at == null && it.deleted_at == null }
-            TextButton(enabled = enabled && active, onClick = { guard.request { editingId = item.id; editingVersion = item.version; accountId = item.entries.single().account_id; note = item.note; error = ""; navigation.value = "adjustment"  } }) { Text("Изменить корректировку ${item.note}") }
-            TextButton(enabled = enabled && active, onClick = { deleting = item }) { Text("Удалить корректировку ${item.note}") }
+            TextButton(enabled = enabled && active, onClick = { editAdjustment(item) }) { Text("Изменить корректировку ${item.note}") }
+            TextButton(enabled = enabled && active, onClick = { deleteAdjustment(item) }) { Text("Удалить корректировку ${item.note}") }
         }
     }
 }

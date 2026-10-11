@@ -24,11 +24,32 @@ enum class FinancialCreation(val prefix: String, val section: String, val label:
 
 data class FinancialCreationRequest(val kind: FinancialCreation, val account: Account? = null, val expense: Transaction? = null, val transfer: Transaction? = null)
 
+enum class FinancialTransactionAction { EDIT, DELETE }
+data class FinancialTransactionRequest(val action: FinancialTransactionAction, val transaction: Transaction, val parent: Transaction? = null, val fee: Transaction? = null, val transfer: Transaction? = null) {
+    val prefix get() = when (transaction.kind) { "income", "expense" -> "transaction"; else -> transaction.kind }
+}
+
 /** An ephemeral UI intent scoped to the signed-in owner, never a submitted command. */
 class FinancialCreateRouter {
     var request by mutableStateOf<FinancialCreationRequest?>(null)
+    var transactionRequest by mutableStateOf<FinancialTransactionRequest?>(null)
     var canCreate by mutableStateOf(false)
     var editorOpen by mutableStateOf(false)
+}
+
+@Composable
+fun HandleFinancialTransaction(prefix: String, enabled: Boolean, act: (FinancialTransactionRequest) -> Unit) {
+    val router = LocalFinancialCreateRouter.current
+    val scope = LocalFinancialDraftScope.current
+    val section = LocalFinancialSection.current
+    val request = router.transactionRequest
+    LaunchedEffect(request, enabled, scope.saving, scope.failed) {
+        if (request != null && request.prefix == prefix && enabled && !scope.saving && !scope.failed) {
+            router.transactionRequest = null
+            section.value = "operations"
+            act(request)
+        }
+    }
 }
 
 val LocalFinancialCreateRouter = staticCompositionLocalOf<FinancialCreateRouter> { error("Financial create router required") }
@@ -53,11 +74,11 @@ fun FinancialAddButton(model: AuthViewModel, router: FinancialCreateRouter) {
     val state = model.state
     var menu by remember(router) { mutableStateOf(false) }
     var choosing by remember(router) { mutableStateOf<FinancialCreation?>(null) }
-    val enabled = !state.busy && state.persisted && !state.financeBlocked && router.canCreate && router.request == null
+    val enabled = !state.busy && state.persisted && !state.financeBlocked && router.canCreate && router.request == null && router.transactionRequest == null
     fun dismiss() { menu = false; choosing = null }
     fun select(request: FinancialCreationRequest) { router.request = request; dismiss() }
     LaunchedEffect(state.financeBlocked, state.logoutPending, state.revokePendingId) {
-        if (state.financeBlocked || state.logoutPending || state.revokePendingId != null) { router.request = null; dismiss() }
+        if (state.financeBlocked || state.logoutPending || state.revokePendingId != null) { router.request = null; router.transactionRequest = null; dismiss() }
     }
     if (!router.editorOpen && state.detailStack.isEmpty()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp), horizontalArrangement = Arrangement.End) {
