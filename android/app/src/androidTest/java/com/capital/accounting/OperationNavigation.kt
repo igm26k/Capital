@@ -20,15 +20,22 @@ fun ComposeContentTestRule.prepareOperationNavigation(text: String) {
     val operationField = text in setOf("Сумма операции", "Примечание операции", "Получатель операции", "Дата операции (YYYY-MM-DDTHH:MM:SS)", "Часовой пояс операции") || text.matches(Regex("Сумма части [0-9]+"))
     val operationButton = text in setOf("Расход", "Доход", "Сохранить операцию", "Сохранить изменения операции", "Отменить изменение операции", "Использовать обновленную версию операции", "Добавить часть операции") || text.startsWith("Категория части ") || text.startsWith("Без категории для части ") || text.startsWith("Убрать часть ") || text.startsWith("Для операции: ")
     val transferTarget = text in setOf("Сумма списания перевода", "Сумма зачисления перевода", "Примечание перевода", "Примечание комиссии перевода", "Получатель перевода", "Дата перевода (YYYY-MM-DDTHH:MM:SS)", "Часовой пояс перевода", "Сумма комиссии перевода", "Сохранить перевод", "Сохранить изменения перевода", "Отменить изменение перевода", "Добавить комиссию перевода", "Убрать комиссию перевода", "Добавить часть комиссии", "Использовать обновленные версии перевода и комиссии") || listOf("Списать со счета: ", "Зачислить на счет: ", "Счет комиссии: ", "Сумма части комиссии ", "Категория комиссии ", "Без категории комиссии ", "Убрать часть комиссии ").any { text.startsWith(it) }
-    val common = text in setOf("Вернуться к истории операций", "Вернуться к истории переводов", "Обновить счета", "Обновить категории и теги", "Обновить историю", "Повторить сохраненную команду", "Принять подтвержденный результат", "Обновить данные для новой команды", "Продолжить сохраненную команду в этой сессии", "Открыть черновик операции", "Открыть черновик перевода")
+    val refundTarget = text in setOf("Примечание возврата", "Получатель возврата", "Дата возврата (YYYY-MM-DDTHH:MM:SS)", "Часовой пояс возврата", "Сохранить возврат", "Сохранить изменения возврата", "Отменить создание возврата", "Отменить изменение возврата", "Использовать обновленную версию возврата", "Использовать обновленные версии расхода и перевода") || listOf("Сумма части возврата ", "Счет возврата: ").any { text.startsWith(it) }
+    val common = text in setOf("Вернуться к истории операций", "Вернуться к истории переводов", "Вернуться к истории возвратов", "Обновить счета", "Обновить категории и теги", "Обновить историю", "Повторить сохраненную команду", "Принять подтвержденный результат", "Обновить данные для новой команды", "Продолжить сохраненную команду в этой сессии", "Открыть черновик операции", "Открыть черновик перевода", "Открыть черновик возврата")
     val current = when {
         onAllNodesWithText("Вернуться к истории операций").fetchSemanticsNodes().isNotEmpty() -> "операции"
         onAllNodesWithText("Вернуться к истории переводов").fetchSemanticsNodes().isNotEmpty() -> "перевода"
+        onAllNodesWithText("Вернуться к истории возвратов").fetchSemanticsNodes().isNotEmpty() -> "возврата"
         else -> null
     }
-    val owns = if (current == "операции") operationField || operationButton || text.startsWith("Восстановить черновик операции ") || text.startsWith("Отбросить сохраненный черновик операции ") else transferTarget || text.startsWith("Восстановить черновик перевода ") || text.startsWith("Отбросить сохраненный черновик перевода ")
+    val owns = when (current) {
+        "операции" -> operationField || operationButton || text.startsWith("Восстановить черновик операции ") || text.startsWith("Отбросить сохраненный черновик операции ")
+        "перевода" -> transferTarget || text.startsWith("Восстановить черновик перевода ") || text.startsWith("Отбросить сохраненный черновик перевода ")
+        "возврата" -> refundTarget || text.startsWith("Восстановить черновик возврата ") || text.startsWith("Отбросить сохраненный черновик возврата ")
+        else -> false
+    }
     if (current != null && !owns && !common) {
-        val back = if (current == "операции") "Вернуться к истории операций" else "Вернуться к истории переводов"
+        val back = when (current) { "операции" -> "Вернуться к истории операций"; "перевода" -> "Вернуться к истории переводов"; else -> "Вернуться к истории возвратов" }
         waitUntil(10000) { onAllNodes(hasText(back) and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
         onNodeWithText(back).performScrollTo().performClick()
         if (onAllNodesWithText("Сохранить измененный черновик?").fetchSemanticsNodes().isNotEmpty()) {
@@ -46,4 +53,10 @@ fun ComposeContentTestRule.prepareOperationNavigation(text: String) {
         waitUntil(10000) { onAllNodes(hasText("Открыть черновик перевода") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
         onNodeWithText("Открыть черновик перевода").performScrollTo().performClick()
     }
+    val refundOpen = onAllNodesWithText("Вернуться к истории возвратов").fetchSemanticsNodes().isNotEmpty()
+    if (!refundOpen && refundTarget) {
+        waitUntil(10000) { onAllNodes(hasText("Открыть черновик возврата") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+        onNodeWithText("Открыть черновик возврата").performScrollTo().performClick()
+    }
+
 }

@@ -76,6 +76,53 @@ class RefundsScreenTest {
         waitFor("Создать возврат расхода Refund expense")
     }
 
+    @Test fun separateRefundEditorGuardsBackAndReturnsAfterConfirmation() {
+        load()
+        compose.onNodeWithText("Примечание возврата").assertDoesNotExist()
+        click("Создать возврат расхода Refund expense")
+        field("Сумма части возврата 1", "invalid")
+        field("Примечание возврата", "Retained refund")
+        fun back() {
+            val descriptor = InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand("input keyevent KEYCODE_BACK")
+            android.os.ParcelFileDescriptor.AutoCloseInputStream(descriptor).use { it.readBytes() }
+        }
+        fun choose(text: String) {
+            waitFor("Сохранить измененный черновик?")
+            compose.waitUntil(10000) { compose.onAllNodes(hasText(text) and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithText(text).performClick()
+        }
+        back(); android.os.SystemClock.sleep(500)
+        if (compose.onAllNodesWithText("Сохранить измененный черновик?").fetchSemanticsNodes().isEmpty()) back()
+        choose("Остаться в редакторе")
+        compose.activityRule.scenario.recreate()
+        waitFor("Вернуться к истории возвратов")
+        compose.onNodeWithText("Примечание возврата").assertTextContains("Retained refund")
+        click("Вернуться к истории возвратов"); choose("Сохранить черновик и продолжить")
+        assertEquals(4, history().size)
+        click("Восстановить черновик возврата 1")
+        compose.onNodeWithText("Сумма части возврата 1").assertTextContains("invalid")
+        field("Примечание возврата", "Discard refund")
+        click("Вернуться к истории возвратов"); choose("Отбросить черновик и продолжить")
+        click("Восстановить черновик возврата 1")
+        field("Сумма части возврата 1", "0.123")
+        click("Сохранить возврат")
+        waitFor("Изменить возврат Retained refund")
+        compose.onNodeWithText("Вернуться к истории возвратов").assertDoesNotExist()
+        val records = history()
+        assertEquals(5, records.size)
+        val saved = records.single { it.kind == "refund" }
+        assertEquals(expense.id, saved.parent_transaction_id)
+        assertEquals("123", saved.entries.single().amount_minor)
+        val original = records.single { it.id == expense.id }
+        val allocation = original.allocations.single { it.id == saved.allocations.single().original_allocation_id }
+        assertEquals((allocation.amount_minor.toLong() - 123).toString(), allocation.remaining_refundable_minor)
+        assertEquals("87778", accounts()[source.id]!!.posted_balance_minor)
+        assertEquals("20000", accounts()[alternate.id]!!.posted_balance_minor)
+        assertEquals("3000", accounts()[usd.id]!!.posted_balance_minor)
+        val app = ApplicationProvider.getApplicationContext<CapitalApplication>()
+        assertNull(runBlocking { app.database.commands().get(origin, auth.profile.id, auth.workspace.id) })
+    }
+
     @Test fun realSplitPartialRefundQuotaAndConcurrentParentVersion() {
         load()
         val first = expense.allocations.single { it.amount_minor == "5001" }
@@ -103,6 +150,7 @@ class RefundsScreenTest {
         assertNull(partial.allocations.single { it.original_allocation_id == second.id }.category_id)
         assertEquals("87655", accounts()[source.id]!!.posted_balance_minor)
         assertEquals("23003", accounts()[alternate.id]!!.posted_balance_minor)
+        click("Открыть черновик возврата")
         waitFor("Доступно для части возврата $firstIndex: 4,000 KWD")
         waitFor("Доступно для части возврата $secondIndex: 5,342 KWD")
         click("Создать возврат расхода Refund expense")
@@ -216,7 +264,7 @@ class RefundsScreenTest {
         load()
         click("Изменить возврат Editable refund")
         waitFor("Доступно для части возврата $index: 5,001 KWD")
-        compose.onNodeWithText("Создать возврат расхода Refund expense").assertIsNotEnabled()
+        compose.onNodeWithText("Вернуться к истории возвратов").assertExists()
         compose.onNodeWithText("Счет возврата: Refund USD · USD").assertDoesNotExist()
         click("Счет возврата: Refund source · KWD")
         field("Сумма части возврата $index", "4.003")

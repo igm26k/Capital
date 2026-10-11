@@ -161,7 +161,11 @@ class DeletedTransactionsScreenTest {
         click("Сохранить изменения возврата")
         waitFor("Изменить возврат Own refund saved")
         field("Примечание возврата", "Kept refund draft")
+        click("Вернуться к истории возвратов")
+        compose.waitUntil(10000) { compose.onAllNodes(hasText("Сохранить черновик и продолжить") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Сохранить черновик и продолжить").performClick()
         click("Удалить возврат Own refund saved")
+        click("Восстановить черновик возврата 1")
         val latest = history().associateBy { it.id }
         remove(latest[refund.id]!!, listOf(latest[expense.id]!!))
         click("Обновить историю")
@@ -170,6 +174,7 @@ class DeletedTransactionsScreenTest {
         compose.onNodeWithText("Сохранить изменения возврата").assertIsNotEnabled()
         compose.onNodeWithText("Подтвердить удаление возврата").assertIsNotEnabled()
         click("Отменить удаление возврата")
+        click("Восстановить черновик возврата 1")
         click("Отменить изменение возврата")
         assertEquals("101000", balances()[cash.id])
         assertEquals("3000", balances()[usd.id])

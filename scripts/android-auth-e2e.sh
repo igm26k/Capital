@@ -39,7 +39,7 @@ run_suite com.capital.accounting.TransactionDetailsScreenTest 2 ops/.runtime/che
 run_suite com.capital.accounting.DeletedTransactionsScreenTest 2 ops/.runtime/checks/android-deleted-transactions-ui-instrumentation.txt
 run_suite com.capital.accounting.HistoryScreenTest 2 ops/.runtime/checks/android-history-ui-instrumentation.txt
 run_suite com.capital.accounting.AdjustmentsScreenTest 2 ops/.runtime/checks/android-adjustments-ui-instrumentation.txt
-run_suite com.capital.accounting.RefundsScreenTest 4 ops/.runtime/checks/android-refunds-ui-instrumentation.txt
+run_suite com.capital.accounting.RefundsScreenTest 5 ops/.runtime/checks/android-refunds-ui-instrumentation.txt
 run_suite com.capital.accounting.TransfersScreenTest 4 ops/.runtime/checks/android-transfers-ui-instrumentation.txt
 run_suite com.capital.accounting.CatalogScreenTest 4 ops/.runtime/checks/android-catalog-ui-instrumentation.txt
 # AuthScreen publishes the current session proof; consume it before any fixture changes auth.
@@ -47,4 +47,4 @@ run_suite com.capital.accounting.AuthScreenTest 1 ops/.runtime/checks/android-ui
 python3 scripts/check-android-auth-runtime.py "$adb" "$serial"
 python3 scripts/check-android-financial-runtime.py "$adb" "$serial"
 python3 scripts/check-android-release-trust.py "$sdk"
-echo 'PASS 44/44 real Android instrumentation executions and auth runtime acceptance'
+echo 'PASS 45/45 real Android instrumentation executions and auth runtime acceptance'
