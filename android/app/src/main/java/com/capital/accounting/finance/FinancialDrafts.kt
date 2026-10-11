@@ -3,6 +3,7 @@ package com.capital.accounting.finance
 import android.content.Context
 import android.util.AtomicFile
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import com.capital.accounting.api.ApiClient
 import com.capital.accounting.api.Transaction
 import kotlinx.coroutines.Dispatchers
@@ -164,6 +165,8 @@ inline fun <reified T> rememberFinancialDraft(key: String, noinline initial: () 
     return value
 }
 
+val LocalFinancialEditor = staticCompositionLocalOf<MutableState<String?>> { error("Financial editor scope required") }
+
 @Composable
 fun FinancialDraftContent(context: Context, origin: String, owner: String, workspace: String, content: @Composable () -> Unit) {
     val application = context.applicationContext as com.capital.accounting.CapitalApplication
@@ -176,9 +179,10 @@ fun FinancialDraftContent(context: Context, origin: String, owner: String, works
         catch (e: kotlinx.coroutines.CancellationException) { throw e }
         catch (_: Exception) { failed = true }
     }
+    val editor = rememberSaveable(origin, owner, workspace) { mutableStateOf<String?>(null) }
     val loaded = scope
     if (loaded != null) {
-        CompositionLocalProvider(LocalFinancialDraftScope provides loaded) {
+        CompositionLocalProvider(LocalFinancialDraftScope provides loaded, LocalFinancialEditor provides editor) {
             content()
             if (loaded.failed) androidx.compose.material3.Text("Не удалось сохранить черновики на устройстве. Повторите сохранение.")
             if (loaded.failed) androidx.compose.material3.Button(onClick = { loaded.persist(retry = true) }) { androidx.compose.material3.Text("Повторить сохранение черновиков") }

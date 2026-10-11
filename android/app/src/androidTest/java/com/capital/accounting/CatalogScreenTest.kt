@@ -112,6 +112,62 @@ class CatalogScreenTest {
             api.request("/auth/logout", "POST", session = foreign.credential(origin))
         }
     }
+    @Test fun separateCategoryAndTagEditorsGuardBackAndReturnAfterOwnConfirmation() {
+        fun click(text: String) {
+            compose.waitUntil(10000) { compose.onAllNodes(hasText(text) and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithText(text).performScrollTo().performClick()
+        }
+        fun field(label: String, value: String) {
+            compose.onNodeWithText(label).performScrollTo().performTextClearance()
+            compose.onNodeWithText(label).performTextInput(value)
+        }
+        fun waitFor(text: String) = compose.waitUntil(30000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
+        fun choose(text: String) {
+            waitFor("Сохранить измененный черновик?")
+            compose.waitUntil(10000) { compose.onAllNodes(hasText(text) and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithText(text).performClick()
+        }
+        waitFor("Вы вошли: ${auth.profile.email}"); waitFor("Новая категория")
+        compose.onNodeWithText("Название категории").assertDoesNotExist()
+        click("Обновить категории и теги"); waitFor("Категория: Home / Food")
+        click("Новая категория")
+        field("Название категории", "Retained category")
+        click("Родитель категории: Home")
+        fun back() {
+            val descriptor = InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand("input keyevent KEYCODE_BACK")
+            android.os.ParcelFileDescriptor.AutoCloseInputStream(descriptor).use { it.readBytes() }
+        }
+        back(); android.os.SystemClock.sleep(500)
+        if (compose.onAllNodesWithText("Сохранить измененный черновик?").fetchSemanticsNodes().isEmpty()) back()
+        choose("Остаться в редакторе")
+        compose.activityRule.scenario.recreate()
+        waitFor("Редактор категории")
+        compose.onNodeWithText("Название категории").assertTextContains("Retained category")
+        compose.onNodeWithText("Родитель: Home").assertExists()
+        click("Вернуться к категориям и тегам"); choose("Сохранить черновик и продолжить")
+        waitFor("Открыть черновик классификации")
+        compose.onNodeWithText("Редактор категории").assertDoesNotExist()
+        assertEquals(2, runBlocking { api.categories(auth.credential(origin)).size })
+        click("Восстановить черновик классификации 1")
+        field("Название категории", "Discard category")
+        click("Вернуться к категориям и тегам"); choose("Отбросить черновик и продолжить")
+        click("Восстановить черновик классификации 1")
+        click("Сохранить категорию")
+        waitFor("Категория: Home / Retained category")
+        compose.onNodeWithText("Редактор категории").assertDoesNotExist()
+        click("Новый тег")
+        field("Название тега", "Retained tag")
+        click("Вернуться к категориям и тегам"); choose("Сохранить черновик и продолжить")
+        click("Восстановить черновик классификации 2")
+        compose.onNodeWithText("Название тега").assertTextContains("Retained tag")
+        click("Сохранить тег")
+        waitFor("Тег: Retained tag")
+        compose.onNodeWithText("Редактор тега").assertDoesNotExist()
+        assertEquals(3, runBlocking { api.categories(auth.credential(origin)).size })
+        assertEquals(3, runBlocking { api.tags(auth.credential(origin)).size })
+        val app = ApplicationProvider.getApplicationContext<CapitalApplication>()
+        assertNull(runBlocking { app.database.commands().get(origin, auth.profile.id, auth.workspace.id) })
+    }
     @Test fun realCatalogMutationsArchiveAndExplicitVersionConflict() {
         fun click(text: String) = compose.onNodeWithText(text).performScrollTo().performClick().also {
             if (text == "Отменить изменение операции" || text.startsWith("Изменить операцию ") || text.startsWith("Изменить категорию ") || text.startsWith("Изменить тег ") || text == "Новая категория" || text == "Новый тег") {

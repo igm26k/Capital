@@ -1,6 +1,6 @@
 # Этап 2: приложения
 
-Дата: 2026-10-06. Статус: in_progress.
+Дата: 2026-10-11. Статус: in_progress.
 
 Сервер/веб приняты в S3-07B. APP-01 завершена. В APP-02 приняты Keystore/AES-GCM, реальные login/register/restore/renew/logout, process restart и durable logout intent (6/6 device tests). Devices/финансовые экраны еще реализуются. S3-05 не начат. Банковские источники остаются финальным этапом.
 
@@ -181,3 +181,11 @@ APP-02 in_progress: далее отдельные разделы/редакто�
 Приемка шага25: финальный `make android-auth-e2e` завершился exit0 — **41/41 свежих instrumentation executions без skips**, **19/19 unit**, debug/release/lint, real TLS API/PostgreSQL, cold restart/auth/financial outage/SQL и compiled release trust PASS. Число executions дополнительно сверено по каждому свежему native artifact, включая three account cases и host phases. Новый real AccountsScreenTest проверяет системный Back, stay, keep/restore/discard, recreation отдельного экрана, отсутствие server account до явного submit и возврат после подтверждения exact KWD123456. Второй новый UI test препятствует настоящему AtomicFile commit непустым каталогом только для synthetic owner: keep блокируется, поля остаются, после устранения препятствия явный retry записывает исходный raw draft, без API/Room command. Cold draft harness восстанавливает сохраненный account slot после actual force-stop и проверяет owner isolation; прежние catalog/account conflict сценарии адаптированы к отдельному экрану.
 
 APP-02 in_progress: далее остальные отдельные редакторы и разделы/bottom navigation, detail actions, bulk classification, S3-05 и APP-03.
+
+## Шаг 26: отдельные редакторы категорий и тегов — 2026-10-11
+
+Классификация открывается в отдельном полноэкранном редакторе с keep/discard/stay при закрытии и системном Back. Saved slots восстанавливают collection/id/parent/expected version и открывают свой редактор; own receipt возвращает список, rejected/pending остаются с retry/rebind/accept. В редакторе доступны refresh, local write error и explicit local retry. Общий scoped saveable флаг хранит только имя открытого редактора; editor account/catalog не открываются одновременно. FinancialCommandStatus вынесен из дублированного UI: он отображается в активном редакторе либо в списке, с прежними exact body/key/version и auth/busy/generation guards.
+
+Приемка шага26: полный `make android-auth-e2e` завершился exit0 — **42/42 свежих instrumentation executions без skips**, **19/19 unit**, debug/release/lint, real TLS API/PostgreSQL, cold restart/auth/financial outage/SQL и compiled release trust PASS. Число executions сверено по всем свежим native artifacts. Новый real CatalogScreenTest проверяет системный Back/stay, keep/restore/discard, parent и recreation, отсутствие category/tag write до submit и return-to-list после обеих own confirmations. Cold draft host сохраняет account и category slots, force-stop и новый процесс восстанавливают их у владельца; другие owner/scope не получают поля. Прежние category/tag rejected conflicts/archive/cycle и account retry/failed local commit сценарии входят в общий gate.
+
+APP-02 in_progress: далее отдельные редакторы операций/переводов/возвратов/корректировок, разделы и bottom navigation, detail actions, bulk classification, S3-05 и APP-03.

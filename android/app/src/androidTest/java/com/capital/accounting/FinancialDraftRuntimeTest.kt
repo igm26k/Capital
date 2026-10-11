@@ -89,7 +89,12 @@ class FinancialDraftRuntimeTest {
             click("Вернуться к счетам")
             compose.waitUntil(10000) { compose.onAllNodes(hasText("Сохранить черновик и продолжить") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithText("Сохранить черновик и продолжить").performClick()
+            click("Новая категория")
             field("Название категории", "Unsent category")
+            compose.waitUntil(10000) { compose.onAllNodes(hasText("Вернуться к категориям и тегам") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+            click("Вернуться к категориям и тегам")
+            compose.waitUntil(10000) { compose.onAllNodes(hasText("Сохранить черновик и продолжить") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithText("Сохранить черновик и продолжить").performClick()
             click("Изменить операцию Draft expense")
             field("Примечание операции", "Unsent expense <svg onload=alert(1)>")
             field("Получатель операции", "Unsent recipient")
@@ -119,11 +124,14 @@ class FinancialDraftRuntimeTest {
             val after = snapshot()
             assertEquals(before.keys().asSequence().toSet(), after.keys().asSequence().toSet())
             before.keys().forEach { key -> assertEquals("Restored field $key", before.getString(key), after.getString(key)) }
-            listOf("Название категории" to "Unsent category", "Примечание операции" to "Unsent expense <svg onload=alert(1)>", "Получатель операции" to "Unsent recipient", "Сумма списания перевода" to "10.001", "Сумма зачисления перевода" to "3.01", "Примечание перевода" to "Unsent transfer", "Сумма комиссии перевода" to "0.501", "Примечание комиссии перевода" to "Unsent fee", "Сумма части возврата 1" to "0.001", "Примечание возврата" to "Unsent refund", "Фактический остаток" to "-1.234", "Причина корректировки" to "Unsent reason").forEach { (label, value) -> compose.onNodeWithText(label).assertTextContains(value) }
+            listOf("Примечание операции" to "Unsent expense <svg onload=alert(1)>", "Получатель операции" to "Unsent recipient", "Сумма списания перевода" to "10.001", "Сумма зачисления перевода" to "3.01", "Примечание перевода" to "Unsent transfer", "Сумма комиссии перевода" to "0.501", "Примечание комиссии перевода" to "Unsent fee", "Сумма части возврата 1" to "0.001", "Примечание возврата" to "Unsent refund", "Фактический остаток" to "-1.234", "Причина корректировки" to "Unsent reason").forEach { (label, value) -> compose.onNodeWithText(label).assertTextContains(value) }
             click("Восстановить черновик счета 1")
             compose.onNodeWithText("Название счета").assertTextContains("Unsent account")
             compose.onNodeWithText("Начальный остаток").assertTextContains("invalid balance")
             click("Вернуться к счетам")
+            click("Восстановить черновик классификации 1")
+            compose.onNodeWithText("Название категории").assertTextContains("Unsent category")
+            click("Вернуться к категориям и тегам")
             compose.onNodeWithText("Версия операции на сервере: 2; версия черновика: 1").assertExists()
             compose.onNodeWithText("Использовать обновленную версию операции").assertExists()
             assertEquals("2026-10-06T08:10:00.123456Z", runBlocking { api.transaction(session, expense.id) }.occurred_at)

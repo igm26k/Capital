@@ -3,7 +3,6 @@ package com.capital.accounting.finance
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.material3.*
@@ -22,7 +21,8 @@ fun AccountPanel(model: AuthViewModel) {
     val enabled = !state.busy && state.persisted && !state.financeBlocked
     val guard = rememberDraftGuard("account", enabled, render = false)
     val scope = LocalFinancialDraftScope.current
-    var editorOpen by rememberSaveable { mutableStateOf(false) }
+    val navigation = LocalFinancialEditor.current
+    val editorOpen = navigation.value == "account"
     var handledReceipt by remember { mutableStateOf(state.collectionReceipt?.commandId) }
     var editingId by rememberFinancialDraft<String?>("account.editingId") { null }
     var editingVersion by rememberFinancialDraft("account.editingVersion") { "" }
@@ -40,7 +40,7 @@ fun AccountPanel(model: AuthViewModel) {
         opened = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.ROOT).format(Date()); zone = TimeZone.getDefault().id; archived = false; error = ""
     }
     fun close() {
-        if (enabled && !scope.saving) guard.request { reset(); editorOpen = false }
+        if (enabled && !scope.saving) guard.request { reset(); navigation.value = null }
     }
     LaunchedEffect(state.financialCommand?.commandId, state.collectionReceipt?.commandId) {
         val command = state.financialCommand
@@ -52,16 +52,16 @@ fun AccountPanel(model: AuthViewModel) {
                     editingVersion = it.version; currency = it.currency; editingBalance = it.posted_balance_minor
                 }
                 guard.markClean()
-                editorOpen = false
+                if (navigation.value == "account") navigation.value = null
             }
         }
         if (command?.method == "PUT" && command.path.contains("/accounts/")) {
-            editorOpen = true
+            navigation.value = "account"
             val draft = decodeResponse<AccountUpdate>(command.body)
             editingId = command.path.substringAfterLast('/'); editingVersion = draft.expected_version
             name = draft.name; type = draft.type; archived = draft.archived
         } else if (command?.method == "POST" && command.path.endsWith("/accounts")) {
-            editorOpen = true
+            navigation.value = "account"
             val draft = decodeResponse<AccountCreate>(command.body)
             name = draft.name; type = draft.type; currency = draft.currency
             zone = draft.occurred_timezone; opened = openingLocal(draft.opened_at, zone)
@@ -74,24 +74,12 @@ fun AccountPanel(model: AuthViewModel) {
         state.accounts.forEach { account ->
             Text("${account.name}${if (account.archived_at != null) " · В архиве" else ""}")
             Text(Money.display(account.posted_balance_minor, account.currency))
-            Button(enabled = enabled, onClick = { guard.request { editingId = account.id; editingVersion = account.version; currency = account.currency; editingBalance = account.posted_balance_minor; name = account.name; type = account.type; archived = account.archived_at != null; error = ""; editorOpen = true  } }) { Text("Изменить счет ${account.name}") }
+            Button(enabled = enabled, onClick = { guard.request { editingId = account.id; editingVersion = account.version; currency = account.currency; editingBalance = account.posted_balance_minor; name = account.name; type = account.type; archived = account.archived_at != null; error = ""; navigation.value = "account"  } }) { Text("Изменить счет ${account.name}") }
         }
-        Button(enabled = enabled && !scope.saving, onClick = { guard.request { reset(); editorOpen = true } }) { Text("Добавить счет") }
-        TextButton(enabled = enabled && !scope.saving, onClick = { editorOpen = true }) { Text("Открыть черновик счета") }
-        DraftGuardControls(guard, "account", enabled) { editorOpen = true }
-        state.financialCommand?.let { command ->
-            Text("Сохраненная команда: ${command.commandId}")
-            Text("Состояние: ${command.state}")
-            if (command.state == "pending" && command.sessionId != state.auth?.session?.id && command.generationId == state.auth?.workspace?.sync_generation_id) {
-                Button(enabled = !state.busy, onClick = model::rebindAccountCommand) { Text("Продолжить сохраненную команду в этой сессии") }
-            }
-            if (command.state == "pending") Button(enabled = !state.busy && command.sessionId == state.auth?.session?.id && command.generationId == state.auth?.workspace?.sync_generation_id, onClick = model::retryAccountCommand) { Text("Повторить сохраненную команду") }
-            if (command.state == "confirmed" || command.state == "rejected") Button(enabled = !state.busy, onClick = model::acceptAccountResult) { Text(if (command.state == "confirmed") "Принять подтвержденный результат" else "Обновить данные для новой команды") }
-            state.accountConflict?.let { current ->
-                Text("На сервере: ${current.name}, ${current.type}, версия ${current.version}; ${if (current.archived_at != null) "в архиве" else "активен"}")
-                Text("Ваш черновик: $name, $type; ${if (archived) "в архив" else "активен"}")
-            }
-        }
+        Button(enabled = enabled && !scope.saving, onClick = { guard.request { reset(); navigation.value = "account" } }) { Text("Добавить счет") }
+        TextButton(enabled = enabled && !scope.saving, onClick = { navigation.value = "account" }) { Text("Открыть черновик счета") }
+        DraftGuardControls(guard, "account", enabled) { navigation.value = "account" }
+        if (navigation.value == null) FinancialCommandStatus(model, "Ваш черновик: $name, $type; ${if (archived) "в архив" else "активен"}")
     } else Dialog(onDismissRequest = ::close, properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)) {
         Surface(Modifier.fillMaxSize()) {
             Column(Modifier.safeDrawingPadding().imePadding().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -106,19 +94,7 @@ fun AccountPanel(model: AuthViewModel) {
                     Button(enabled = !scope.saving, onClick = { scope.persist(retry = true) }) { Text("Повторить локальное сохранение") }
                 }
                 DraftGuardControls(guard, "account", enabled)
-                state.financialCommand?.let { command ->
-                    Text("Сохраненная команда: ${command.commandId}")
-                    Text("Состояние: ${command.state}")
-                    if (command.state == "pending" && command.sessionId != state.auth?.session?.id && command.generationId == state.auth?.workspace?.sync_generation_id) {
-                        Button(enabled = !state.busy, onClick = model::rebindAccountCommand) { Text("Продолжить сохраненную команду в этой сессии") }
-                    }
-                    if (command.state == "pending") Button(enabled = !state.busy && command.sessionId == state.auth?.session?.id && command.generationId == state.auth?.workspace?.sync_generation_id, onClick = model::retryAccountCommand) { Text("Повторить сохраненную команду") }
-                    if (command.state == "confirmed" || command.state == "rejected") Button(enabled = !state.busy, onClick = model::acceptAccountResult) { Text(if (command.state == "confirmed") "Принять подтвержденный результат" else "Обновить данные для новой команды") }
-                    state.accountConflict?.let { current ->
-                        Text("На сервере: ${current.name}, ${current.type}, версия ${current.version}; ${if (current.archived_at != null) "в архиве" else "активен"}")
-                        Text("Ваш черновик: $name, $type; ${if (archived) "в архив" else "активен"}")
-                    }
-                }
+                FinancialCommandStatus(model, "Ваш черновик: $name, $type; ${if (archived) "в архив" else "активен"}")
                 Text(if (editingId == null) "Новый счет" else "Изменить счет", style = MaterialTheme.typography.titleMedium)
                 OutlinedTextField(name, { name = it }, label = { Text(if (editingId == null) "Название счета" else "Новое название счета") }, enabled = enabled, singleLine = true)
                 Text("Тип счета: $type")

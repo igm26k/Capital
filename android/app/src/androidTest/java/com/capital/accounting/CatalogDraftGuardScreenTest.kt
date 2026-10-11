@@ -93,14 +93,17 @@ class CatalogDraftGuardScreenTest {
         click("Восстановить черновик счета 1")
         compose.onNodeWithText("Начальный остаток").assertTextContains("invalid")
         click("Вернуться к счетам")
+        click("Новая категория")
         field("Название категории", "Unsent category")
         click("Родитель категории: Detail group")
         click("Новый тег"); choose("Сохранить черновик и продолжить")
         field("Название тега", "Unsent tag")
-        click("Изменить тег $tagName"); choose("Сохранить черновик и продолжить")
+        click("Вернуться к категориям и тегам"); choose("Сохранить черновик и продолжить")
+        click("Изменить тег $tagName")
         field("Название тега", "Own tag")
         click("Сохранить тег"); waitFor("Изменить тег Own tag")
         compose.waitUntil(30000) { runBlocking { app.database.commands().get(origin, auth.profile.id, auth.workspace.id) } == null }
+        click("Открыть черновик классификации")
         val ownTag = runBlocking { api.tags(auth.credential(origin)).single { it.name == "Own tag" } }
         runBlocking { mutate("tags/${ownTag.id}", "PUT", ApiClient.json.encodeToString(TagUpdate(ownTag.version, "Foreign tag", false))) }
         click("Обновить категории и теги")
@@ -117,6 +120,7 @@ class CatalogDraftGuardScreenTest {
         compose.activityRule.scenario.recreate()
         waitFor("Обновить счета")
         compose.onNodeWithText("Название тега").assertTextContains("Unsent tag")
+        click("Вернуться к категориям и тегам")
         click("Восстановить черновик счета 1")
         compose.onNodeWithText("Начальный остаток").assertTextContains("invalid")
         waitFor("Локальные черновики сохранены. Отправка операций выполняется отдельно.")
