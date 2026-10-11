@@ -42,6 +42,8 @@ class FinancialOutageTest {
             compose.onNodeWithText(label).performScrollTo().performTextClearance()
             compose.onNodeWithText(label).performTextInput(value)
         }
+        compose.waitUntil(30000) { compose.onAllNodesWithText("Добавить счет").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Добавить счет").performScrollTo().performClick()
         field("Название счета", "Outage pocket")
         compose.onNodeWithText("KWD").performScrollTo().performClick()
         field("Начальный остаток", "123.456")

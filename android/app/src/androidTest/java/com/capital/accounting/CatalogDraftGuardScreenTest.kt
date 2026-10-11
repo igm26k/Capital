@@ -54,6 +54,7 @@ class CatalogDraftGuardScreenTest {
     @get:Rule(order = 1) val compose = createAndroidComposeRule<MainActivity>()
     private suspend fun mutate(path: String, method: String, body: String) = decodeResponse<MutationResult>(api.request("/workspaces/${auth.workspace.id}/$path", method, body, auth.credential(origin), UUID.randomUUID().toString(), auth.workspace.sync_generation_id))
     private fun click(text: String) {
+        compose.waitUntil(10000) { compose.onAllNodes(hasText(text) and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
         if (text == "Остаться в редакторе") compose.onNodeWithText(text).performClick()
         else compose.onNodeWithText(text).performScrollTo().performClick()
     }
@@ -71,15 +72,18 @@ class CatalogDraftGuardScreenTest {
         waitFor("Вы вошли: ${auth.profile.email}"); waitFor("Обновить счета")
         click("Обновить счета"); waitFor("Изменить счет Detail cash")
         click("Обновить категории и теги"); waitFor("Изменить тег $tagName")
+        click("Добавить счет")
         field("Название счета", "Unsent account")
         field("Начальный остаток", "invalid")
         click("KWD")
-        click("Изменить счет Detail cash"); choose("Остаться в редакторе")
+        click("Вернуться к счетам"); choose("Остаться в редакторе")
         compose.onNodeWithText("Название счета").assertTextContains("Unsent account")
-        click("Изменить счет Detail cash"); choose("Сохранить черновик и продолжить")
+        click("Вернуться к счетам"); choose("Сохранить черновик и продолжить")
+        click("Изменить счет Detail cash")
         field("Новое название счета", "Own account")
         click("Сохранить счет"); waitFor("Изменить счет Own account")
         compose.waitUntil(30000) { runBlocking { app.database.commands().get(origin, auth.profile.id, auth.workspace.id) } == null }
+        click("Открыть черновик счета")
         val own = runBlocking { api.accounts(auth.credential(origin)).single { it.id == cash.id } }
         val foreign = runBlocking { mutate("accounts/${cash.id}", "PUT", ApiClient.json.encodeToString(AccountUpdate(own.version, "Foreign account", own.type, false))).accounts.single() }
         click("Обновить счета")
@@ -88,6 +92,7 @@ class CatalogDraftGuardScreenTest {
         compose.onNodeWithText("Сохранить измененный черновик?").assertDoesNotExist()
         click("Восстановить черновик счета 1")
         compose.onNodeWithText("Начальный остаток").assertTextContains("invalid")
+        click("Вернуться к счетам")
         field("Название категории", "Unsent category")
         click("Родитель категории: Detail group")
         click("Новый тег"); choose("Сохранить черновик и продолжить")
@@ -112,6 +117,7 @@ class CatalogDraftGuardScreenTest {
         compose.activityRule.scenario.recreate()
         waitFor("Обновить счета")
         compose.onNodeWithText("Название тега").assertTextContains("Unsent tag")
+        click("Восстановить черновик счета 1")
         compose.onNodeWithText("Начальный остаток").assertTextContains("invalid")
         waitFor("Локальные черновики сохранены. Отправка операций выполняется отдельно.")
         assertEquals(6, runBlocking { api.transactions(auth.credential(origin)).size })

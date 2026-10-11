@@ -19,6 +19,7 @@ import java.util.UUID
 
 @RunWith(AndroidJUnit4::class)
 class AccountsScreenTest {
+    private val app get() = ApplicationProvider.getApplicationContext<CapitalApplication>()
     private lateinit var api: ApiClient
     private lateinit var auth: BearerAuth
     private val origin get() = InstrumentationRegistry.getArguments().getString("api_origin")!!
@@ -41,6 +42,7 @@ class AccountsScreenTest {
     }
     @get:Rule(order = 1) val compose = createAndroidComposeRule<MainActivity>()
     private fun click(text: String) {
+        compose.waitUntil(10000) { compose.onAllNodes(hasText(text) and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText(text).performScrollTo().performClick()
         if (text.startsWith("Изменить счет ") || text == "Новый счет вместо изменения") {
             if (compose.onAllNodesWithText("Сохранить измененный черновик?").fetchSemanticsNodes().isNotEmpty()) {
@@ -54,8 +56,83 @@ class AccountsScreenTest {
         compose.onNodeWithText(label).performTextInput(value)
     }
     private fun waitFor(text: String) = compose.waitUntil(30000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
+    @Test fun separateAccountEditorGuardsSystemBackAndReturnsOnlyAfterConfirmation() {
+        waitFor("Вы вошли: ${auth.profile.email}"); waitFor("Добавить счет")
+        compose.onNodeWithText("Название счета").assertDoesNotExist()
+        click("Добавить счет")
+        field("Название счета", "Retained account")
+        field("Начальный остаток", "invalid")
+        click("KWD")
+        fun systemBack() {
+            val descriptor = InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand("input keyevent KEYCODE_BACK")
+            android.os.ParcelFileDescriptor.AutoCloseInputStream(descriptor).use { it.readBytes() }
+        }
+        systemBack()
+        android.os.SystemClock.sleep(500)
+        if (compose.onAllNodesWithText("Сохранить измененный черновик?").fetchSemanticsNodes().isEmpty()) systemBack()
+        waitFor("Сохранить измененный черновик?")
+        compose.onNodeWithText("Остаться в редакторе").performClick()
+        compose.onNodeWithText("Название счета").assertTextContains("Retained account")
+        compose.activityRule.scenario.recreate()
+        waitFor("Редактор счета")
+        compose.onNodeWithText("Начальный остаток").assertTextContains("invalid")
+        click("Вернуться к счетам")
+        compose.waitUntil(10000) { compose.onAllNodes(hasText("Сохранить черновик и продолжить") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Сохранить черновик и продолжить").performClick()
+        waitFor("Добавить счет")
+        compose.onNodeWithText("Редактор счета").assertDoesNotExist()
+        assertEquals(0, runBlocking { api.accounts(auth.credential(origin)).size })
+        click("Восстановить черновик счета 1")
+        compose.onNodeWithText("Название счета").assertTextContains("Retained account")
+        field("Название счета", "Discarded account")
+        click("Вернуться к счетам")
+        compose.waitUntil(10000) { compose.onAllNodes(hasText("Отбросить черновик и продолжить") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Отбросить черновик и продолжить").performClick()
+        waitFor("Добавить счет")
+        click("Восстановить черновик счета 1")
+        field("Начальный остаток", "123.456")
+        click("Создать счет")
+        waitFor("Изменить счет Retained account")
+        compose.onNodeWithText("Редактор счета").assertDoesNotExist()
+        compose.onNodeWithText("123,456 KWD").assertExists()
+        val account = runBlocking { api.accounts(auth.credential(origin)).single() }
+        assertEquals("123456", account.posted_balance_minor)
+        assertNull(runBlocking { app.database.commands().get(origin, auth.profile.id, auth.workspace.id) })
+    }
+    @Test fun editorExposesExplicitRetryWhenActualAtomicFileCommitFails() {
+        waitFor("Вы вошли: ${auth.profile.email}"); waitFor("Добавить счет")
+        click("Добавить счет")
+        field("Название счета", "Before disk failure")
+        val hash = java.security.MessageDigest.getInstance("SHA-256").digest(ApiClient.json.encodeToString(listOf(origin, auth.profile.id, auth.workspace.id)).toByteArray()).joinToString("") { "%02x".format(it) }
+        val file = java.io.File(app.noBackupFilesDir, "financial-drafts/$hash.json")
+        val backup = java.io.File(file.parentFile, "$hash.test-original")
+        compose.waitUntil(10000) { compose.onAllNodes(hasText("Вернуться к счетам") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+        assertTrue(file.renameTo(backup))
+        assertTrue(file.mkdir())
+        val obstruction = java.io.File(file, "obstruction").apply { writeText("synthetic fixture") }
+        try {
+            field("Название счета", "Retained during disk failure")
+            waitFor("Повторить локальное сохранение")
+            click("Вернуться к счетам")
+            waitFor("Сохранить измененный черновик?")
+            compose.onNodeWithText("Сохранить черновик и продолжить").assertIsNotEnabled()
+            compose.onNodeWithText("Остаться в редакторе").performClick()
+            compose.onNodeWithText("Название счета").assertTextContains("Retained during disk failure")
+            assertTrue(obstruction.delete()); assertTrue(file.delete()); assertTrue(backup.renameTo(file))
+            click("Повторить локальное сохранение")
+            compose.waitUntil(10000) { compose.onAllNodesWithText("Повторить локальное сохранение").fetchSemanticsNodes().isEmpty() }
+            val disk = runBlocking { com.capital.accounting.finance.FinancialDrafts(app).open(origin, auth.profile.id, auth.workspace.id) }
+            assertEquals(ApiClient.json.encodeToString("Retained during disk failure"), disk.read("account.name"))
+            assertEquals(0, runBlocking { api.accounts(auth.credential(origin)).size })
+            assertNull(runBlocking { app.database.commands().get(origin, auth.profile.id, auth.workspace.id) })
+        } finally {
+            if (file.isDirectory) { obstruction.delete(); file.delete() }
+            if (backup.exists()) { file.delete(); assertTrue(backup.renameTo(file)) }
+        }
+    }
     @Test fun exactCreationArchiveAndExplicitConflictResolution() {
         waitFor("Вы вошли: ${auth.profile.email}")
+        waitFor("Добавить счет"); click("Добавить счет")
         field("Название счета", "Android pocket")
         click("KWD")
         field("Начальный остаток", "123.456")

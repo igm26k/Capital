@@ -1,6 +1,11 @@
 package com.capital.accounting.finance
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -15,7 +20,9 @@ import java.util.*
 fun AccountPanel(model: AuthViewModel) {
     val state = model.state
     val enabled = !state.busy && state.persisted && !state.financeBlocked
-    val guard = rememberDraftGuard("account", enabled)
+    val guard = rememberDraftGuard("account", enabled, render = false)
+    val scope = LocalFinancialDraftScope.current
+    var editorOpen by rememberSaveable { mutableStateOf(false) }
     var handledReceipt by remember { mutableStateOf(state.collectionReceipt?.commandId) }
     var editingId by rememberFinancialDraft<String?>("account.editingId") { null }
     var editingVersion by rememberFinancialDraft("account.editingVersion") { "" }
@@ -28,6 +35,13 @@ fun AccountPanel(model: AuthViewModel) {
     var zone by rememberFinancialDraft("account.zone") { TimeZone.getDefault().id }
     var archived by rememberFinancialDraft("account.archived") { false }
     var error by remember { mutableStateOf("") }
+    fun reset() {
+        editingId = null; editingVersion = ""; editingBalance = "0"; name = ""; type = "bank"; currency = "EUR"; balance = "0"
+        opened = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.ROOT).format(Date()); zone = TimeZone.getDefault().id; archived = false; error = ""
+    }
+    fun close() {
+        if (enabled && !scope.saving) guard.request { reset(); editorOpen = false }
+    }
     LaunchedEffect(state.financialCommand?.commandId, state.collectionReceipt?.commandId) {
         val command = state.financialCommand
         if (command == null && state.collectionReceipt?.commandId != handledReceipt) {
@@ -38,81 +52,118 @@ fun AccountPanel(model: AuthViewModel) {
                     editingVersion = it.version; currency = it.currency; editingBalance = it.posted_balance_minor
                 }
                 guard.markClean()
+                editorOpen = false
             }
         }
         if (command?.method == "PUT" && command.path.contains("/accounts/")) {
+            editorOpen = true
             val draft = decodeResponse<AccountUpdate>(command.body)
             editingId = command.path.substringAfterLast('/'); editingVersion = draft.expected_version
             name = draft.name; type = draft.type; archived = draft.archived
         } else if (command?.method == "POST" && command.path.endsWith("/accounts")) {
+            editorOpen = true
             val draft = decodeResponse<AccountCreate>(command.body)
             name = draft.name; type = draft.type; currency = draft.currency
             zone = draft.occurred_timezone; opened = openingLocal(draft.opened_at, zone)
             balance = Money.display(draft.opening_balance_minor, draft.currency).removeSuffix(" ${draft.currency}").replace('−', '-')
         }
     }
-    Text("Счета", style = MaterialTheme.typography.titleLarge)
-    Button(enabled = !state.busy, onClick = model::loadAccounts) { Text("Обновить счета") }
-    state.financialCommand?.let { command ->
-        Text("Сохраненная команда: ${command.commandId}")
-        Text("Состояние: ${command.state}")
-        if (command.state == "pending" && command.sessionId != state.auth?.session?.id && command.generationId == state.auth?.workspace?.sync_generation_id) {
-            Button(enabled = !state.busy, onClick = model::rebindAccountCommand) { Text("Продолжить сохраненную команду в этой сессии") }
+    if (!editorOpen) {
+        Text("Счета", style = MaterialTheme.typography.titleLarge)
+        Button(enabled = !state.busy, onClick = model::loadAccounts) { Text("Обновить счета") }
+        state.accounts.forEach { account ->
+            Text("${account.name}${if (account.archived_at != null) " · В архиве" else ""}")
+            Text(Money.display(account.posted_balance_minor, account.currency))
+            Button(enabled = enabled, onClick = { guard.request { editingId = account.id; editingVersion = account.version; currency = account.currency; editingBalance = account.posted_balance_minor; name = account.name; type = account.type; archived = account.archived_at != null; error = ""; editorOpen = true  } }) { Text("Изменить счет ${account.name}") }
         }
-        if (command.state == "pending") Button(enabled = !state.busy && command.sessionId == state.auth?.session?.id && command.generationId == state.auth?.workspace?.sync_generation_id, onClick = model::retryAccountCommand) { Text("Повторить сохраненную команду") }
-        if (command.state == "confirmed" || command.state == "rejected") Button(enabled = !state.busy, onClick = model::acceptAccountResult) { Text(if (command.state == "confirmed") "Принять подтвержденный результат" else "Обновить данные для новой команды") }
-        state.accountConflict?.let { current ->
-            Text("На сервере: ${current.name}, ${current.type}, версия ${current.version}; ${if (current.archived_at != null) "в архиве" else "активен"}")
-            Text("Ваш черновик: $name, $type; ${if (archived) "в архив" else "активен"}")
+        Button(enabled = enabled && !scope.saving, onClick = { guard.request { reset(); editorOpen = true } }) { Text("Добавить счет") }
+        TextButton(enabled = enabled && !scope.saving, onClick = { editorOpen = true }) { Text("Открыть черновик счета") }
+        DraftGuardControls(guard, "account", enabled) { editorOpen = true }
+        state.financialCommand?.let { command ->
+            Text("Сохраненная команда: ${command.commandId}")
+            Text("Состояние: ${command.state}")
+            if (command.state == "pending" && command.sessionId != state.auth?.session?.id && command.generationId == state.auth?.workspace?.sync_generation_id) {
+                Button(enabled = !state.busy, onClick = model::rebindAccountCommand) { Text("Продолжить сохраненную команду в этой сессии") }
+            }
+            if (command.state == "pending") Button(enabled = !state.busy && command.sessionId == state.auth?.session?.id && command.generationId == state.auth?.workspace?.sync_generation_id, onClick = model::retryAccountCommand) { Text("Повторить сохраненную команду") }
+            if (command.state == "confirmed" || command.state == "rejected") Button(enabled = !state.busy, onClick = model::acceptAccountResult) { Text(if (command.state == "confirmed") "Принять подтвержденный результат" else "Обновить данные для новой команды") }
+            state.accountConflict?.let { current ->
+                Text("На сервере: ${current.name}, ${current.type}, версия ${current.version}; ${if (current.archived_at != null) "в архиве" else "активен"}")
+                Text("Ваш черновик: $name, $type; ${if (archived) "в архив" else "активен"}")
+            }
+        }
+    } else Dialog(onDismissRequest = ::close, properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)) {
+        Surface(Modifier.fillMaxSize()) {
+            Column(Modifier.safeDrawingPadding().imePadding().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Редактор счета", style = MaterialTheme.typography.headlineLarge)
+                state.auth?.let { Text("Вы вошли: ${it.profile.email}") }
+                Button(enabled = enabled && !scope.saving, onClick = ::close) { Text("Вернуться к счетам") }
+                Button(enabled = !state.busy, onClick = model::loadAccounts) { Text("Обновить счета") }
+                if (state.busy) CircularProgressIndicator()
+                if (state.message.isNotEmpty()) Text(state.message)
+                if (scope.failed) {
+                    Text("Не удалось сохранить черновики на устройстве. Повторите сохранение.")
+                    Button(enabled = !scope.saving, onClick = { scope.persist(retry = true) }) { Text("Повторить локальное сохранение") }
+                }
+                DraftGuardControls(guard, "account", enabled)
+                state.financialCommand?.let { command ->
+                    Text("Сохраненная команда: ${command.commandId}")
+                    Text("Состояние: ${command.state}")
+                    if (command.state == "pending" && command.sessionId != state.auth?.session?.id && command.generationId == state.auth?.workspace?.sync_generation_id) {
+                        Button(enabled = !state.busy, onClick = model::rebindAccountCommand) { Text("Продолжить сохраненную команду в этой сессии") }
+                    }
+                    if (command.state == "pending") Button(enabled = !state.busy && command.sessionId == state.auth?.session?.id && command.generationId == state.auth?.workspace?.sync_generation_id, onClick = model::retryAccountCommand) { Text("Повторить сохраненную команду") }
+                    if (command.state == "confirmed" || command.state == "rejected") Button(enabled = !state.busy, onClick = model::acceptAccountResult) { Text(if (command.state == "confirmed") "Принять подтвержденный результат" else "Обновить данные для новой команды") }
+                    state.accountConflict?.let { current ->
+                        Text("На сервере: ${current.name}, ${current.type}, версия ${current.version}; ${if (current.archived_at != null) "в архиве" else "активен"}")
+                        Text("Ваш черновик: $name, $type; ${if (archived) "в архив" else "активен"}")
+                    }
+                }
+                Text(if (editingId == null) "Новый счет" else "Изменить счет", style = MaterialTheme.typography.titleMedium)
+                OutlinedTextField(name, { name = it }, label = { Text(if (editingId == null) "Название счета" else "Новое название счета") }, enabled = enabled, singleLine = true)
+                Text("Тип счета: $type")
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf("bank" to "Банк", "cash" to "Наличные", "card" to "Карта").forEach { (value, label) ->
+                        TextButton(enabled = enabled, onClick = { type = value }) { Text(label) }
+                    }
+                }
+                if (editingId == null) {
+                    Text("Валюта счета: $currency")
+                    Row { Money.scales.keys.take(3).forEach { code -> TextButton(enabled = enabled, onClick = { currency = code }) { Text(code) } } }
+                    Row { Money.scales.keys.drop(3).forEach { code -> TextButton(enabled = enabled, onClick = { currency = code }) { Text(code) } } }
+                    OutlinedTextField(balance, { balance = it }, label = { Text("Начальный остаток") }, enabled = enabled, singleLine = true)
+                    OutlinedTextField(opened, { opened = it }, label = { Text("Дата открытия (YYYY-MM-DDTHH:MM:SS)") }, enabled = enabled, singleLine = true)
+                    OutlinedTextField(zone, { zone = it }, label = { Text("Часовой пояс открытия") }, enabled = enabled, singleLine = true)
+                } else {
+                    Text("Валюта: $currency. Остаток: ${Money.display(editingBalance, currency)}")
+                    Row { Checkbox(archived, { archived = it }, enabled = enabled); Text("Счет в архиве") }
+                    Text("Архив сохраняет историю и остаток. Для новых операций восстановите счет.")
+                }
+                if (editingId != null) {
+                    val current = state.accounts.find { it.id == editingId }
+                    if (current != null && current.version != editingVersion) {
+                        Text("Текущая версия на сервере: ${current.version}; ваш черновик: $editingVersion")
+                        Button(enabled = enabled, onClick = { editingVersion = current.version; currency = current.currency; editingBalance = current.posted_balance_minor }) { Text("Использовать обновленную версию") }
+                    }
+                }
+                if (error.isNotEmpty()) Text(error)
+                Button(enabled = enabled, onClick = {
+                    try {
+                        require(name.isNotBlank() && name.length <= 100) { "Введите название счета до 100 символов." }
+                        val id = editingId
+                        val body = if (id == null) {
+                            require(zone in TimeZone.getAvailableIDs()) { "Проверьте часовой пояс." }
+                            require(opened.matches(Regex("[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}"))) { "Проверьте дату открытия." }
+                            val parser = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.ROOT).apply { isLenient = false; timeZone = TimeZone.getTimeZone(zone) }
+                            val date = requireNotNull(parser.parse(opened))
+                            val instant = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.ROOT).apply { timeZone = TimeZone.getTimeZone("UTC") }.format(date)
+                            ApiClient.json.encodeToString(AccountCreate(UUID.randomUUID().toString(), name.trim(), type, currency, instant, zone, Money.minor(balance, currency)))
+                        } else ApiClient.json.encodeToString(AccountUpdate(editingVersion, name.trim(), type, archived))
+                        error = ""; model.submitAccount(body, id)
+                    } catch (_: Exception) { error = "Проверьте название, сумму, дату и часовой пояс счета." }
+                }) { Text(if (editingId == null) "Создать счет" else "Сохранить счет") }
+                if (editingId != null) TextButton(enabled = enabled, onClick = { guard.request { reset() } }) { Text("Новый счет вместо изменения") }
+            }
         }
     }
-    state.accounts.forEach { account ->
-        Text("${account.name}${if (account.archived_at != null) " · В архиве" else ""}")
-        Text(Money.display(account.posted_balance_minor, account.currency))
-        Button(enabled = enabled, onClick = { guard.request { editingId = account.id; editingVersion = account.version; currency = account.currency; editingBalance = account.posted_balance_minor; name = account.name; type = account.type; archived = account.archived_at != null; error = ""  } }) { Text("Изменить счет ${account.name}") }
-    }
-    Text(if (editingId == null) "Новый счет" else "Изменить счет", style = MaterialTheme.typography.titleMedium)
-    OutlinedTextField(name, { name = it }, label = { Text(if (editingId == null) "Название счета" else "Новое название счета") }, enabled = enabled, singleLine = true)
-    Text("Тип счета: $type")
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        listOf("bank" to "Банк", "cash" to "Наличные", "card" to "Карта").forEach { (value, label) ->
-            TextButton(enabled = enabled, onClick = { type = value }) { Text(label) }
-        }
-    }
-    if (editingId == null) {
-        Text("Валюта счета: $currency")
-        Row { Money.scales.keys.take(3).forEach { code -> TextButton(enabled = enabled, onClick = { currency = code }) { Text(code) } } }
-        Row { Money.scales.keys.drop(3).forEach { code -> TextButton(enabled = enabled, onClick = { currency = code }) { Text(code) } } }
-        OutlinedTextField(balance, { balance = it }, label = { Text("Начальный остаток") }, enabled = enabled, singleLine = true)
-        OutlinedTextField(opened, { opened = it }, label = { Text("Дата открытия (YYYY-MM-DDTHH:MM:SS)") }, enabled = enabled, singleLine = true)
-        OutlinedTextField(zone, { zone = it }, label = { Text("Часовой пояс открытия") }, enabled = enabled, singleLine = true)
-    } else {
-        Text("Валюта: $currency. Остаток: ${Money.display(editingBalance, currency)}")
-        Row { Checkbox(archived, { archived = it }, enabled = enabled); Text("Счет в архиве") }
-        Text("Архив сохраняет историю и остаток. Для новых операций восстановите счет.")
-    }
-    if (editingId != null) {
-        val current = state.accounts.find { it.id == editingId }
-        if (current != null && current.version != editingVersion) {
-            Text("Текущая версия на сервере: ${current.version}; ваш черновик: $editingVersion")
-            Button(enabled = enabled, onClick = { editingVersion = current.version; currency = current.currency; editingBalance = current.posted_balance_minor }) { Text("Использовать обновленную версию") }
-        }
-    }
-    if (error.isNotEmpty()) Text(error)
-    Button(enabled = enabled, onClick = {
-        try {
-            require(name.isNotBlank() && name.length <= 100) { "Введите название счета до 100 символов." }
-            val id = editingId
-            val body = if (id == null) {
-                require(zone in TimeZone.getAvailableIDs()) { "Проверьте часовой пояс." }
-                require(opened.matches(Regex("[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}"))) { "Проверьте дату открытия." }
-                val parser = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.ROOT).apply { isLenient = false; timeZone = TimeZone.getTimeZone(zone) }
-                val date = requireNotNull(parser.parse(opened))
-                val instant = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.ROOT).apply { timeZone = TimeZone.getTimeZone("UTC") }.format(date)
-                ApiClient.json.encodeToString(AccountCreate(UUID.randomUUID().toString(), name.trim(), type, currency, instant, zone, Money.minor(balance, currency)))
-            } else ApiClient.json.encodeToString(AccountUpdate(editingVersion, name.trim(), type, archived))
-            error = ""; model.submitAccount(body, id)
-        } catch (_: Exception) { error = "Проверьте название, сумму, дату и часовой пояс счета." }
-    }) { Text(if (editingId == null) "Создать счет" else "Сохранить счет") }
-    if (editingId != null) TextButton(enabled = enabled, onClick = { guard.request { editingId = null; editingVersion = ""; editingBalance = "0"; name = ""; type = "bank"; currency = "EUR"; balance = "0"; opened = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.ROOT).format(Date()); zone = TimeZone.getDefault().id; archived = false; error = ""  } }) { Text("Новый счет вместо изменения") }
 }

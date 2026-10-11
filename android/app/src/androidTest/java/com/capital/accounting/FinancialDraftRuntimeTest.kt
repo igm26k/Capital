@@ -81,9 +81,14 @@ class FinancialDraftRuntimeTest {
         click("Обновить счета"); waitFor("Для операции: Draft cash · KWD")
         click("Обновить историю"); waitFor("Детали операции ${expense.note}")
         if (phase == "prepare") {
+            click("Добавить счет")
             field("Название счета", "Unsent account")
             click("KWD")
             field("Начальный остаток", "invalid balance")
+            compose.waitUntil(10000) { compose.onAllNodes(hasText("Вернуться к счетам") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+            click("Вернуться к счетам")
+            compose.waitUntil(10000) { compose.onAllNodes(hasText("Сохранить черновик и продолжить") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithText("Сохранить черновик и продолжить").performClick()
             field("Название категории", "Unsent category")
             click("Изменить операцию Draft expense")
             field("Примечание операции", "Unsent expense <svg onload=alert(1)>")
@@ -114,7 +119,11 @@ class FinancialDraftRuntimeTest {
             val after = snapshot()
             assertEquals(before.keys().asSequence().toSet(), after.keys().asSequence().toSet())
             before.keys().forEach { key -> assertEquals("Restored field $key", before.getString(key), after.getString(key)) }
-            listOf("Название счета" to "Unsent account", "Начальный остаток" to "invalid balance", "Название категории" to "Unsent category", "Примечание операции" to "Unsent expense <svg onload=alert(1)>", "Получатель операции" to "Unsent recipient", "Сумма списания перевода" to "10.001", "Сумма зачисления перевода" to "3.01", "Примечание перевода" to "Unsent transfer", "Сумма комиссии перевода" to "0.501", "Примечание комиссии перевода" to "Unsent fee", "Сумма части возврата 1" to "0.001", "Примечание возврата" to "Unsent refund", "Фактический остаток" to "-1.234", "Причина корректировки" to "Unsent reason").forEach { (label, value) -> compose.onNodeWithText(label).assertTextContains(value) }
+            listOf("Название категории" to "Unsent category", "Примечание операции" to "Unsent expense <svg onload=alert(1)>", "Получатель операции" to "Unsent recipient", "Сумма списания перевода" to "10.001", "Сумма зачисления перевода" to "3.01", "Примечание перевода" to "Unsent transfer", "Сумма комиссии перевода" to "0.501", "Примечание комиссии перевода" to "Unsent fee", "Сумма части возврата 1" to "0.001", "Примечание возврата" to "Unsent refund", "Фактический остаток" to "-1.234", "Причина корректировки" to "Unsent reason").forEach { (label, value) -> compose.onNodeWithText(label).assertTextContains(value) }
+            click("Восстановить черновик счета 1")
+            compose.onNodeWithText("Название счета").assertTextContains("Unsent account")
+            compose.onNodeWithText("Начальный остаток").assertTextContains("invalid balance")
+            click("Вернуться к счетам")
             compose.onNodeWithText("Версия операции на сервере: 2; версия черновика: 1").assertExists()
             compose.onNodeWithText("Использовать обновленную версию операции").assertExists()
             assertEquals("2026-10-06T08:10:00.123456Z", runBlocking { api.transaction(session, expense.id) }.occurred_at)
@@ -126,7 +135,9 @@ class FinancialDraftRuntimeTest {
             field("Email", foreignEmail); field("Пароль", "synthetic draft password"); click("Войти")
             waitFor("Вы вошли: $foreignEmail"); waitFor("Новая операция"); saved()
             compose.onNodeWithText("Примечание операции").assert(SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.EditableText, androidx.compose.ui.text.AnnotatedString("")))
+            click("Открыть черновик счета")
             compose.onNodeWithText("Название счета").assert(SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.EditableText, androidx.compose.ui.text.AnnotatedString("")))
+            click("Вернуться к счетам")
             field("Примечание операции", "Foreign local draft"); saved()
             click("Выйти"); waitFor("Войти")
             field("Email", auth.profile.email); field("Пароль", "synthetic draft password"); click("Войти")
