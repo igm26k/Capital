@@ -7,6 +7,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.capital.accounting.api.*
@@ -23,6 +24,7 @@ fun AccountPanel(model: AuthViewModel) {
     val scope = LocalFinancialDraftScope.current
     val navigation = LocalFinancialEditor.current
     val section = LocalFinancialSection.current
+    var accountFilter by rememberSaveable(state.origin, state.auth?.profile?.id, state.auth?.workspace?.id) { mutableStateOf("active") }
     val editorOpen = navigation.value == "account"
     var handledReceipt by remember { mutableStateOf(state.collectionReceipt?.commandId) }
     var editingId by rememberFinancialDraft<String?>("account.editingId") { null }
@@ -73,8 +75,19 @@ fun AccountPanel(model: AuthViewModel) {
     if (navigation.value == null) FinancialCommandStatus(model, "Ваш черновик: $name, $type; ${if (archived) "в архив" else "активен"}")
     if (!editorOpen && section.value == "accounts") {
         Text("Счета", style = MaterialTheme.typography.titleLarge)
-        state.accounts.forEach { account ->
+        Text("Показаны счета: ${when (accountFilter) { "archived" -> "архивные"; "all" -> "все"; else -> "активные" }}")
+        listOf("active" to "Активные счета", "archived" to "Архивные счета", "all" to "Все счета").forEach { (value, label) ->
+            TextButton(onClick = { accountFilter = value }) { Text(label) }
+        }
+        val visibleAccounts = state.accounts.filter { when (accountFilter) { "archived" -> it.archived_at != null; "all" -> true; else -> it.archived_at == null } }
+        Text("Итоги показанных счетов по валютам")
+        visibleAccounts.groupBy { it.currency }.toSortedMap().forEach { (currency, accounts) ->
+            Text("Итого: ${Money.displayTotal(accounts.map { it.posted_balance_minor }, currency)}")
+        }
+        if (visibleAccounts.isEmpty() && !state.busy) Text("В выбранном фильтре счетов нет.")
+        visibleAccounts.forEach { account ->
             Text("${account.name}${if (account.archived_at != null) " · В архиве" else ""}")
+            Text("Тип: ${when (account.type) { "bank" -> "Банк"; "card" -> "Карта"; else -> "Наличные" }} · Валюта: ${account.currency}")
             Text(Money.display(account.posted_balance_minor, account.currency))
             TextButton(enabled = !state.busy && state.persisted, onClick = {
                 model.applyHistoryFilter(TransactionFilter(accountId = account.id))

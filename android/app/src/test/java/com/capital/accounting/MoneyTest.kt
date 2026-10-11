@@ -5,6 +5,15 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class MoneyTest {
+    @Test fun totalsKeepPrecisionBeyondSingleRecordLimitAndAllowCancellation() {
+        assertEquals("180000000000000,00 USD", Money.displayTotal(listOf("9000000000000000", "9000000000000000"), "USD"))
+        assertEquals("−18000000000000,000 KWD", Money.displayTotal(listOf("-9000000000000000", "-9000000000000000"), "KWD"))
+        assertEquals("0,001 KWD", Money.displayTotal(listOf("9000000000000000", "-9000000000000000", "1"), "KWD"))
+        assertEquals("0 JPY", Money.displayTotal(emptyList(), "JPY"))
+        assertThrows(IllegalArgumentException::class.java) { Money.displayTotal(listOf("9000000000000001"), "USD") }
+        assertThrows(IllegalArgumentException::class.java) { Money.displayTotal(listOf("01"), "USD") }
+        assertThrows(IllegalArgumentException::class.java) { Money.displayTotal(emptyList(), "XXX") }
+    }
     @Test fun exactScalesSignsAndLimits() {
         assertEquals("1234", Money.minor("12,34", "EUR"))
         assertEquals("-1234", Money.minor("-12.34", "EUR"))

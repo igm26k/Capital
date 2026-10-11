@@ -200,6 +200,8 @@ class TransactionsScreenTest {
                 auth.credential(origin), UUID.randomUUID().toString(), auth.workspace.sync_generation_id)
         }
         click("Обновить счета")
+        compose.onNodeWithContentDescription("Раздел Счета").performClick()
+        compose.onNodeWithText("Архивные счета").performScrollTo().performClick()
         waitFor("KWD cash · В архиве")
         click("Открыть черновик операции")
         compose.financialNode("Сохранить операцию").assertIsNotEnabled()

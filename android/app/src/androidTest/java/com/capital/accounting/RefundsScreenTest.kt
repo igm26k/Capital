@@ -196,6 +196,8 @@ class RefundsScreenTest {
         val latest = accounts()[source.id]!!
         runBlocking { api.request("/workspaces/${auth.workspace.id}/accounts/${source.id}", "PUT", ApiClient.json.encodeToString(AccountUpdate(latest.version, latest.name, latest.type, true)), auth.credential(origin), UUID.randomUUID().toString(), auth.workspace.sync_generation_id) }
         click("Обновить счета")
+        compose.onNodeWithContentDescription("Раздел Счета").performClick()
+        compose.onNodeWithText("Архивные счета").performScrollTo().performClick()
         waitFor("Refund source · В архиве")
         click("Создать возврат расхода Refund expense")
         click("Счет возврата: Refund alternate · KWD")
