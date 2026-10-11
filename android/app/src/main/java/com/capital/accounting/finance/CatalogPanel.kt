@@ -11,6 +11,8 @@ import java.util.UUID
 fun CatalogPanel(model: AuthViewModel) {
     val state = model.state
     val enabled = !state.busy && !state.financeBlocked && state.persisted
+    val guard = rememberDraftGuard("catalog", enabled)
+    var handledReceipt by remember { mutableStateOf(state.collectionReceipt?.commandId) }
     var collection by rememberFinancialDraft("catalog.collection") { "categories" }
     var id by rememberFinancialDraft<String?>("catalog.id") { null }
     var version by rememberFinancialDraft("catalog.version") { "" }
@@ -18,8 +20,19 @@ fun CatalogPanel(model: AuthViewModel) {
     var parentId by rememberFinancialDraft<String?>("catalog.parentId") { null }
     var archived by rememberFinancialDraft("catalog.archived") { false }
     var error by remember { mutableStateOf("") }
-    LaunchedEffect(state.financialCommand?.commandId) {
-        val command = state.financialCommand ?: return@LaunchedEffect
+    LaunchedEffect(state.financialCommand?.commandId, state.collectionReceipt?.commandId) {
+        val command = state.financialCommand
+        if (command == null) {
+            val receipt = state.collectionReceipt
+            if (receipt?.commandId != handledReceipt) {
+                handledReceipt = receipt?.commandId
+                if (receipt != null && receipt.collection == collection && (receipt.recordId == id || (receipt.created && id == null))) {
+                    if (id != null) version = if (collection == "categories") receipt.result.categories.single { it.id == id }.version else receipt.result.tags.single { it.id == id }.version
+                    guard.markClean()
+                }
+            }
+            return@LaunchedEffect
+        }
         collection = when {
             command.path.contains("/categories") -> "categories"
             command.path.contains("/tags") -> "tags"
@@ -44,8 +57,8 @@ fun CatalogPanel(model: AuthViewModel) {
     }
     Text("Категории и теги", style = MaterialTheme.typography.titleLarge)
     Button(enabled = !state.busy, onClick = model::loadCatalog) { Text("Обновить категории и теги") }
-    TextButton(enabled = enabled, onClick = { collection = "categories"; id = null; name = ""; parentId = null; archived = false; error = "" }) { Text("Новая категория") }
-    TextButton(enabled = enabled, onClick = { collection = "tags"; id = null; name = ""; parentId = null; archived = false; error = "" }) { Text("Новый тег") }
+    TextButton(enabled = enabled, onClick = { guard.request { collection = "categories"; id = null; version = ""; name = ""; parentId = null; archived = false; error = ""  } }) { Text("Новая категория") }
+    TextButton(enabled = enabled, onClick = { guard.request { collection = "tags"; id = null; version = ""; name = ""; parentId = null; archived = false; error = ""  } }) { Text("Новый тег") }
     val category = collection == "categories"
     Text(if (category) "Редактор категории" else "Редактор тега")
     OutlinedTextField(name, { name = it }, label = { Text(if (category) "Название категории" else "Название тега") }, enabled = enabled, singleLine = true)
@@ -81,10 +94,10 @@ fun CatalogPanel(model: AuthViewModel) {
     }) { Text(if (category) "Сохранить категорию" else "Сохранить тег") }
     state.categories.forEach { item ->
         Text("Категория: ${categoryPath(item.id, state.categories)}${if (item.archived_at != null) " · В архиве" else ""}")
-        TextButton(enabled = enabled, onClick = { collection = "categories"; id = item.id; version = item.version; name = item.name; parentId = item.parent_id; archived = item.archived_at != null; error = "" }) { Text("Изменить категорию ${categoryPath(item.id, state.categories)}") }
+        TextButton(enabled = enabled, onClick = { guard.request { collection = "categories"; id = item.id; version = item.version; name = item.name; parentId = item.parent_id; archived = item.archived_at != null; error = ""  } }) { Text("Изменить категорию ${categoryPath(item.id, state.categories)}") }
     }
     state.tags.forEach { item ->
         Text("Тег: ${item.name}${if (item.archived_at != null) " · В архиве" else ""}")
-        TextButton(enabled = enabled, onClick = { collection = "tags"; id = item.id; version = item.version; name = item.name; archived = item.archived_at != null; error = "" }) { Text("Изменить тег ${item.name}") }
+        TextButton(enabled = enabled, onClick = { guard.request { collection = "tags"; id = item.id; version = item.version; name = item.name; parentId = null; archived = item.archived_at != null; error = ""  } }) { Text("Изменить тег ${item.name}") }
     }
 }

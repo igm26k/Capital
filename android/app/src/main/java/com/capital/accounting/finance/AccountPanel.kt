@@ -15,6 +15,8 @@ import java.util.*
 fun AccountPanel(model: AuthViewModel) {
     val state = model.state
     val enabled = !state.busy && state.persisted && !state.financeBlocked
+    val guard = rememberDraftGuard("account", enabled)
+    var handledReceipt by remember { mutableStateOf(state.collectionReceipt?.commandId) }
     var editingId by rememberFinancialDraft<String?>("account.editingId") { null }
     var editingVersion by rememberFinancialDraft("account.editingVersion") { "" }
     var editingBalance by rememberFinancialDraft("account.editingBalance") { "0" }
@@ -26,8 +28,18 @@ fun AccountPanel(model: AuthViewModel) {
     var zone by rememberFinancialDraft("account.zone") { TimeZone.getDefault().id }
     var archived by rememberFinancialDraft("account.archived") { false }
     var error by remember { mutableStateOf("") }
-    LaunchedEffect(state.financialCommand?.commandId) {
+    LaunchedEffect(state.financialCommand?.commandId, state.collectionReceipt?.commandId) {
         val command = state.financialCommand
+        if (command == null && state.collectionReceipt?.commandId != handledReceipt) {
+            val receipt = state.collectionReceipt
+            handledReceipt = receipt?.commandId
+            if (receipt?.collection == "accounts" && (receipt.recordId == editingId || (receipt.created && editingId == null))) {
+                if (editingId != null) receipt.result.accounts.single { it.id == editingId }.let {
+                    editingVersion = it.version; currency = it.currency; editingBalance = it.posted_balance_minor
+                }
+                guard.markClean()
+            }
+        }
         if (command?.method == "PUT" && command.path.contains("/accounts/")) {
             val draft = decodeResponse<AccountUpdate>(command.body)
             editingId = command.path.substringAfterLast('/'); editingVersion = draft.expected_version
@@ -57,7 +69,7 @@ fun AccountPanel(model: AuthViewModel) {
     state.accounts.forEach { account ->
         Text("${account.name}${if (account.archived_at != null) " · В архиве" else ""}")
         Text(Money.display(account.posted_balance_minor, account.currency))
-        Button(enabled = enabled, onClick = { editingId = account.id; editingVersion = account.version; currency = account.currency; editingBalance = account.posted_balance_minor; name = account.name; type = account.type; archived = account.archived_at != null; error = "" }) { Text("Изменить счет ${account.name}") }
+        Button(enabled = enabled, onClick = { guard.request { editingId = account.id; editingVersion = account.version; currency = account.currency; editingBalance = account.posted_balance_minor; name = account.name; type = account.type; archived = account.archived_at != null; error = ""  } }) { Text("Изменить счет ${account.name}") }
     }
     Text(if (editingId == null) "Новый счет" else "Изменить счет", style = MaterialTheme.typography.titleMedium)
     OutlinedTextField(name, { name = it }, label = { Text(if (editingId == null) "Название счета" else "Новое название счета") }, enabled = enabled, singleLine = true)
@@ -102,5 +114,5 @@ fun AccountPanel(model: AuthViewModel) {
             error = ""; model.submitAccount(body, id)
         } catch (_: Exception) { error = "Проверьте название, сумму, дату и часовой пояс счета." }
     }) { Text(if (editingId == null) "Создать счет" else "Сохранить счет") }
-    if (editingId != null) TextButton(enabled = enabled, onClick = { editingId = null; name = ""; error = "" }) { Text("Новый счет вместо изменения") }
+    if (editingId != null) TextButton(enabled = enabled, onClick = { guard.request { editingId = null; editingVersion = ""; editingBalance = "0"; name = ""; type = "bank"; currency = "EUR"; balance = "0"; opened = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.ROOT).format(Date()); zone = TimeZone.getDefault().id; archived = false; error = ""  } }) { Text("Новый счет вместо изменения") }
 }

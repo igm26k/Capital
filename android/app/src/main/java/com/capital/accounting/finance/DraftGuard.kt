@@ -83,7 +83,7 @@ class DraftGuard internal constructor(private val scope: FinancialDraftScope, pr
 @Composable
 fun rememberDraftGuard(prefix: String, enabled: Boolean): DraftGuard {
     val scope = LocalFinancialDraftScope.current
-    val noun = when (prefix) { "transfer" -> "перевода"; "refund" -> "возврата"; "adjustment" -> "корректировки"; else -> "операции" }
+    val noun = when (prefix) { "account" -> "счета"; "catalog" -> "классификации"; "transfer" -> "перевода"; "refund" -> "возврата"; "adjustment" -> "корректировки"; else -> "операции" }
     val guard = remember(scope, prefix) { DraftGuard(scope, prefix) }
     SideEffect {
         android.os.Handler(android.os.Looper.getMainLooper()).post { guard.initialize() }

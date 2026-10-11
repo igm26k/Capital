@@ -165,3 +165,11 @@ APP-02 остается in_progress. Эта приемка защищает пе
 Приемка шага23: финальный `make android-auth-e2e` — **38/38 instrumentation executions без skips**, **19/19 unit**, debug/release/lint, real TLS API/PostgreSQL, auth/financial outage/cold restart/SQL и compiled release trust PASS. Новый real LinkedDraftGuardScreenTest принимает keep/restore transfer+fee, discard измененного transfer, keep/restore refund parts и negative adjustment target/reason, recreation, typed expected versions, unchanged6 server records и отсутствие Room command. Прежние сценарии смены/отмены явно выбирают discard при запросе guard.
 
 APP-02 in_progress: guard счетов/catalogs, отдельные разделы/редакторы, detail actions и return-to-list, bulk classification, S3-05 atomic mirror/outbox/staging/epoch recovery и APP-03 еще впереди.
+
+## Шаг 24: guard счетов и классификации и точные mutation receipts — 2026-10-11
+
+Замена редактора счета, категории или тега использует scoped keep/discard/stay и отдельные saved slots. Новый счет сбрасывает все поля открытия; новая классификация очищает ожидаемую версию и parent. Own подтверждение POST/PUT перед удалением Room command проверяется по collection/id/workspace и сохраняет точный MutationResult; редактор принимает version из этого результата, а не из последующего GET. Внешний refresh сохраняет expected version черновика и требует явного решения при конфликте.
+
+Приемка шага24: полный `make android-auth-e2e` — **39/39 instrumentation executions без skips**, **19/19 unit**, debug/release/lint, real TLS API/PostgreSQL, cold restart/auth/financial outage/SQL и compiled release trust PASS. Новый CatalogDraftGuardScreenTest проверяет три решения, invalid opening balance, category parent, восстановление account/category/tag slots после recreation, own receipts и внешние обновления без автоматической подмены версии, отсутствие лишних transactions и Room command.
+
+APP-02 in_progress: далее отдельные разделы/редакторы, Back/закрытие, detail actions и return-to-list, bulk classification, S3-05 atomic mirror/outbox/staging/epoch recovery и APP-03.

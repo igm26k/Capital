@@ -55,7 +55,7 @@ class CatalogScreenTest {
         compose.activityRule.scenario.recreate()
         compose.onNodeWithText("Категория: Home / Food").assertExists()
         fun click(text: String) = compose.onNodeWithText(text).performScrollTo().performClick().also {
-            if (text == "Отменить изменение операции" || text.startsWith("Изменить операцию ")) {
+            if (text == "Отменить изменение операции" || text.startsWith("Изменить операцию ") || text.startsWith("Изменить категорию ") || text.startsWith("Изменить тег ") || text == "Новая категория" || text == "Новый тег") {
                 if (compose.onAllNodesWithText("Сохранить измененный черновик?").fetchSemanticsNodes().isNotEmpty()) {
                     compose.waitUntil(10000) { compose.onAllNodes(hasText("Отбросить черновик и продолжить") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
                     compose.onNodeWithText("Отбросить черновик и продолжить").performClick()
@@ -114,7 +114,7 @@ class CatalogScreenTest {
     }
     @Test fun realCatalogMutationsArchiveAndExplicitVersionConflict() {
         fun click(text: String) = compose.onNodeWithText(text).performScrollTo().performClick().also {
-            if (text == "Отменить изменение операции" || text.startsWith("Изменить операцию ")) {
+            if (text == "Отменить изменение операции" || text.startsWith("Изменить операцию ") || text.startsWith("Изменить категорию ") || text.startsWith("Изменить тег ") || text == "Новая категория" || text == "Новый тег") {
                 if (compose.onAllNodesWithText("Сохранить измененный черновик?").fetchSemanticsNodes().isNotEmpty()) {
                     compose.waitUntil(10000) { compose.onAllNodes(hasText("Отбросить черновик и продолжить") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
                     compose.onNodeWithText("Отбросить черновик и продолжить").performClick()
@@ -194,7 +194,7 @@ class CatalogScreenTest {
 
     @Test fun categoryConflictAndCycleKeepRejectedDraftWithoutAutomaticWrite() {
         fun click(text: String) = compose.onNodeWithText(text).performScrollTo().performClick().also {
-            if (text == "Отменить изменение операции" || text.startsWith("Изменить операцию ")) {
+            if (text == "Отменить изменение операции" || text.startsWith("Изменить операцию ") || text.startsWith("Изменить категорию ") || text.startsWith("Изменить тег ") || text == "Новая категория" || text == "Новый тег") {
                 if (compose.onAllNodesWithText("Сохранить измененный черновик?").fetchSemanticsNodes().isNotEmpty()) {
                     compose.waitUntil(10000) { compose.onAllNodes(hasText("Отбросить черновик и продолжить") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
                     compose.onNodeWithText("Отбросить черновик и продолжить").performClick()

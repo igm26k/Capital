@@ -8,8 +8,8 @@
 Задача: HTTPS bearer регистрация/вход/renew/revoke, Keystore credential, accounts/opening/archive, полные ручные операции, классификация/фильтры и явные ошибки/конфликты по готовому серверному контракту.
 Критерии приемки: реальные API/PostgreSQL; exact integer minor/versions/generation, никакого финансового auto-resubmit при конфликте; credential не в Room/логах/backup; Android запись видна в вебе.
 Проверки: Gradle unit/build/lint и instrumentation на устройстве/эмуляторе с реальным TLS API/PostgreSQL; сквозная web сверка. Mock не подменяет приемку.
-Результат: приняты Keystore/bearer auth, devices/revoke, durable commands, счета, создание/изменение/удаление доходов/расходов, части/классификация, управление categories/tags и создание/изменение/удаление transfer+fee, refunds, adjustments и серверные фильтры истории/pagination и обработка удаленных записей, отдельные read-only детали и переходы parent/fee/refund и scoped persistence неотправленных черновиков и save/discard/stay при смене/cancel income/expense с отдельными сохраненными слотами, guard transfer/refund/adjustment; текущий общий gate — 38/38 device и 19/19 unit PASS. APP-02 остается in_progress; каждый проверенный шаг — отдельный commit/push.
-Следующий шаг: навигация разделов/редакторов, действия из деталей, защита черновиков остальных типов, закрытие отдельного редактора и массовая классификация; затем S3-05 durable atomic outbox/mirror/staging и APP-03 Android→server→web.
+Результат: приняты Keystore/bearer auth, devices/revoke, durable commands, счета, создание/изменение/удаление доходов/расходов, части/классификация, управление categories/tags и создание/изменение/удаление transfer+fee, refunds, adjustments и серверные фильтры истории/pagination и обработка удаленных записей, отдельные read-only детали и переходы parent/fee/refund и scoped persistence неотправленных черновиков и save/discard/stay при смене/cancel income/expense с отдельными сохраненными слотами, guard transfer/refund/adjustment; guard счетов/categories/tags и exact collection receipts; текущий общий gate — 39/39 device и 19/19 unit PASS. APP-02 остается in_progress; каждый проверенный шаг — отдельный commit/push.
+Следующий шаг: навигация разделов/редакторов, действия из деталей, закрытие отдельного редактора и массовая классификация; затем S3-05 durable atomic outbox/mirror/staging и APP-03 Android→server→web.
 
 ## Шаг 1: CredentialVault — 2026-10-06
 
@@ -224,3 +224,11 @@ APP-02 остается in_progress. Эта приемка защищает пе
 Приемка шага23: финальный `make android-auth-e2e` — **38/38 instrumentation executions без skips**, **19/19 unit**, debug/release/lint, real TLS API/PostgreSQL, auth/financial outage/cold restart/SQL и compiled release trust PASS. Новый real LinkedDraftGuardScreenTest принимает keep/restore transfer+fee, discard измененного transfer, keep/restore refund parts и negative adjustment target/reason, recreation, typed expected versions, unchanged6 server records и отсутствие Room command. Прежние сценарии смены/отмены явно выбирают discard при запросе guard.
 
 APP-02 in_progress: guard счетов/catalogs, отдельные разделы/редакторы, detail actions и return-to-list, bulk classification, S3-05 atomic mirror/outbox/staging/epoch recovery и APP-03 еще впереди.
+
+## Шаг 24: guard счетов и классификации и точные mutation receipts — 2026-10-11
+
+Замена редактора счета, категории или тега использует scoped keep/discard/stay и отдельные saved slots. Новый счет сбрасывает все поля открытия; новая классификация очищает ожидаемую версию и parent. Own подтверждение POST/PUT перед удалением Room command проверяется по collection/id/workspace и сохраняет точный MutationResult; редактор принимает version из этого результата, а не из последующего GET. Внешний refresh сохраняет expected version черновика и требует явного решения при конфликте.
+
+Приемка шага24: полный `make android-auth-e2e` — **39/39 instrumentation executions без skips**, **19/19 unit**, debug/release/lint, real TLS API/PostgreSQL, cold restart/auth/financial outage/SQL и compiled release trust PASS. Новый CatalogDraftGuardScreenTest проверяет три решения, invalid opening balance, category parent, восстановление account/category/tag slots после recreation, own receipts и внешние обновления без автоматической подмены версии, отсутствие лишних transactions и Room command.
+
+APP-02 in_progress: далее отдельные разделы/редакторы, Back/закрытие, detail actions и return-to-list, bulk classification, S3-05 atomic mirror/outbox/staging/epoch recovery и APP-03.

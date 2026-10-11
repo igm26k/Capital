@@ -24,6 +24,8 @@ data class TransactionReceipt(val commandId: String, val transactionId: String, 
     val transaction get() = records.find { it.id == transactionId }
 }
 
+data class CollectionReceipt(val commandId: String, val collection: String, val recordId: String, val created: Boolean, val result: MutationResult)
+
 data class AuthState(
     val origin: String = "", val busy: Boolean = true, val message: String = "",
     val auth: BearerAuth? = null, val restorePending: Boolean = false,
@@ -31,6 +33,7 @@ data class AuthState(
     val sessions: List<Session> = emptyList(), val revokePendingId: String? = null,
     val accounts: List<Account> = emptyList(), val transactions: List<Transaction> = emptyList(), val categories: List<Category> = emptyList(), val tags: List<Tag> = emptyList(), val financialCommand: FinancialCommand? = null,
     val detailStack: List<String> = emptyList(), val detailTransaction: Transaction? = null, val detailMissing: Boolean = false, val detailError: String = "",
+    val collectionReceipt: CollectionReceipt? = null,
     val transactionsLoaded: Boolean = false, val transactionReceipt: TransactionReceipt? = null,
     val historyFilter: TransactionFilter? = null, val historyItems: List<Transaction>? = null,
     val historyLimit: Int = 50, val historyNextCursor: String? = null, val historyCursors: List<String> = emptyList(), val historyError: String = "",
@@ -407,10 +410,11 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             val categories = ApiClient(saved.origin).categories(saved)
             val tags = ApiClient(saved.origin).tags(saved)
             val page = state.historyFilter?.let { ApiClient(saved.origin).transactionPage(saved, it, state.historyLimit) }
+            val collection = collectionReceipt(result) ?: state.collectionReceipt
             val receipt = transactionReceipt(result) ?: state.transactionReceipt
             require(app.database.commands().remove(result.commandId, "confirmed") == 1)
             state = state.copy(busy = false, accounts = accounts, transactions = history, transactionsLoaded = true, categories = categories, tags = tags, financialCommand = null, financeBlocked = false, historyItems = page?.items, historyNextCursor = page?.next_cursor,
-                historyCursors = listOfNotNull(page?.next_cursor), historyError = "", transactionReceipt = receipt, message = savedMessage(result.path))
+                historyCursors = listOfNotNull(page?.next_cursor), historyError = "", transactionReceipt = receipt, collectionReceipt = collection, message = savedMessage(result.path))
         } else {
             var current: Account? = null
             var transaction: Transaction? = null
@@ -457,11 +461,12 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                 val categories = ApiClient(saved.origin).categories(saved)
                 val tags = ApiClient(saved.origin).tags(saved)
                 val page = state.historyFilter?.let { ApiClient(saved.origin).transactionPage(saved, it, state.historyLimit) }
+                val collection = if (command.state == "confirmed") collectionReceipt(command) ?: state.collectionReceipt else state.collectionReceipt
                 val receipt = if (command.state == "confirmed") transactionReceipt(command) ?: state.transactionReceipt else state.transactionReceipt
                 require(app.database.commands().remove(command.commandId, command.state) == 1)
                 state = state.copy(busy = false, accounts = accounts, transactions = history, transactionsLoaded = true, categories = categories, tags = tags, financialCommand = null, financeBlocked = false,
                     historyItems = page?.items, historyNextCursor = page?.next_cursor, historyCursors = listOfNotNull(page?.next_cursor), historyError = "",
-                    transactionReceipt = receipt,
+                    transactionReceipt = receipt, collectionReceipt = collection,
                     accountConflict = null, transactionConflict = null, categoryConflict = null, tagConflict = null, message = if (command.state == "confirmed") savedMessage(command.path) else "Данные обновлены. Проверьте поля перед новой командой.")
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) { if (!financialFailure(saved, e)) state = state.copy(busy = false, message = "Не удалось обновить данные. Команда сохранена.") }
@@ -538,4 +543,19 @@ private fun transactionReceipt(command: FinancialCommand): TransactionReceipt? {
     val records = decodeResponse<MutationResult>(requireNotNull(command.result)).transactions
     require(command.method == "DELETE" || records.any { it.id == id })
     return TransactionReceipt(command.commandId, id, command.method == "DELETE", command.method == "POST", kind, records)
+}
+
+private fun collectionReceipt(command: FinancialCommand): CollectionReceipt? {
+    val match = Regex("^/workspaces/([0-9a-f-]{36})/(accounts|categories|tags)(?:/([0-9a-f-]{36}))?$").matchEntire(command.path) ?: return null
+    require(match.groupValues[1] == command.workspaceId && command.method in listOf("POST", "PUT"))
+    val collection = match.groupValues[2]
+    val id = if (command.method == "POST") ApiClient.json.parseToJsonElement(command.body).jsonObject.getValue("id").jsonPrimitive.content else match.groupValues[3]
+    val result = decodeResponse<MutationResult>(requireNotNull(command.result))
+    val valid = when (collection) {
+        "accounts" -> result.accounts.any { it.id == id && it.workspace_id == command.workspaceId }
+        "categories" -> result.categories.any { it.id == id && it.workspace_id == command.workspaceId }
+        else -> result.tags.any { it.id == id && it.workspace_id == command.workspaceId }
+    }
+    require(valid)
+    return CollectionReceipt(command.commandId, collection, id, command.method == "POST", result)
 }
