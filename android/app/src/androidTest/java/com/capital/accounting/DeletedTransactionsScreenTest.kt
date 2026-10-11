@@ -140,7 +140,11 @@ class DeletedTransactionsScreenTest {
         click("Сохранить изменения перевода")
         waitFor("Изменить перевод Own transfer saved")
         field("Примечание перевода", "Kept transfer draft")
+        click("Вернуться к истории переводов")
+        compose.waitUntil(10000) { compose.onAllNodes(hasText("Сохранить черновик и продолжить") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Сохранить черновик и продолжить").performClick()
         click("Удалить перевод Own transfer saved")
+        click("Восстановить черновик перевода 1")
         val snapshot = history().associateBy { it.id }
         val current = snapshot[transfer.id]!!
         remove(current, listOf(snapshot[current.fee_transaction_id]!!))
@@ -150,6 +154,7 @@ class DeletedTransactionsScreenTest {
         compose.onNodeWithText("Сохранить изменения перевода").assertIsNotEnabled()
         compose.onNodeWithText("Подтвердить удаление перевода").assertIsNotEnabled()
         click("Отменить удаление перевода")
+        click("Восстановить черновик перевода 1")
         click("Отменить изменение перевода")
         click("Изменить возврат Original refund")
         field("Примечание возврата", "Own refund saved")

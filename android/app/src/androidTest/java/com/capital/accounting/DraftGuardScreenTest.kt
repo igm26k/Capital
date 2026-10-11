@@ -55,7 +55,8 @@ class DraftGuardScreenTest {
     private suspend fun mutate(path: String, method: String, body: String) = decodeResponse<MutationResult>(api.request("/workspaces/${auth.workspace.id}/$path", method, body, auth.credential(origin), UUID.randomUUID().toString(), auth.workspace.sync_generation_id))
     private fun click(text: String) {
         compose.waitUntil(10000) { compose.onAllNodes(hasText(text) and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
-        if (text == "Остаться в редакторе") compose.onNodeWithText(text).performClick()
+        if (text == "Вернуться к истории операций") compose.onNodeWithText(text).performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick) { it() }
+        else if (text == "Остаться в редакторе") compose.onNodeWithText(text).performClick()
         else compose.onNodeWithText(text).performScrollTo().performClick()
     }
     private fun field(label: String, value: String) {

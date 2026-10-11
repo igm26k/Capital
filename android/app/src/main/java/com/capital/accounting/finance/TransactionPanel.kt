@@ -214,7 +214,7 @@ fun TransactionPanel(model: AuthViewModel) {
         TextButton(enabled = enabled, onClick = { deleting = null }) { Text("Отменить удаление") }
     }
     Text("История операций", style = MaterialTheme.typography.titleLarge)
-    if (!editorOpen) Button(enabled = !state.busy, onClick = model::loadTransactions) { Text("Обновить историю") }
+    if (navigation.value == null) Button(enabled = !state.busy, onClick = model::loadTransactions) { Text("Обновить историю") }
     HistoryFilters(model)
     (state.historyItems ?: state.transactions).forEach { transaction ->
         val label = when (transaction.kind) {

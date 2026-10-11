@@ -106,12 +106,17 @@ class FinancialDraftRuntimeTest {
             click("Вернуться к истории операций")
             compose.waitUntil(10000) { compose.onAllNodes(hasText("Сохранить черновик и продолжить") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithText("Сохранить черновик и продолжить").performClick()
+            click("Открыть черновик перевода")
             field("Сумма списания перевода", "10.001")
             field("Сумма зачисления перевода", "3.01")
             field("Примечание перевода", "Unsent transfer")
             click("Добавить комиссию перевода")
             field("Сумма комиссии перевода", "0.501")
             field("Примечание комиссии перевода", "Unsent fee")
+            compose.waitUntil(10000) { compose.onAllNodes(hasText("Вернуться к истории переводов") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+            click("Вернуться к истории переводов")
+            compose.waitUntil(10000) { compose.onAllNodes(hasText("Сохранить черновик и продолжить") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithText("Сохранить черновик и продолжить").performClick()
             click("Создать возврат расхода Draft expense")
             field("Сумма части возврата 1", "0.001")
             field("Примечание возврата", "Unsent refund")
@@ -132,7 +137,7 @@ class FinancialDraftRuntimeTest {
             val after = snapshot()
             assertEquals(before.keys().asSequence().toSet(), after.keys().asSequence().toSet())
             before.keys().forEach { key -> assertEquals("Restored field $key", before.getString(key), after.getString(key)) }
-            listOf("Сумма списания перевода" to "10.001", "Сумма зачисления перевода" to "3.01", "Примечание перевода" to "Unsent transfer", "Сумма комиссии перевода" to "0.501", "Примечание комиссии перевода" to "Unsent fee", "Сумма части возврата 1" to "0.001", "Примечание возврата" to "Unsent refund", "Фактический остаток" to "-1.234", "Причина корректировки" to "Unsent reason").forEach { (label, value) -> compose.onNodeWithText(label).assertTextContains(value) }
+            listOf("Сумма части возврата 1" to "0.001", "Примечание возврата" to "Unsent refund", "Фактический остаток" to "-1.234", "Причина корректировки" to "Unsent reason").forEach { (label, value) -> compose.onNodeWithText(label).assertTextContains(value) }
             click("Восстановить черновик счета 1")
             compose.onNodeWithText("Название счета").assertTextContains("Unsent account")
             compose.onNodeWithText("Начальный остаток").assertTextContains("invalid balance")
@@ -148,6 +153,10 @@ class FinancialDraftRuntimeTest {
             assertEquals("2026-10-06T08:10:00.123456Z", runBlocking { api.transaction(session, expense.id) }.occurred_at)
             compose.waitUntil(10000) { compose.onAllNodes(hasText("Вернуться к истории операций") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
             click("Вернуться к истории операций")
+            click("Восстановить черновик перевода 1")
+            listOf("Сумма списания перевода" to "10.001", "Сумма зачисления перевода" to "3.01", "Примечание перевода" to "Unsent transfer", "Сумма комиссии перевода" to "0.501", "Примечание комиссии перевода" to "Unsent fee").forEach { (label, value) -> compose.onNodeWithText(label).assertTextContains(value) }
+            compose.waitUntil(10000) { compose.onAllNodes(hasText("Вернуться к истории переводов") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+            click("Вернуться к истории переводов")
             // A real logout/login must change draft scope and restore it only for its owner.
             val foreignEmail = "draft-foreign-${UUID.randomUUID()}@example.test"
             val foreign = runBlocking { decodeResponse<BearerAuth>(api.request("/auth/register", "POST", ApiClient.json.encodeToString(Register(foreignEmail, "synthetic draft password", "Foreign drafts", "bearer", "UTC")))) }

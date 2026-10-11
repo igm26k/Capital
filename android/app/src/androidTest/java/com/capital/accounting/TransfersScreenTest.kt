@@ -49,6 +49,67 @@ class TransfersScreenTest {
         }
     }
     @get:Rule(order = 1) val compose = createAndroidComposeRule<MainActivity>()
+    private fun click(text: String) = compose.operationNode(text).performScrollTo().performClick()
+    private fun field(label: String, value: String) {
+        compose.operationField(label).performScrollTo().performTextClearance()
+        compose.onNodeWithText(label).performTextInput(value)
+    }
+    private fun waitFor(text: String) = compose.waitUntil(30000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
+    private fun history() = runBlocking { api.transactions(auth.credential(origin)) }
+    @Test fun separateTransferEditorGuardsBackAndReturnsAfterAggregateConfirmation() {
+        waitFor("Вы вошли: ${auth.profile.email}"); waitFor("Новый перевод")
+        compose.onNodeWithText("Сумма списания перевода").assertDoesNotExist()
+        click("Обновить счета"); waitFor("Списать со счета: Transfer source · KWD")
+        click("Списать со счета: Transfer source · KWD")
+        click("Зачислить на счет: Transfer target · USD")
+        field("Сумма списания перевода", "invalid")
+        field("Сумма зачисления перевода", "2.34")
+        field("Примечание перевода", "Retained transfer")
+        click("Добавить комиссию перевода")
+        field("Сумма комиссии перевода", "0.101")
+        field("Примечание комиссии перевода", "Retained fee")
+        fun back() {
+            val descriptor = InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand("input keyevent KEYCODE_BACK")
+            android.os.ParcelFileDescriptor.AutoCloseInputStream(descriptor).use { it.readBytes() }
+        }
+        back(); android.os.SystemClock.sleep(500)
+        if (compose.onAllNodesWithText("Сохранить измененный черновик?").fetchSemanticsNodes().isEmpty()) back()
+        waitFor("Сохранить измененный черновик?")
+        compose.onNodeWithText("Остаться в редакторе").performClick()
+        compose.activityRule.scenario.recreate()
+        waitFor("Вернуться к истории переводов")
+        compose.onNodeWithText("Примечание комиссии перевода").assertTextContains("Retained fee")
+        fun choose(text: String) {
+            waitFor("Сохранить измененный черновик?")
+            compose.waitUntil(10000) { compose.onAllNodes(hasText(text) and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithText(text).performClick()
+        }
+        compose.waitUntil(10000) { compose.onAllNodes(hasText("Вернуться к истории переводов") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Вернуться к истории переводов").performScrollTo().performClick()
+        choose("Сохранить черновик и продолжить")
+        assertEquals(3, history().size)
+        click("Восстановить черновик перевода 1")
+        field("Примечание перевода", "Discard transfer")
+        compose.waitUntil(10000) { compose.onAllNodes(hasText("Вернуться к истории переводов") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Вернуться к истории переводов").performScrollTo().performClick()
+        choose("Отбросить черновик и продолжить")
+        click("Восстановить черновик перевода 1")
+        field("Сумма списания перевода", "1.234")
+        click("Сохранить перевод")
+        waitFor("Изменить перевод Retained transfer")
+        compose.onNodeWithText("Вернуться к истории переводов").assertDoesNotExist()
+        val accounts = runBlocking { api.accounts(auth.credential(origin)).associateBy { it.id } }
+        assertEquals("98665", accounts[source.id]!!.posted_balance_minor)
+        assertEquals("3234", accounts[target.id]!!.posted_balance_minor)
+        assertEquals("20000", accounts[same.id]!!.posted_balance_minor)
+        val records = history()
+        assertEquals(5, records.size)
+        val root = records.single { it.kind == "transfer" }
+        assertEquals("Retained fee", records.single { it.id == root.fee_transaction_id }.note)
+        assertEquals("101", records.single { it.id == root.fee_transaction_id }.allocations.single().amount_minor)
+        val app = ApplicationProvider.getApplicationContext<CapitalApplication>()
+        assertNull(runBlocking { app.database.commands().get(origin, auth.profile.id, auth.workspace.id) })
+    }
     @Test fun realSameAndCrossCurrencyTransfersFeeAndLostReceiptReplay() {
         fun click(text: String) = compose.operationNode(text).performScrollTo().performClick().also {
             if (listOf("Изменить операцию ", "Изменить перевод ", "Изменить возврат ", "Изменить корректировку ", "Создать возврат расхода ", "Создать возврат комиссии ", "Корректировать счет ").any { text.startsWith(it) } || text in listOf("Отменить изменение операции", "Отменить изменение перевода", "Отменить создание возврата", "Отменить изменение возврата", "Отменить корректировку")) {
