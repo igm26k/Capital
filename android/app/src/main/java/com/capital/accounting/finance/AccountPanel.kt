@@ -70,7 +70,7 @@ fun AccountPanel(model: AuthViewModel) {
     }
     if (!editorOpen) {
         Text("Счета", style = MaterialTheme.typography.titleLarge)
-        Button(enabled = !state.busy, onClick = model::loadAccounts) { Text("Обновить счета") }
+        if (navigation.value == null) Button(enabled = !state.busy, onClick = model::loadAccounts) { Text("Обновить счета") }
         state.accounts.forEach { account ->
             Text("${account.name}${if (account.archived_at != null) " · В архиве" else ""}")
             Text(Money.display(account.posted_balance_minor, account.currency))

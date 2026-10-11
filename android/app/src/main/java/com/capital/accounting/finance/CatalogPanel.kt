@@ -75,7 +75,7 @@ fun CatalogPanel(model: AuthViewModel) {
     }
     if (!editorOpen) {
         Text("Категории и теги", style = MaterialTheme.typography.titleLarge)
-        Button(enabled = !state.busy, onClick = model::loadCatalog) { Text("Обновить категории и теги") }
+        if (navigation.value == null) Button(enabled = !state.busy, onClick = model::loadCatalog) { Text("Обновить категории и теги") }
         TextButton(enabled = enabled && !scope.saving, onClick = { guard.request { reset(); navigation.value = "catalog" } }) { Text("Новая категория") }
         TextButton(enabled = enabled && !scope.saving, onClick = { guard.request { reset("tags"); navigation.value = "catalog" } }) { Text("Новый тег") }
         TextButton(enabled = enabled && !scope.saving, onClick = { navigation.value = "catalog" }) { Text("Открыть черновик классификации") }

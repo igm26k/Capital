@@ -54,6 +54,7 @@ class DraftGuardScreenTest {
     @get:Rule(order = 1) val compose = createAndroidComposeRule<MainActivity>()
     private suspend fun mutate(path: String, method: String, body: String) = decodeResponse<MutationResult>(api.request("/workspaces/${auth.workspace.id}/$path", method, body, auth.credential(origin), UUID.randomUUID().toString(), auth.workspace.sync_generation_id))
     private fun click(text: String) {
+        compose.waitUntil(10000) { compose.onAllNodes(hasText(text) and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
         if (text == "Остаться в редакторе") compose.onNodeWithText(text).performClick()
         else compose.onNodeWithText(text).performScrollTo().performClick()
     }
@@ -66,16 +67,18 @@ class DraftGuardScreenTest {
         waitFor("Вы вошли: ${auth.profile.email}")
         click("Обновить счета"); waitFor("Для операции: Detail cash · KWD")
         click("Обновить историю"); waitFor("Изменить операцию Detail expense")
+        click("Открыть черновик операции")
         field("Примечание операции", "Local unsent draft")
         field("Сумма операции", "invalid amount")
-        click("Изменить операцию Detail expense")
+        click("Вернуться к истории операций")
         waitFor("Сохранить измененный черновик?")
         click("Остаться в редакторе")
         compose.onNodeWithText("Примечание операции").assertTextContains("Local unsent draft")
-        click("Изменить операцию Detail expense")
+        click("Вернуться к истории операций")
         waitFor("Сохранить измененный черновик?")
         compose.waitUntil(10000) { compose.onAllNodes(hasText("Сохранить черновик и продолжить") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Сохранить черновик и продолжить").performClick()
+        click("Изменить операцию Detail expense")
         waitFor("Изменение операции")
         compose.onNodeWithText("Примечание операции").assertTextContains("Detail expense")
         field("Примечание операции", "Edited unsent expense")

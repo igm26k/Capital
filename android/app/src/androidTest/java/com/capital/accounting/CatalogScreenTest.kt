@@ -54,7 +54,7 @@ class CatalogScreenTest {
         compose.onNodeWithText("Тег: Shared").assertExists()
         compose.activityRule.scenario.recreate()
         compose.onNodeWithText("Категория: Home / Food").assertExists()
-        fun click(text: String) = compose.onNodeWithText(text).performScrollTo().performClick().also {
+        fun click(text: String) = compose.operationNode(text).performScrollTo().performClick().also {
             if (text == "Отменить изменение операции" || text.startsWith("Изменить операцию ") || text.startsWith("Изменить категорию ") || text.startsWith("Изменить тег ") || text == "Новая категория" || text == "Новый тег") {
                 if (compose.onAllNodesWithText("Сохранить измененный черновик?").fetchSemanticsNodes().isNotEmpty()) {
                     compose.waitUntil(10000) { compose.onAllNodes(hasText("Отбросить черновик и продолжить") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
@@ -63,7 +63,7 @@ class CatalogScreenTest {
             }
         }
         fun field(label: String, value: String) {
-            compose.onNodeWithText(label).performScrollTo().performTextClearance()
+            compose.operationField(label).performScrollTo().performTextClearance()
             compose.onNodeWithText(label).performTextInput(value)
         }
         click("Обновить счета")
@@ -115,17 +115,17 @@ class CatalogScreenTest {
     @Test fun separateCategoryAndTagEditorsGuardBackAndReturnAfterOwnConfirmation() {
         fun click(text: String) {
             compose.waitUntil(10000) { compose.onAllNodes(hasText(text) and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
-            compose.onNodeWithText(text).performScrollTo().performClick()
+            compose.operationNode(text).performScrollTo().performClick()
         }
         fun field(label: String, value: String) {
-            compose.onNodeWithText(label).performScrollTo().performTextClearance()
+            compose.operationField(label).performScrollTo().performTextClearance()
             compose.onNodeWithText(label).performTextInput(value)
         }
         fun waitFor(text: String) = compose.waitUntil(30000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
         fun choose(text: String) {
             waitFor("Сохранить измененный черновик?")
             compose.waitUntil(10000) { compose.onAllNodes(hasText(text) and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
-            compose.onNodeWithText(text).performClick()
+            compose.operationNode(text).performClick()
         }
         waitFor("Вы вошли: ${auth.profile.email}"); waitFor("Новая категория")
         compose.onNodeWithText("Название категории").assertDoesNotExist()
@@ -169,7 +169,7 @@ class CatalogScreenTest {
         assertNull(runBlocking { app.database.commands().get(origin, auth.profile.id, auth.workspace.id) })
     }
     @Test fun realCatalogMutationsArchiveAndExplicitVersionConflict() {
-        fun click(text: String) = compose.onNodeWithText(text).performScrollTo().performClick().also {
+        fun click(text: String) = compose.operationNode(text).performScrollTo().performClick().also {
             if (text == "Отменить изменение операции" || text.startsWith("Изменить операцию ") || text.startsWith("Изменить категорию ") || text.startsWith("Изменить тег ") || text == "Новая категория" || text == "Новый тег") {
                 if (compose.onAllNodesWithText("Сохранить измененный черновик?").fetchSemanticsNodes().isNotEmpty()) {
                     compose.waitUntil(10000) { compose.onAllNodes(hasText("Отбросить черновик и продолжить") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
@@ -178,7 +178,7 @@ class CatalogScreenTest {
             }
         }
         fun field(label: String, value: String) {
-            compose.onNodeWithText(label).performScrollTo().performTextClearance()
+            compose.operationField(label).performScrollTo().performTextClearance()
             compose.onNodeWithText(label).performTextInput(value)
         }
         fun waitFor(text: String) = compose.waitUntil(30000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
@@ -249,7 +249,7 @@ class CatalogScreenTest {
     }
 
     @Test fun categoryConflictAndCycleKeepRejectedDraftWithoutAutomaticWrite() {
-        fun click(text: String) = compose.onNodeWithText(text).performScrollTo().performClick().also {
+        fun click(text: String) = compose.operationNode(text).performScrollTo().performClick().also {
             if (text == "Отменить изменение операции" || text.startsWith("Изменить операцию ") || text.startsWith("Изменить категорию ") || text.startsWith("Изменить тег ") || text == "Новая категория" || text == "Новый тег") {
                 if (compose.onAllNodesWithText("Сохранить измененный черновик?").fetchSemanticsNodes().isNotEmpty()) {
                     compose.waitUntil(10000) { compose.onAllNodes(hasText("Отбросить черновик и продолжить") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }

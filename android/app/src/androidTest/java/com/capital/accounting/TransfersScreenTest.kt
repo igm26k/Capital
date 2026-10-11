@@ -50,7 +50,7 @@ class TransfersScreenTest {
     }
     @get:Rule(order = 1) val compose = createAndroidComposeRule<MainActivity>()
     @Test fun realSameAndCrossCurrencyTransfersFeeAndLostReceiptReplay() {
-        fun click(text: String) = compose.onNodeWithText(text).performScrollTo().performClick().also {
+        fun click(text: String) = compose.operationNode(text).performScrollTo().performClick().also {
             if (listOf("Изменить операцию ", "Изменить перевод ", "Изменить возврат ", "Изменить корректировку ", "Создать возврат расхода ", "Создать возврат комиссии ", "Корректировать счет ").any { text.startsWith(it) } || text in listOf("Отменить изменение операции", "Отменить изменение перевода", "Отменить создание возврата", "Отменить изменение возврата", "Отменить корректировку")) {
                 if (compose.onAllNodesWithText("Сохранить измененный черновик?").fetchSemanticsNodes().isNotEmpty()) {
                     compose.waitUntil(10000) { compose.onAllNodes(hasText("Отбросить черновик и продолжить") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
@@ -59,7 +59,7 @@ class TransfersScreenTest {
             }
         }
         fun field(label: String, value: String) {
-            compose.onNodeWithText(label).performScrollTo().performTextClearance()
+            compose.operationField(label).performScrollTo().performTextClearance()
             compose.onNodeWithText(label).performTextInput(value)
         }
         fun waitFor(text: String) = compose.waitUntil(30000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
@@ -160,7 +160,7 @@ class TransfersScreenTest {
         compose.onNodeWithText("Сохранить перевод").assertIsNotEnabled()
     }
     @Test fun aggregateEditConflictFeeRemovalAdditionAndConfirmedDelete() {
-        fun click(text: String) = compose.onNodeWithText(text).performScrollTo().performClick().also {
+        fun click(text: String) = compose.operationNode(text).performScrollTo().performClick().also {
             if (listOf("Изменить операцию ", "Изменить перевод ", "Изменить возврат ", "Изменить корректировку ", "Создать возврат расхода ", "Создать возврат комиссии ", "Корректировать счет ").any { text.startsWith(it) } || text in listOf("Отменить изменение операции", "Отменить изменение перевода", "Отменить создание возврата", "Отменить изменение возврата", "Отменить корректировку")) {
                 if (compose.onAllNodesWithText("Сохранить измененный черновик?").fetchSemanticsNodes().isNotEmpty()) {
                     compose.waitUntil(10000) { compose.onAllNodes(hasText("Отбросить черновик и продолжить") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
@@ -169,7 +169,7 @@ class TransfersScreenTest {
             }
         }
         fun field(label: String, value: String) {
-            compose.onNodeWithText(label).performScrollTo().performTextClearance()
+            compose.operationField(label).performScrollTo().performTextClearance()
             compose.onNodeWithText(label).performTextInput(value)
         }
         fun waitFor(text: String) = compose.waitUntil(30000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
@@ -279,7 +279,7 @@ class TransfersScreenTest {
     }
 
     @Test fun staleDeleteAndFeeRefundDependencyNeverRemoveFinancialMovements() {
-        fun click(text: String) = compose.onNodeWithText(text).performScrollTo().performClick().also {
+        fun click(text: String) = compose.operationNode(text).performScrollTo().performClick().also {
             if (listOf("Изменить операцию ", "Изменить перевод ", "Изменить возврат ", "Изменить корректировку ", "Создать возврат расхода ", "Создать возврат комиссии ", "Корректировать счет ").any { text.startsWith(it) } || text in listOf("Отменить изменение операции", "Отменить изменение перевода", "Отменить создание возврата", "Отменить изменение возврата", "Отменить корректировку")) {
                 if (compose.onAllNodesWithText("Сохранить измененный черновик?").fetchSemanticsNodes().isNotEmpty()) {
                     compose.waitUntil(10000) { compose.onAllNodes(hasText("Отбросить черновик и продолжить") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }

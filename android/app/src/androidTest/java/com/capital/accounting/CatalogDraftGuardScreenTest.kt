@@ -118,7 +118,7 @@ class CatalogDraftGuardScreenTest {
         click("Новая категория"); choose("Отбросить черновик и продолжить")
         click("Восстановить черновик классификации 2")
         compose.activityRule.scenario.recreate()
-        waitFor("Обновить счета")
+        waitFor("Вернуться к категориям и тегам")
         compose.onNodeWithText("Название тега").assertTextContains("Unsent tag")
         click("Вернуться к категориям и тегам")
         click("Восстановить черновик счета 1")

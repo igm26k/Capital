@@ -50,7 +50,7 @@ class HistoryScreenTest {
     }
     @get:Rule(order = 1) val compose = createAndroidComposeRule<MainActivity>()
     private suspend fun create(path: String, body: String) = decodeResponse<MutationResult>(api.request("/workspaces/${auth.workspace.id}/$path", "POST", body, auth.credential(origin), UUID.randomUUID().toString(), auth.workspace.sync_generation_id))
-    private fun click(text: String) = compose.onNodeWithText(text).performScrollTo().performClick().also {
+    private fun click(text: String) = compose.operationNode(text).performScrollTo().performClick().also {
             if (text == "Отменить изменение операции" || text.startsWith("Изменить операцию ")) {
                 if (compose.onAllNodesWithText("Сохранить измененный черновик?").fetchSemanticsNodes().isNotEmpty()) {
                     compose.waitUntil(10000) { compose.onAllNodes(hasText("Отбросить черновик и продолжить") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
@@ -59,7 +59,7 @@ class HistoryScreenTest {
             }
         }
     private fun field(label: String, value: String) {
-        compose.onNodeWithText(label).performScrollTo().performTextClearance()
+        compose.operationField(label).performScrollTo().performTextClearance()
         compose.onNodeWithText(label).performTextInput(value)
     }
     private fun waitFor(text: String) = compose.waitUntil(30000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }

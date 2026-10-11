@@ -39,6 +39,10 @@ class FinancialDraftRuntimeTest {
         val hash = MessageDigest.getInstance("SHA-256").digest(ApiClient.json.encodeToString(listOf(origin, session.ownerId, session.workspaceId)).toByteArray()).joinToString("") { "%02x".format(it) }
         return JSONObject(File(app.noBackupFilesDir, "financial-drafts/$hash.json").readText()).getJSONObject("fields")
     }
+    private fun savedOperation(snapshot: JSONObject): JSONObject {
+        val slots = JSONObject(snapshot.getString("draft.management")).getJSONArray("saved")
+        return (0 until slots.length()).map { slots.getJSONObject(it) }.single { it.getString("prefix") == "transaction" }.getJSONObject("fields")
+    }
     private suspend fun mutate(path: String, body: String, method: String = "POST") = decodeResponse<MutationResult>(api.request("/workspaces/${session.workspaceId}/$path", method, body, session, UUID.randomUUID().toString(), session.generationId))
     @get:Rule(order = 0) val setup = object : ExternalResource() {
         override fun before() = runBlocking<Unit> {
@@ -98,6 +102,10 @@ class FinancialDraftRuntimeTest {
             click("Изменить операцию Draft expense")
             field("Примечание операции", "Unsent expense <svg onload=alert(1)>")
             field("Получатель операции", "Unsent recipient")
+            compose.waitUntil(10000) { compose.onAllNodes(hasText("Вернуться к истории операций") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+            click("Вернуться к истории операций")
+            compose.waitUntil(10000) { compose.onAllNodes(hasText("Сохранить черновик и продолжить") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithText("Сохранить черновик и продолжить").performClick()
             field("Сумма списания перевода", "10.001")
             field("Сумма зачисления перевода", "3.01")
             field("Примечание перевода", "Unsent transfer")
@@ -112,7 +120,7 @@ class FinancialDraftRuntimeTest {
             field("Причина корректировки", "Unsent reason")
             saved()
             val before = snapshot()
-            assertEquals("\"1\"", before.getString("transaction.editingVersion"))
+            assertEquals("\"1\"", savedOperation(before).getString("transaction.editingVersion"))
             assertEquals("\"1\"", before.getString("refund.parentVersion"))
             // A different client updates the record after the draft has been durably saved.
             val updated = runBlocking { mutate("transactions/${expense.id}", ApiClient.json.encodeToString(ExpenseReplace(expense.occurred_at, expense.occurred_timezone, "Foreign version2", expense.payee, expense.tag_ids, "expense", expense.entries.single().account_id, "12345", expense.allocations.map { AllocationInput(it.id, it.category_id, it.amount_minor) }, expense.version, null)), "PUT") }.transactions.single()
@@ -124,7 +132,7 @@ class FinancialDraftRuntimeTest {
             val after = snapshot()
             assertEquals(before.keys().asSequence().toSet(), after.keys().asSequence().toSet())
             before.keys().forEach { key -> assertEquals("Restored field $key", before.getString(key), after.getString(key)) }
-            listOf("Примечание операции" to "Unsent expense <svg onload=alert(1)>", "Получатель операции" to "Unsent recipient", "Сумма списания перевода" to "10.001", "Сумма зачисления перевода" to "3.01", "Примечание перевода" to "Unsent transfer", "Сумма комиссии перевода" to "0.501", "Примечание комиссии перевода" to "Unsent fee", "Сумма части возврата 1" to "0.001", "Примечание возврата" to "Unsent refund", "Фактический остаток" to "-1.234", "Причина корректировки" to "Unsent reason").forEach { (label, value) -> compose.onNodeWithText(label).assertTextContains(value) }
+            listOf("Сумма списания перевода" to "10.001", "Сумма зачисления перевода" to "3.01", "Примечание перевода" to "Unsent transfer", "Сумма комиссии перевода" to "0.501", "Примечание комиссии перевода" to "Unsent fee", "Сумма части возврата 1" to "0.001", "Примечание возврата" to "Unsent refund", "Фактический остаток" to "-1.234", "Причина корректировки" to "Unsent reason").forEach { (label, value) -> compose.onNodeWithText(label).assertTextContains(value) }
             click("Восстановить черновик счета 1")
             compose.onNodeWithText("Название счета").assertTextContains("Unsent account")
             compose.onNodeWithText("Начальный остаток").assertTextContains("invalid balance")
@@ -132,9 +140,14 @@ class FinancialDraftRuntimeTest {
             click("Восстановить черновик классификации 1")
             compose.onNodeWithText("Название категории").assertTextContains("Unsent category")
             click("Вернуться к категориям и тегам")
+            click("Восстановить черновик операции 1")
+            compose.onNodeWithText("Примечание операции").assertTextContains("Unsent expense <svg onload=alert(1)>")
+            compose.onNodeWithText("Получатель операции").assertTextContains("Unsent recipient")
             compose.onNodeWithText("Версия операции на сервере: 2; версия черновика: 1").assertExists()
             compose.onNodeWithText("Использовать обновленную версию операции").assertExists()
             assertEquals("2026-10-06T08:10:00.123456Z", runBlocking { api.transaction(session, expense.id) }.occurred_at)
+            compose.waitUntil(10000) { compose.onAllNodes(hasText("Вернуться к истории операций") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+            click("Вернуться к истории операций")
             // A real logout/login must change draft scope and restore it only for its owner.
             val foreignEmail = "draft-foreign-${UUID.randomUUID()}@example.test"
             val foreign = runBlocking { decodeResponse<BearerAuth>(api.request("/auth/register", "POST", ApiClient.json.encodeToString(Register(foreignEmail, "synthetic draft password", "Foreign drafts", "bearer", "UTC")))) }
@@ -142,20 +155,27 @@ class FinancialDraftRuntimeTest {
             click("Выйти"); waitFor("Войти")
             field("Email", foreignEmail); field("Пароль", "synthetic draft password"); click("Войти")
             waitFor("Вы вошли: $foreignEmail"); waitFor("Новая операция"); saved()
+            click("Открыть черновик операции")
             compose.onNodeWithText("Примечание операции").assert(SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.EditableText, androidx.compose.ui.text.AnnotatedString("")))
+            click("Вернуться к истории операций")
             click("Открыть черновик счета")
             compose.onNodeWithText("Название счета").assert(SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.EditableText, androidx.compose.ui.text.AnnotatedString("")))
             click("Вернуться к счетам")
+            click("Открыть черновик операции")
             field("Примечание операции", "Foreign local draft"); saved()
+            click("Вернуться к истории операций")
+            compose.waitUntil(10000) { compose.onAllNodes(hasText("Сохранить черновик и продолжить") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithText("Сохранить черновик и продолжить").performClick()
             click("Выйти"); waitFor("Войти")
             field("Email", auth.profile.email); field("Пароль", "synthetic draft password"); click("Войти")
-            waitFor("Вы вошли: ${auth.profile.email}"); waitFor("Изменение операции"); saved()
+            waitFor("Вы вошли: ${auth.profile.email}"); waitFor("Открыть черновик операции"); click("Восстановить черновик операции 1"); waitFor("Изменение операции"); saved()
             compose.onNodeWithText("Примечание операции").assertTextContains("Unsent expense <svg onload=alert(1)>")
             val fresh = runBlocking { (app.credentialVault.load(origin) as VaultRead.Available).session }
             assertNotEquals(session.sessionId, fresh.sessionId)
             val disk = runBlocking { FinancialDrafts(app).open(origin, fresh.ownerId, fresh.workspaceId) }
-            assertEquals(before.getString("transaction.parts"), disk.read("transaction.parts"))
+            assertEquals(savedOperation(before).getString("transaction.parts"), disk.read("transaction.parts"))
             proof.writeText(JSONObject(proof.readText()).put("stage", "verified").put("process_restart", true).put("scope_isolation", true).put("stale_version_retained", true).toString())
+            click("Вернуться к истории операций")
             click("Выйти"); waitFor("Войти")
         }
         assertNull(runBlocking { app.database.commands().get(origin, session.ownerId, session.workspaceId) })

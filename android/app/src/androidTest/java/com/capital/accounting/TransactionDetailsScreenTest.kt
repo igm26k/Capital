@@ -53,9 +53,9 @@ class TransactionDetailsScreenTest {
     }
     @get:Rule(order = 1) val compose = createAndroidComposeRule<MainActivity>()
     private suspend fun mutate(path: String, method: String, body: String) = decodeResponse<MutationResult>(api.request("/workspaces/${auth.workspace.id}/$path", method, body, auth.credential(origin), UUID.randomUUID().toString(), auth.workspace.sync_generation_id))
-    private fun click(text: String) = compose.onNodeWithText(text).performScrollTo().performClick()
+    private fun click(text: String) = compose.operationNode(text).performScrollTo().performClick()
     private fun field(label: String, value: String) {
-        compose.onNodeWithText(label).performScrollTo().performTextClearance()
+        compose.operationField(label).performScrollTo().performTextClearance()
         compose.onNodeWithText(label).performTextInput(value)
     }
     private fun waitFor(text: String) = compose.waitUntil(30000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
@@ -65,6 +65,10 @@ class TransactionDetailsScreenTest {
         click("Обновить историю"); waitFor("Детали операции Detail expense")
         field("Примечание операции", "Unsaved main draft")
         field("Сумма операции", "2.001")
+        compose.waitUntil(10000) { compose.onAllNodes(hasText("Вернуться к истории операций") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Вернуться к истории операций").performScrollTo().performClick()
+        compose.waitUntil(10000) { compose.onAllNodes(hasText("Сохранить черновик и продолжить") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Сохранить черновик и продолжить").performClick()
         click("Фильтры истории")
         field("Поиск по примечанию и получателю", search)
         click("Применить фильтры истории")
@@ -88,6 +92,7 @@ class TransactionDetailsScreenTest {
         click("Назад к предыдущим деталям")
         waitFor("Примечание детали: Detail fee")
         click("Вернуться к истории")
+        click("Восстановить черновик операции 1")
         compose.onNodeWithText("Примечание операции").assertTextContains("Unsaved main draft")
         compose.onNodeWithText("Сумма операции").assertTextContains("2.001")
         compose.onNodeWithText("Поиск по примечанию и получателю").assertTextContains("Detail fee")
