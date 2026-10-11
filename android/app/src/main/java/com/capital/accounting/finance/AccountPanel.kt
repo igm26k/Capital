@@ -45,6 +45,8 @@ fun AccountPanel(model: AuthViewModel) {
     fun close() {
         if (enabled && !scope.saving) guard.request { reset(); navigation.value = null }
     }
+    fun createAccount() { guard.request { reset(); navigation.value = "account" } }
+    HandleFinancialCreate("account", enabled) { createAccount() }
     LaunchedEffect(state.financialCommand?.commandId, state.collectionReceipt?.commandId) {
         val command = state.financialCommand
         if (command == null && state.collectionReceipt?.commandId != handledReceipt) {
@@ -95,7 +97,7 @@ fun AccountPanel(model: AuthViewModel) {
             }) { Text("Операции счета ${account.name}") }
             Button(enabled = enabled, onClick = { guard.request { editingId = account.id; editingVersion = account.version; currency = account.currency; editingBalance = account.posted_balance_minor; name = account.name; type = account.type; archived = account.archived_at != null; error = ""; navigation.value = "account"  } }) { Text("Изменить счет ${account.name}") }
         }
-        Button(enabled = enabled && !scope.saving, onClick = { guard.request { reset(); navigation.value = "account" } }) { Text("Добавить счет") }
+        Button(enabled = enabled && !scope.saving, onClick = ::createAccount) { Text("Добавить счет") }
         TextButton(enabled = enabled && !scope.saving, onClick = { navigation.value = "account" }) { Text("Открыть черновик счета") }
         DraftGuardControls(guard, "account", enabled) { navigation.value = "account" }
     } else if (editorOpen) Dialog(onDismissRequest = ::close, properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)) {

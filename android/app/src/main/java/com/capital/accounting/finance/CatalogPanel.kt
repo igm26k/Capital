@@ -36,6 +36,8 @@ fun CatalogPanel(model: AuthViewModel) {
     fun close() {
         if (enabled && !scope.saving) guard.request { reset(); navigation.value = null }
     }
+    fun createCatalog(target: String) { guard.request { reset(target); navigation.value = "catalog" } }
+    HandleFinancialCreate("catalog", enabled) { createCatalog(if (it.kind == FinancialCreation.TAG) "tags" else "categories") }
     LaunchedEffect(state.financialCommand?.commandId, state.collectionReceipt?.commandId) {
         val command = state.financialCommand
         if (command == null) {
@@ -76,8 +78,8 @@ fun CatalogPanel(model: AuthViewModel) {
     if (navigation.value == null) Button(enabled = !state.busy, onClick = model::loadCatalog) { Text("Обновить категории и теги") }
     if (!editorOpen && LocalFinancialSection.current.value == "more") {
         Text("Категории и теги", style = MaterialTheme.typography.titleLarge)
-        TextButton(enabled = enabled && !scope.saving, onClick = { guard.request { reset(); navigation.value = "catalog" } }) { Text("Новая категория") }
-        TextButton(enabled = enabled && !scope.saving, onClick = { guard.request { reset("tags"); navigation.value = "catalog" } }) { Text("Новый тег") }
+        TextButton(enabled = enabled && !scope.saving, onClick = { createCatalog("categories") }) { Text("Новая категория") }
+        TextButton(enabled = enabled && !scope.saving, onClick = { createCatalog("tags") }) { Text("Новый тег") }
         TextButton(enabled = enabled && !scope.saving, onClick = { navigation.value = "catalog" }) { Text("Открыть черновик классификации") }
         DraftGuardControls(guard, "catalog", enabled) { navigation.value = "catalog" }
         state.categories.forEach { item ->
@@ -102,8 +104,8 @@ fun CatalogPanel(model: AuthViewModel) {
                 }
                 FinancialCommandStatus(model)
                 DraftGuardControls(guard, "catalog", enabled)
-                TextButton(enabled = enabled && !scope.saving, onClick = { guard.request { reset(); navigation.value = "catalog" } }) { Text("Новая категория") }
-                TextButton(enabled = enabled && !scope.saving, onClick = { guard.request { reset("tags"); navigation.value = "catalog" } }) { Text("Новый тег") }
+                TextButton(enabled = enabled && !scope.saving, onClick = { createCatalog("categories") }) { Text("Новая категория") }
+                TextButton(enabled = enabled && !scope.saving, onClick = { createCatalog("tags") }) { Text("Новый тег") }
                 val category = collection == "categories"
                 Text(if (category) "Редактор категории" else "Редактор тега")
                 OutlinedTextField(name, { name = it }, label = { Text(if (category) "Название категории" else "Название тега") }, enabled = enabled, singleLine = true)

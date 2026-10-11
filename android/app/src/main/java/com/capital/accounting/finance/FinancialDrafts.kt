@@ -191,6 +191,16 @@ fun FinancialDraftContent(context: Context, origin: String, owner: String, works
         }
     }
     val loaded = scope
+    val createRouter = LocalFinancialCreateRouter.current
+    val canCreate = loaded != null && !loaded.saving && !loaded.failed
+    val editorOpen = editor.value != null
+    SideEffect {
+        createRouter.canCreate = canCreate
+        createRouter.editorOpen = editorOpen
+    }
+    DisposableEffect(createRouter) {
+        onDispose { createRouter.canCreate = false; createRouter.editorOpen = false; createRouter.request = null }
+    }
     if (loaded != null) {
         CompositionLocalProvider(LocalFinancialDraftScope provides loaded, LocalFinancialEditor provides editor) {
             content()

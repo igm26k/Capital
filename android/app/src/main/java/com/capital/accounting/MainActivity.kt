@@ -15,6 +15,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import com.capital.accounting.finance.LocalFinancialSection
+import com.capital.accounting.finance.LocalFinancialCreateRouter
+import com.capital.accounting.finance.FinancialCreateRouter
+import com.capital.accounting.finance.FinancialAddButton
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.KeyboardType
@@ -42,10 +45,11 @@ class MainActivity : ComponentActivity() {
             var password by remember { mutableStateOf("") }
             var device by remember { mutableStateOf("Android") }
             val section = rememberSaveable(state.origin, state.auth?.profile?.id, state.auth?.workspace?.id) { mutableStateOf("operations") }
+            val createRouter = remember(state.origin, state.auth?.profile?.id, state.auth?.workspace?.id) { FinancialCreateRouter() }
             LaunchedEffect(state.auth) { if (state.auth != null) password = "" }
             MaterialTheme(colorScheme = if (isSystemInDarkTheme()) darkColorScheme() else lightColorScheme()) {
                 if (state.auth != null && state.detailStack.isNotEmpty()) TransactionDetails(model)
-                CompositionLocalProvider(LocalFinancialSection provides section) {
+                CompositionLocalProvider(LocalFinancialSection provides section, LocalFinancialCreateRouter provides createRouter) {
                     Surface(Modifier.fillMaxSize()) {
                         Column(Modifier.fillMaxSize()) {
                             Column(Modifier.weight(1f).safeDrawingPadding().imePadding().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -103,6 +107,7 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                             if (state.auth != null && !state.logoutPending && state.revokePendingId == null) {
+                                FinancialAddButton(model, createRouter)
                                 NavigationBar {
                                     listOf(Triple("accounts", "Счета", "◫"), Triple("operations", "Операции", "⇄"), Triple("more", "Еще", "⋯")).forEach { (id, label, symbol) ->
                                         NavigationBarItem(selected = section.value == id, onClick = { section.value = id }, icon = { Text(symbol) }, label = { Text(label) }, modifier = Modifier.semantics { contentDescription = "Раздел $label" })

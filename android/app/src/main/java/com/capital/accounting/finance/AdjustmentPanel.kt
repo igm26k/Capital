@@ -37,6 +37,13 @@ fun AdjustmentPanel(model: AuthViewModel) {
     } catch (_: Exception) { null }
     fun reset() { accountId = null; balanceVersion = ""; editingId = null; editingVersion = ""; target = ""; note = ""; reason = ""; zone = TimeZone.getDefault().id; error = "" }
     fun close() { if (enabled && !scope.saving) guard.request { reset(); navigation.value = null } }
+    fun createAdjustment(item: Account) { guard.request {
+        reset(); navigation.value = "adjustment"
+        accountId = item.id; balanceVersion = item.balance_version
+        target = Money.display(item.posted_balance_minor, item.currency).removeSuffix(" ${item.currency}").replace('−', '-')
+        error = ""
+    } }
+    HandleFinancialCreate("adjustment", enabled) { createAdjustment(requireNotNull(it.account)) }
     LaunchedEffect(state.financialCommand?.commandId, state.transactionReceipt?.commandId, state.accounts, state.transactions) {
         val command = state.financialCommand
         if (command == null) {
@@ -69,12 +76,7 @@ fun AdjustmentPanel(model: AuthViewModel) {
         TextButton(enabled = enabled && !scope.saving, onClick = { navigation.value = "adjustment" }) { Text("Открыть черновик корректировки") }
         DraftGuardControls(guard, "adjustment", enabled) { navigation.value = "adjustment" }
         state.accounts.filter { it.archived_at == null && it.deleted_at == null }.forEach { item ->
-            TextButton(enabled = enabled, onClick = { guard.request {
-                reset(); navigation.value = "adjustment"
-                accountId = item.id; balanceVersion = item.balance_version
-                target = Money.display(item.posted_balance_minor, item.currency).removeSuffix(" ${item.currency}").replace('−', '-')
-                error = ""
-             } }) { Text("Корректировать счет ${item.name} · ${item.currency}") }
+            TextButton(enabled = enabled, onClick = { createAdjustment(item) }) { Text("Корректировать счет ${item.name} · ${item.currency}") }
         }
     } else if (editorOpen) FinancialEditorScreen(model, "adjustment", guard, "Вернуться к истории корректировок", ::close) {
         Text(if (editingId == null) "Корректировка остатка" else "Изменение примечания корректировки", style = MaterialTheme.typography.titleLarge)

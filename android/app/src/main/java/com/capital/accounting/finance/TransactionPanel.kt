@@ -56,6 +56,8 @@ fun TransactionPanel(model: AuthViewModel) {
     fun close() {
         if (enabled && !scope.saving) guard.request { reset(); navigation.value = null }
     }
+    fun createOperation(targetKind: String) { guard.request { reset(targetKind); navigation.value = "transaction" } }
+    HandleFinancialCreate("transaction", enabled) { createOperation(if (it.kind == FinancialCreation.INCOME) "income" else "expense") }
     LaunchedEffect(state.financialCommand?.commandId, state.transactionReceipt?.commandId, state.accounts, state.transactions) {
         val command = state.financialCommand
         if (command == null && state.transactionReceipt?.commandId != handledReceipt) {
@@ -112,8 +114,8 @@ fun TransactionPanel(model: AuthViewModel) {
     if (!editorOpen && LocalFinancialSection.current.value == "operations") {
         Text("Новая операция", style = MaterialTheme.typography.titleLarge)
         Row {
-            TextButton(enabled = enabled && !scope.saving, onClick = { guard.request { reset("expense"); navigation.value = "transaction" } }) { Text("Расход") }
-            TextButton(enabled = enabled && !scope.saving, onClick = { guard.request { reset("income"); navigation.value = "transaction" } }) { Text("Доход") }
+            TextButton(enabled = enabled && !scope.saving, onClick = { createOperation("expense") }) { Text("Расход") }
+            TextButton(enabled = enabled && !scope.saving, onClick = { createOperation("income") }) { Text("Доход") }
         }
         state.accounts.filter { it.deleted_at == null && it.archived_at == null }.forEach { item ->
             TextButton(enabled = enabled && !scope.saving, onClick = { guard.request { reset(); accountId = item.id; navigation.value = "transaction" } }) { Text("Для операции: ${item.name} · ${item.currency}") }

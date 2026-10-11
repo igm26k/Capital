@@ -51,6 +51,13 @@ fun RefundPanel(model: AuthViewModel) {
     val account = accounts.find { it.id == accountId }
     fun reset() { editingId = null; editingVersion = ""; parentId = null; parentVersion = ""; transferVersion = null; accountId = null; parts = emptyList(); note = ""; payee = ""; tags = emptyList(); zone = TimeZone.getDefault().id; occurred = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.ROOT).format(Date()); preservedInstant = null; preservedZone = null; error = "" }
     fun close() { if (enabled && !scope.saving) guard.request { reset(); navigation.value = null } }
+    fun createRefund(expense: Transaction, linked: Transaction?) { guard.request {
+        reset(); navigation.value = "refund"
+        parentId = expense.id; parentVersion = expense.version; transferVersion = linked?.version
+        accountId = expense.entries.single().account_id; parts = expense.allocations.map { RefundDraft(it.id) }
+        note = ""; payee = expense.payee; tags = emptyList(); error = ""
+    } }
+    HandleFinancialCreate("refund", enabled) { createRefund(requireNotNull(it.expense), it.transfer) }
     LaunchedEffect(state.financialCommand?.commandId, state.transactionReceipt?.commandId, state.accounts, state.transactions) {
         val command = state.financialCommand
         if (command == null) {
@@ -98,12 +105,7 @@ fun RefundPanel(model: AuthViewModel) {
         DraftGuardControls(guard, "refund", enabled) { navigation.value = "refund" }
         state.transactions.filter { it.kind == "expense" && it.status == "posted" }.forEach { expense ->
             val linked = state.transactions.find { it.id == expense.parent_transaction_id }
-            TextButton(enabled = enabled && (expense.parent_transaction_id == null || linked?.kind == "transfer"), onClick = { guard.request {
-                reset(); navigation.value = "refund"
-                parentId = expense.id; parentVersion = expense.version; transferVersion = linked?.version
-                accountId = expense.entries.single().account_id; parts = expense.allocations.map { RefundDraft(it.id) }
-                note = ""; payee = expense.payee; tags = emptyList(); error = ""
-             } }) { Text(if (expense.parent_transaction_id == null) "Создать возврат расхода ${expense.note}" else "Создать возврат комиссии ${expense.note}") }
+            TextButton(enabled = enabled && (expense.parent_transaction_id == null || linked?.kind == "transfer"), onClick = { createRefund(expense, linked) }) { Text(if (expense.parent_transaction_id == null) "Создать возврат расхода ${expense.note}" else "Создать возврат комиссии ${expense.note}") }
         }
     } else if (editorOpen) FinancialEditorScreen(model, "refund", guard, "Вернуться к истории возвратов", ::close) {
         Text(if (editingId == null) "Новый возврат" else "Изменение возврата", style = MaterialTheme.typography.titleLarge)
