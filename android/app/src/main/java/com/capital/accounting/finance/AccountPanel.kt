@@ -22,6 +22,7 @@ fun AccountPanel(model: AuthViewModel) {
     val guard = rememberDraftGuard("account", enabled, render = false)
     val scope = LocalFinancialDraftScope.current
     val navigation = LocalFinancialEditor.current
+    val section = LocalFinancialSection.current
     val editorOpen = navigation.value == "account"
     var handledReceipt by remember { mutableStateOf(state.collectionReceipt?.commandId) }
     var editingId by rememberFinancialDraft<String?>("account.editingId") { null }
@@ -70,11 +71,15 @@ fun AccountPanel(model: AuthViewModel) {
     }
     if (navigation.value == null) Button(enabled = !state.busy, onClick = model::loadAccounts) { Text("Обновить счета") }
     if (navigation.value == null) FinancialCommandStatus(model, "Ваш черновик: $name, $type; ${if (archived) "в архив" else "активен"}")
-    if (!editorOpen && LocalFinancialSection.current.value == "accounts") {
+    if (!editorOpen && section.value == "accounts") {
         Text("Счета", style = MaterialTheme.typography.titleLarge)
         state.accounts.forEach { account ->
             Text("${account.name}${if (account.archived_at != null) " · В архиве" else ""}")
             Text(Money.display(account.posted_balance_minor, account.currency))
+            TextButton(enabled = !state.busy && state.persisted, onClick = {
+                model.applyHistoryFilter(TransactionFilter(accountId = account.id))
+                section.value = "operations"
+            }) { Text("Операции счета ${account.name}") }
             Button(enabled = enabled, onClick = { guard.request { editingId = account.id; editingVersion = account.version; currency = account.currency; editingBalance = account.posted_balance_minor; name = account.name; type = account.type; archived = account.archived_at != null; error = ""; navigation.value = "account"  } }) { Text("Изменить счет ${account.name}") }
         }
         Button(enabled = enabled && !scope.saving, onClick = { guard.request { reset(); navigation.value = "account" } }) { Text("Добавить счет") }

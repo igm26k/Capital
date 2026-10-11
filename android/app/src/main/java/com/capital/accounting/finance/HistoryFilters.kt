@@ -19,7 +19,17 @@ fun HistoryFilters(model: AuthViewModel) {
     var to by remember { mutableStateOf(state.historyFilter?.to ?: "") }
     var limit by remember { mutableStateOf(state.historyLimit.toString()) }
     var error by remember { mutableStateOf("") }
+    LaunchedEffect(state.historyFilter, state.historyLimit) {
+        val filter = state.historyFilter
+        account = filter?.accountId; category = filter?.categoryId; tag = filter?.tagId
+        kind = filter?.kind; status = filter?.status
+        search = filter?.search ?: ""; from = filter?.from ?: ""; to = filter?.to ?: ""
+        limit = state.historyLimit.toString(); error = ""
+    }
     val enabled = !state.busy && state.persisted
+    state.historyFilter?.accountId?.let { id ->
+        Text("История счета: ${state.accounts.find { it.id == id }?.name ?: id}")
+    }
     TextButton(onClick = { expanded = !expanded }) { Text(if (expanded) "Скрыть фильтры истории" else "Фильтры истории") }
     if (expanded) {
         Text("Период: от включительно, до не включительно. Время UTC, например 2026-10-06T08:00:00Z.")

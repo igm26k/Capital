@@ -88,6 +88,72 @@ class HistoryScreenTest {
         } finally { api.request("/auth/logout", "POST", session = foreign.credential(origin)) }
     }
 
+    @Test fun accountShortcutReplacesFiltersAndKeepsUnsentOperationDraft() {
+        fun directClick(text: String) {
+            compose.waitUntil(30000) { compose.onAllNodes(hasText(text) and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+            val node = compose.onNodeWithText(text)
+            if (text == "Сохранить черновик и продолжить") node.performClick()
+            else node.performScrollTo().performClick()
+        }
+        fun section(label: String) { compose.onNodeWithContentDescription("Раздел $label").performClick() }
+        fun directField(label: String, value: String) { compose.onNodeWithText(label).performScrollTo().performTextReplacement(value) }
+        waitFor("Вы вошли: ${auth.profile.email}")
+        directClick("Обновить счета")
+        directClick("Обновить историю")
+        waitFor("Доход · 0,500 KWD · History salary")
+        directClick("Открыть черновик операции")
+        directField("Примечание операции", "Unsent account history draft")
+        directClick("Вернуться к истории операций")
+        directClick("Сохранить черновик и продолжить")
+        directClick("Фильтры истории")
+        directClick("История: счет History USD")
+        directClick("Тип истории: Расход")
+        directField("Поиск по примечанию и получателю", "Поиск & +%")
+        directField("Операций на странице (1–100)", "1")
+        directClick("Применить фильтры истории")
+        waitFor("Показано операций: 1")
+        compose.onNodeWithText("Расход · −1,00 USD · Поиск & +% USD").assertExists()
+
+        section("Счета")
+        directClick("Операции счета History cash")
+        waitFor("История счета: History cash")
+        waitFor("Показано операций: 4")
+        compose.onNodeWithContentDescription("Раздел Операции").assertIsSelected()
+        compose.onNodeWithText("Доход · 0,500 KWD · History salary").assertExists()
+        compose.onNodeWithText("Расход · −1,000 KWD · Поиск & +% A").assertExists()
+        compose.onNodeWithText("Расход · −2,000 KWD · Поиск & +% B").assertExists()
+        compose.onNodeWithText("Расход · −1,00 USD · Поиск & +% USD").assertDoesNotExist()
+        compose.onNodeWithText("Следующая страница истории").assertDoesNotExist()
+        directClick("Фильтры истории")
+        compose.onNodeWithText("Счет: History cash").assertExists()
+        compose.onNodeWithText("Тип: Все типы").assertExists()
+        compose.onNodeWithText("Поиск по примечанию и получателю").assertTextEquals("Поиск по примечанию и получателю", "")
+        compose.onNodeWithText("Операций на странице (1–100)").assertTextContains("50")
+
+        section("Счета")
+        directClick("Операции счета History USD")
+        waitFor("История счета: History USD")
+        waitFor("Показано операций: 2")
+        compose.onNodeWithText("Расход · −1,00 USD · Поиск & +% USD").assertExists()
+        compose.onNodeWithText("Доход · 0,500 KWD · History salary").assertDoesNotExist()
+        compose.activityRule.scenario.recreate()
+        waitFor("История счета: History USD")
+        compose.onNodeWithContentDescription("Раздел Операции").assertIsSelected()
+        directClick("Сбросить фильтры истории")
+        waitFor("Доход · 0,500 KWD · History salary")
+        compose.onNodeWithText("Расход · −1,00 USD · Поиск & +% USD").assertExists()
+        compose.onNodeWithText("История счета: History USD").assertDoesNotExist()
+        directClick("Восстановить черновик операции 1")
+        compose.onNodeWithText("Примечание операции").assertTextContains("Unsent account history draft")
+        val session = auth.credential(origin)
+        assertEquals(6, runBlocking { api.transactions(session) }.size)
+        val accounts = runBlocking { api.accounts(session) }
+        assertEquals("97500", accounts.single { it.id == cash.id }.posted_balance_minor)
+        assertEquals("2900", accounts.single { it.id == other.id }.posted_balance_minor)
+        val app = ApplicationProvider.getApplicationContext<CapitalApplication>()
+        assertNull(runBlocking { app.database.commands().get(origin, auth.profile.id, auth.workspace.id) })
+    }
+
     @Test fun realUiFiltersPagingRecreationAndResetKeepFullEditorGraph() {
         waitFor("Вы вошли: ${auth.profile.email}")
         click("Обновить счета"); waitFor("Для операции: History cash · KWD")
