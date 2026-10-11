@@ -15,7 +15,10 @@ import java.util.UUID
 fun AdjustmentPanel(model: AuthViewModel) {
     val state = model.state
     val enabled = !state.busy && !state.financeBlocked && state.persisted
-    val guard = rememberDraftGuard("adjustment", enabled)
+    val guard = rememberDraftGuard("adjustment", enabled, render = false)
+    val scope = LocalFinancialDraftScope.current
+    val navigation = LocalFinancialEditor.current
+    val editorOpen = navigation.value == "adjustment"
     var accountId by rememberFinancialDraft<String?>("adjustment.accountId") { null }
     var balanceVersion by rememberFinancialDraft("adjustment.balanceVersion") { "" }
     var target by rememberFinancialDraft("adjustment.target") { "" }
@@ -32,6 +35,8 @@ fun AdjustmentPanel(model: AuthViewModel) {
     val difference = try {
         account?.let { Money.display((BigInteger(Money.minor(target, it.currency)) - BigInteger(it.posted_balance_minor)).toString(), it.currency) }
     } catch (_: Exception) { null }
+    fun reset() { accountId = null; balanceVersion = ""; editingId = null; editingVersion = ""; target = ""; note = ""; reason = ""; zone = TimeZone.getDefault().id; error = "" }
+    fun close() { if (enabled && !scope.saving) guard.request { reset(); navigation.value = null } }
     LaunchedEffect(state.financialCommand?.commandId, state.transactionReceipt?.commandId, state.accounts, state.transactions) {
         val command = state.financialCommand
         if (command == null) {
@@ -42,77 +47,85 @@ fun AdjustmentPanel(model: AuthViewModel) {
                 if (receipt != null && receipt.transactionId == editingId) {
                     if (receipt.deleted) editingId = null else editingVersion = receipt.version(editingId) ?: editingVersion
                 }
-                if (affectsDraft) guard.markClean()
+                if (affectsDraft) { guard.markClean(); if (navigation.value == "adjustment") navigation.value = null }
             }
             return@LaunchedEffect
         }
         if (command.method == "POST" && command.path.endsWith("/adjustments")) {
             val draft = decodeResponse<AdjustmentCreate>(command.body)
-            editingId = null; accountId = command.path.substringBeforeLast('/').substringAfterLast('/')
+            navigation.value = "adjustment"; editingId = null; editingVersion = ""; accountId = command.path.substringBeforeLast('/').substringAfterLast('/')
             balanceVersion = draft.expected_balance_version; reason = draft.reason; note = draft.note; zone = draft.occurred_timezone
             val currency = state.accounts.find { it.id == accountId }?.currency ?: return@LaunchedEffect
             target = Money.display(draft.target_balance_minor, currency).removeSuffix(" $currency").replace('−', '-')
         } else if (command.method == "PUT" && command.path.contains("/transactions/") && ApiClient.json.parseToJsonElement(command.body).jsonObject.getValue("kind").jsonPrimitive.content == "adjustment") {
+            navigation.value = "adjustment"
             val draft = decodeResponse<AdjustmentReplace>(command.body)
             editingId = command.path.substringAfterLast('/'); editingVersion = draft.expected_version; note = draft.note
             accountId = state.transactions.find { it.id == editingId }?.entries?.singleOrNull()?.account_id
         }
     }
-    Text(if (editingId == null) "Корректировка остатка" else "Изменение примечания корректировки", style = MaterialTheme.typography.titleLarge)
-    if (editingId == null) {
-        Text("Укажите фактический остаток. Сервер вычислит разницу и зафиксирует текущее время.")
+    if (!editorOpen) {
+        Text("Корректировки", style = MaterialTheme.typography.titleLarge)
+        TextButton(enabled = enabled && !scope.saving, onClick = { navigation.value = "adjustment" }) { Text("Открыть черновик корректировки") }
+        DraftGuardControls(guard, "adjustment", enabled) { navigation.value = "adjustment" }
         state.accounts.filter { it.archived_at == null && it.deleted_at == null }.forEach { item ->
             TextButton(enabled = enabled, onClick = { guard.request {
+                reset(); navigation.value = "adjustment"
                 accountId = item.id; balanceVersion = item.balance_version
                 target = Money.display(item.posted_balance_minor, item.currency).removeSuffix(" ${item.currency}").replace('−', '-')
                 error = ""
              } }) { Text("Корректировать счет ${item.name} · ${item.currency}") }
         }
-        if (account != null) {
-            Text("Корректируемый счет: ${account.name}")
-            Text("Текущий остаток: ${Money.display(account.posted_balance_minor, account.currency)}")
-            OutlinedTextField(target, { target = it }, label = { Text("Фактический остаток") }, enabled = enabled, singleLine = true)
-            if (difference != null) Text("Разница нового остатка: $difference")
-            else Text("Введите допустимый остаток и разницу в пределах денежного лимита.")
-            OutlinedTextField(reason, { reason = it }, label = { Text("Причина корректировки") }, enabled = enabled)
-            OutlinedTextField(zone, { zone = it }, label = { Text("Часовой пояс корректировки") }, enabled = enabled, singleLine = true)
-            if (account.balance_version != balanceVersion) {
-                Text("Версия остатка на сервере: ${account.balance_version}; черновика: $balanceVersion")
-                Button(enabled = enabled, onClick = { balanceVersion = account.balance_version }) { Text("Использовать обновленную версию остатка") }
+    } else FinancialEditorScreen(model, "adjustment", guard, "Вернуться к истории корректировок", ::close) {
+        Text(if (editingId == null) "Корректировка остатка" else "Изменение примечания корректировки", style = MaterialTheme.typography.titleLarge)
+        if (editingId == null) {
+            Text("Укажите фактический остаток. Сервер вычислит разницу и зафиксирует текущее время.")
+            if (account != null) {
+                Text("Корректируемый счет: ${account.name}")
+                Text("Текущий остаток: ${Money.display(account.posted_balance_minor, account.currency)}")
+                OutlinedTextField(target, { target = it }, label = { Text("Фактический остаток") }, enabled = enabled, singleLine = true)
+                if (difference != null) Text("Разница нового остатка: $difference")
+                else Text("Введите допустимый остаток и разницу в пределах денежного лимита.")
+                OutlinedTextField(reason, { reason = it }, label = { Text("Причина корректировки") }, enabled = enabled)
+                OutlinedTextField(zone, { zone = it }, label = { Text("Часовой пояс корректировки") }, enabled = enabled, singleLine = true)
+                if (account.balance_version != balanceVersion) {
+                    Text("Версия остатка на сервере: ${account.balance_version}; черновика: $balanceVersion")
+                    Button(enabled = enabled, onClick = { balanceVersion = account.balance_version }) { Text("Использовать обновленную версию остатка") }
+                }
             }
+        } else {
+            if (state.transactionsLoaded && edited == null) Text("Корректировка удалена на сервере. Черновик сохранен; отмените редактирование.")
+            Text("Изменяется только примечание. Сумма, причина, счет и время сохраняются.")
+            edited?.let { item ->
+                Text("Счет корректировки: ${account?.name ?: "Обновите счета"}")
+                Text("Разница корректировки: ${Money.display(item.entries.single().amount_minor, item.entries.single().currency)}")
+                Text("Причина: ${item.reason ?: ""}")
+                Text("Время корректировки: ${openingLocal(item.occurred_at, item.occurred_timezone)} · ${item.occurred_timezone}")
+            }
+            if (edited != null && edited.version != editingVersion) {
+                Text("Версия корректировки на сервере: ${edited.version}; черновика: $editingVersion")
+                Button(enabled = enabled, onClick = { editingVersion = edited.version }) { Text("Использовать обновленную версию корректировки") }
+            }
+            state.transactionConflict?.takeIf { it.kind == "adjustment" }?.let { Text("Корректировка на сервере: ${it.note}; версия ${it.version}") }
         }
-    } else {
-        if (state.transactionsLoaded && edited == null) Text("Корректировка удалена на сервере. Черновик сохранен; отмените редактирование.")
-        Text("Изменяется только примечание. Сумма, причина, счет и время сохраняются.")
-        edited?.let { item ->
-            Text("Счет корректировки: ${account?.name ?: "Обновите счета"}")
-            Text("Разница корректировки: ${Money.display(item.entries.single().amount_minor, item.entries.single().currency)}")
-            Text("Причина: ${item.reason ?: ""}")
-            Text("Время корректировки: ${openingLocal(item.occurred_at, item.occurred_timezone)} · ${item.occurred_timezone}")
+        if (accountId != null || editingId != null) {
+            OutlinedTextField(note, { note = it }, label = { Text("Примечание корректировки") }, enabled = enabled)
+            if (error.isNotEmpty()) Text(error)
+            Button(enabled = enabled && (editingId == null || edited != null) && account != null && account.archived_at == null && account.deleted_at == null, onClick = {
+                try {
+                    require(note.length <= 2000)
+                    if (editingId == null) {
+                        val selected = requireNotNull(account)
+                        val minor = Money.minor(target, selected.currency)
+                        require(difference != null && minor != selected.posted_balance_minor && reason.isNotEmpty() && reason.length <= 500)
+                        TimeZone.getTimeZone(zone).also { require(it.id == zone || zone == "UTC") }
+                        model.submitAdjustment(ApiClient.json.encodeToString(AdjustmentCreate(UUID.randomUUID().toString(), balanceVersion, minor, reason, note, zone)), selected.id)
+                    } else model.submitTransaction(ApiClient.json.encodeToString(AdjustmentReplace("adjustment", editingVersion, note)), editingId)
+                    error = ""
+                } catch (_: Exception) { error = "Проверьте остаток, причину, часовой пояс и длину текста. Остаток должен измениться." }
+            }) { Text(if (editingId == null) "Сохранить корректировку" else "Сохранить примечание корректировки") }
+            TextButton(enabled = enabled, onClick = { guard.request { reset(); navigation.value = null } }) { Text("Отменить корректировку") }
         }
-        if (edited != null && edited.version != editingVersion) {
-            Text("Версия корректировки на сервере: ${edited.version}; черновика: $editingVersion")
-            Button(enabled = enabled, onClick = { editingVersion = edited.version }) { Text("Использовать обновленную версию корректировки") }
-        }
-        state.transactionConflict?.takeIf { it.kind == "adjustment" }?.let { Text("Корректировка на сервере: ${it.note}; версия ${it.version}") }
-    }
-    if (accountId != null || editingId != null) {
-        OutlinedTextField(note, { note = it }, label = { Text("Примечание корректировки") }, enabled = enabled)
-        if (error.isNotEmpty()) Text(error)
-        Button(enabled = enabled && (editingId == null || edited != null) && account != null && account.archived_at == null && account.deleted_at == null, onClick = {
-            try {
-                require(note.length <= 2000)
-                if (editingId == null) {
-                    val selected = requireNotNull(account)
-                    val minor = Money.minor(target, selected.currency)
-                    require(difference != null && minor != selected.posted_balance_minor && reason.isNotEmpty() && reason.length <= 500)
-                    TimeZone.getTimeZone(zone).also { require(it.id == zone || zone == "UTC") }
-                    model.submitAdjustment(ApiClient.json.encodeToString(AdjustmentCreate(UUID.randomUUID().toString(), balanceVersion, minor, reason, note, zone)), selected.id)
-                } else model.submitTransaction(ApiClient.json.encodeToString(AdjustmentReplace("adjustment", editingVersion, note)), editingId)
-                error = ""
-            } catch (_: Exception) { error = "Проверьте остаток, причину, часовой пояс и длину текста. Остаток должен измениться." }
-        }) { Text(if (editingId == null) "Сохранить корректировку" else "Сохранить примечание корректировки") }
-        TextButton(enabled = enabled, onClick = { guard.request { accountId = null; balanceVersion = ""; editingId = null; editingVersion = ""; target = ""; note = ""; reason = ""; zone = TimeZone.getDefault().id; error = ""  } }) { Text("Отменить корректировку") }
     }
     deleting?.let { item ->
         Text("Удалить корректировку: ${item.note}")
@@ -122,7 +135,7 @@ fun AdjustmentPanel(model: AuthViewModel) {
     }
     state.transactions.filter { it.kind == "adjustment" }.forEach { item ->
         val active = state.accounts.any { it.id == item.entries.single().account_id && it.archived_at == null && it.deleted_at == null }
-        TextButton(enabled = enabled && active, onClick = { guard.request { editingId = item.id; editingVersion = item.version; accountId = item.entries.single().account_id; note = item.note; error = ""  } }) { Text("Изменить корректировку ${item.note}") }
+        TextButton(enabled = enabled && active, onClick = { guard.request { editingId = item.id; editingVersion = item.version; accountId = item.entries.single().account_id; note = item.note; error = ""; navigation.value = "adjustment"  } }) { Text("Изменить корректировку ${item.note}") }
         TextButton(enabled = enabled && active, onClick = { deleting = item }) { Text("Удалить корректировку ${item.note}") }
     }
 }

@@ -126,6 +126,9 @@ class FinancialDraftRuntimeTest {
             click("Корректировать счет Draft cash · KWD")
             field("Фактический остаток", "-1.234")
             field("Причина корректировки", "Unsent reason")
+            click("Вернуться к истории корректировок")
+            compose.waitUntil(10000) { compose.onAllNodes(hasText("Сохранить черновик и продолжить") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithText("Сохранить черновик и продолжить").performClick()
             saved()
             val before = snapshot()
             assertEquals("\"1\"", savedOperation(before).getString("transaction.editingVersion"))
@@ -140,7 +143,6 @@ class FinancialDraftRuntimeTest {
             val after = snapshot()
             assertEquals(before.keys().asSequence().toSet(), after.keys().asSequence().toSet())
             before.keys().forEach { key -> assertEquals("Restored field $key", before.getString(key), after.getString(key)) }
-            listOf("Фактический остаток" to "-1.234", "Причина корректировки" to "Unsent reason").forEach { (label, value) -> compose.onNodeWithText(label).assertTextContains(value) }
             click("Восстановить черновик счета 1")
             compose.onNodeWithText("Название счета").assertTextContains("Unsent account")
             compose.onNodeWithText("Начальный остаток").assertTextContains("invalid balance")
@@ -166,6 +168,12 @@ class FinancialDraftRuntimeTest {
             saved()
             assertEquals("\"1\"", snapshot().getString("refund.parentVersion"))
             click("Вернуться к истории возвратов")
+            click("Восстановить черновик корректировки 1")
+            compose.onNodeWithText("Фактический остаток").assertTextContains("-1.234")
+            compose.onNodeWithText("Причина корректировки").assertTextContains("Unsent reason")
+            saved()
+            assertEquals(savedOperation(before, "adjustment").getString("adjustment.balanceVersion"), snapshot().getString("adjustment.balanceVersion"))
+            click("Вернуться к истории корректировок")
             // A real logout/login must change draft scope and restore it only for its owner.
             val foreignEmail = "draft-foreign-${UUID.randomUUID()}@example.test"
             val foreign = runBlocking { decodeResponse<BearerAuth>(api.request("/auth/register", "POST", ApiClient.json.encodeToString(Register(foreignEmail, "synthetic draft password", "Foreign drafts", "bearer", "UTC")))) }

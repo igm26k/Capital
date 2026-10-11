@@ -96,10 +96,11 @@ class LinkedDraftGuardScreenTest {
         click("Восстановить черновик корректировки 1")
         compose.onNodeWithText("Фактический остаток").assertTextContains("-1.234")
         compose.onNodeWithText("Причина корректировки").assertTextContains("Retained reason")
+        click("Вернуться к истории корректировок")
         click("Восстановить черновик перевода 1")
         compose.activityRule.scenario.recreate()
         compose.onNodeWithText("Примечание перевода").assertTextContains("Retained transfer")
-        compose.onNodeWithText("Фактический остаток").assertTextContains("-1.234")
+        compose.onNodeWithText("Примечание комиссии перевода").assertTextContains("Retained fee")
         waitFor("Локальные черновики сохранены. Отправка операций выполняется отдельно.")
         val scope = runBlocking { com.capital.accounting.finance.FinancialDrafts(app).open(origin, auth.profile.id, auth.workspace.id) }
         val original = runBlocking { api.transactions(auth.credential(origin)).associateBy { it.id } }
@@ -108,6 +109,9 @@ class LinkedDraftGuardScreenTest {
         val management = org.json.JSONObject(scope.read("draft.management")!!).getJSONArray("saved")
         val savedRefund = (0 until management.length()).map { management.getJSONObject(it) }.single { it.getString("prefix") == "refund" }.getJSONObject("fields")
         assertEquals(ApiClient.json.encodeToString(original[expense.id]!!.version), savedRefund.getString("refund.parentVersion"))
+        val savedAdjustment = (0 until management.length()).map { management.getJSONObject(it) }.single { it.getString("prefix") == "adjustment" }.getJSONObject("fields")
+        assertEquals(ApiClient.json.encodeToString("-1.234"), savedAdjustment.getString("adjustment.target"))
+        assertEquals(ApiClient.json.encodeToString("Retained reason"), savedAdjustment.getString("adjustment.reason"))
         assertEquals(6, original.size)
         assertEquals("Detail refund", original[refund.id]!!.note)
         assertNull(runBlocking { app.database.commands().get(origin, auth.profile.id, auth.workspace.id) })

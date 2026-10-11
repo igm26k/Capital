@@ -60,6 +60,61 @@ class AdjustmentsScreenTest {
         click("Обновить историю")
         waitFor("Начальный остаток · 100,000 KWD · ")
     }
+    @Test fun separateAdjustmentEditorGuardsBackAndReturnsAfterConfirmation() {
+        load()
+        compose.onNodeWithText("Фактический остаток").assertDoesNotExist()
+        click("Корректировать счет Adjustment cash · KWD")
+        field("Фактический остаток", "invalid")
+        field("Причина корректировки", "Retained count")
+        field("Примечание корректировки", "Retained adjustment")
+        fun back() {
+            val descriptor = InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand("input keyevent KEYCODE_BACK")
+            android.os.ParcelFileDescriptor.AutoCloseInputStream(descriptor).use { it.readBytes() }
+        }
+        fun choose(text: String) {
+            waitFor("Сохранить измененный черновик?")
+            compose.waitUntil(10000) { compose.onAllNodes(hasText(text) and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithText(text).performClick()
+        }
+        back(); android.os.SystemClock.sleep(500)
+        if (compose.onAllNodesWithText("Сохранить измененный черновик?").fetchSemanticsNodes().isEmpty()) back()
+        choose("Остаться в редакторе")
+        compose.activityRule.scenario.recreate()
+        waitFor("Вернуться к истории корректировок")
+        compose.onNodeWithText("Причина корректировки").assertTextContains("Retained count")
+        click("Вернуться к истории корректировок"); choose("Сохранить черновик и продолжить")
+        assertEquals(1, history().size)
+        assertEquals("100000", current().posted_balance_minor)
+        assertNull(runBlocking { app.database.commands().get(origin, auth.profile.id, auth.workspace.id) })
+        click("Восстановить черновик корректировки 1")
+        compose.onNodeWithText("Фактический остаток").assertTextContains("invalid")
+        field("Примечание корректировки", "Discard adjustment")
+        click("Вернуться к истории корректировок"); choose("Отбросить черновик и продолжить")
+        click("Восстановить черновик корректировки 1")
+        field("Фактический остаток", "-1.234")
+        click("Сохранить корректировку")
+        waitFor("Изменить корректировку Retained adjustment")
+        compose.onNodeWithText("Вернуться к истории корректировок").assertDoesNotExist()
+        assertEquals("-1234", current().posted_balance_minor)
+        val saved = history().single { it.kind == "adjustment" }
+        assertEquals("-101234", saved.entries.single().amount_minor)
+        assertEquals("Retained count", saved.reason)
+        assertEquals(2, history().size)
+        val version = current().balance_version
+        click("Изменить корректировку Retained adjustment")
+        field("Примечание корректировки", "Edited adjustment")
+        click("Сохранить примечание корректировки")
+        waitFor("Изменить корректировку Edited adjustment")
+        compose.onNodeWithText("Вернуться к истории корректировок").assertDoesNotExist()
+        val edited = history().single { it.id == saved.id }
+        assertEquals(saved.entries, edited.entries)
+        assertEquals(saved.reason, edited.reason)
+        assertEquals(saved.occurred_at, edited.occurred_at)
+        assertEquals(version, current().balance_version)
+        assertEquals("-1234", current().posted_balance_minor)
+        assertNull(runBlocking { app.database.commands().get(origin, auth.profile.id, auth.workspace.id) })
+    }
+
     @Test fun realNegativeAndZeroTargetsBalanceConflictAndDeletion() {
         load()
         click("Корректировать счет Adjustment cash · KWD")
@@ -79,6 +134,7 @@ class AdjustmentsScreenTest {
         assertEquals("Europe/Nicosia", negative.occurred_timezone)
         assertTrue(negative.allocations.isEmpty())
         click("Корректировать счет Adjustment cash · KWD")
+        field("Причина корректировки", "Cash count")
         field("Фактический остаток", "0")
         field("Примечание корректировки", "Zero cash")
         val income = IncomeCreate(UUID.randomUUID().toString(), "2026-10-06T08:10:00Z", "UTC", "Concurrent income", "", emptyList(), "income", account.id, "1000", listOf(AllocationInput(UUID.randomUUID().toString(), null, "1000")))
