@@ -59,7 +59,14 @@ class FinancialDraftRuntimeTest {
         }
     }
     @get:Rule(order = 1) val compose = createAndroidComposeRule<MainActivity>()
-    private fun click(text: String) = compose.onNodeWithText(text).performScrollTo().performClick()
+    private fun click(text: String) = compose.onNodeWithText(text).performScrollTo().performClick().also {
+            if (text == "Отменить изменение операции" || text.startsWith("Изменить операцию ")) {
+                if (compose.onAllNodesWithText("Сохранить измененный черновик?").fetchSemanticsNodes().isNotEmpty()) {
+                    compose.waitUntil(10000) { compose.onAllNodes(hasText("Отбросить черновик и продолжить") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+                    compose.onNodeWithText("Отбросить черновик и продолжить").performClick()
+                }
+            }
+        }
     private fun field(label: String, value: String) {
         compose.onNodeWithText(label).performScrollTo().performTextClearance()
         compose.onNodeWithText(label).performTextInput(value)
@@ -70,6 +77,7 @@ class FinancialDraftRuntimeTest {
     }
     @Test fun nativeDraftsSurviveActualProcessStopWithoutSendingOrAdoptingForeignVersions() {
         waitFor("Вы вошли: ${auth.profile.email}")
+        waitFor("Обновить счета")
         click("Обновить счета"); waitFor("Для операции: Draft cash · KWD")
         click("Обновить историю"); waitFor("Детали операции ${expense.note}")
         if (phase == "prepare") {

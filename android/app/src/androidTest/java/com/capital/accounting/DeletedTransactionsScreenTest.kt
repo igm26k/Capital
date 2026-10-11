@@ -57,7 +57,14 @@ class DeletedTransactionsScreenTest {
     private fun remove(item: Transaction, parents: List<Transaction> = emptyList()) = runBlocking {
         mutate("transactions/${item.id}", "DELETE", ApiClient.json.encodeToString(TransactionDelete(item.version, parents.map { VersionExpectation(it.id, it.version) })))
     }
-    private fun click(text: String) = compose.onNodeWithText(text).performScrollTo().performClick()
+    private fun click(text: String) = compose.onNodeWithText(text).performScrollTo().performClick().also {
+            if (text == "Отменить изменение операции" || text.startsWith("Изменить операцию ")) {
+                if (compose.onAllNodesWithText("Сохранить измененный черновик?").fetchSemanticsNodes().isNotEmpty()) {
+                    compose.waitUntil(10000) { compose.onAllNodes(hasText("Отбросить черновик и продолжить") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+                    compose.onNodeWithText("Отбросить черновик и продолжить").performClick()
+                }
+            }
+        }
     private fun field(label: String, value: String) {
         compose.onNodeWithText(label).performScrollTo().performTextClearance()
         compose.onNodeWithText(label).performTextInput(value)

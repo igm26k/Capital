@@ -54,7 +54,14 @@ class CatalogScreenTest {
         compose.onNodeWithText("Тег: Shared").assertExists()
         compose.activityRule.scenario.recreate()
         compose.onNodeWithText("Категория: Home / Food").assertExists()
-        fun click(text: String) = compose.onNodeWithText(text).performScrollTo().performClick()
+        fun click(text: String) = compose.onNodeWithText(text).performScrollTo().performClick().also {
+            if (text == "Отменить изменение операции" || text.startsWith("Изменить операцию ")) {
+                if (compose.onAllNodesWithText("Сохранить измененный черновик?").fetchSemanticsNodes().isNotEmpty()) {
+                    compose.waitUntil(10000) { compose.onAllNodes(hasText("Отбросить черновик и продолжить") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+                    compose.onNodeWithText("Отбросить черновик и продолжить").performClick()
+                }
+            }
+        }
         fun field(label: String, value: String) {
             compose.onNodeWithText(label).performScrollTo().performTextClearance()
             compose.onNodeWithText(label).performTextInput(value)
@@ -106,7 +113,14 @@ class CatalogScreenTest {
         }
     }
     @Test fun realCatalogMutationsArchiveAndExplicitVersionConflict() {
-        fun click(text: String) = compose.onNodeWithText(text).performScrollTo().performClick()
+        fun click(text: String) = compose.onNodeWithText(text).performScrollTo().performClick().also {
+            if (text == "Отменить изменение операции" || text.startsWith("Изменить операцию ")) {
+                if (compose.onAllNodesWithText("Сохранить измененный черновик?").fetchSemanticsNodes().isNotEmpty()) {
+                    compose.waitUntil(10000) { compose.onAllNodes(hasText("Отбросить черновик и продолжить") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+                    compose.onNodeWithText("Отбросить черновик и продолжить").performClick()
+                }
+            }
+        }
         fun field(label: String, value: String) {
             compose.onNodeWithText(label).performScrollTo().performTextClearance()
             compose.onNodeWithText(label).performTextInput(value)
@@ -179,7 +193,14 @@ class CatalogScreenTest {
     }
 
     @Test fun categoryConflictAndCycleKeepRejectedDraftWithoutAutomaticWrite() {
-        fun click(text: String) = compose.onNodeWithText(text).performScrollTo().performClick()
+        fun click(text: String) = compose.onNodeWithText(text).performScrollTo().performClick().also {
+            if (text == "Отменить изменение операции" || text.startsWith("Изменить операцию ")) {
+                if (compose.onAllNodesWithText("Сохранить измененный черновик?").fetchSemanticsNodes().isNotEmpty()) {
+                    compose.waitUntil(10000) { compose.onAllNodes(hasText("Отбросить черновик и продолжить") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+                    compose.onNodeWithText("Отбросить черновик и продолжить").performClick()
+                }
+            }
+        }
         fun waitFor(text: String) = compose.waitUntil(30000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
         fun categories() = runBlocking { api.categories(auth.credential(origin)) }
         waitFor("Вы вошли: ${auth.profile.email}")

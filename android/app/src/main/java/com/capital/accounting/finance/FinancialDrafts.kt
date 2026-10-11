@@ -18,9 +18,10 @@ import java.util.concurrent.Executors
 @Serializable
 private data class DraftFile(val schema: Int = 1, val scope: String, val fields: Map<String, String>)
 
-private fun validateDraftFields(fields: Map<String, String>) {
+internal fun validateDraftFields(fields: Map<String, String>) {
     fields.forEach { (key, value) ->
         when (key) {
+            "draft.management" -> validateDraftManagement(ApiClient.json.decodeFromString<DraftManagement>(value))
             "account.editingId", "catalog.id", "catalog.parentId", "transaction.editingId", "transaction.accountId", "transfer.editingId", "transfer.expectedFeeVersion", "transfer.feeAnchorId", "transfer.sourceCurrency", "transfer.targetCurrency", "transfer.feeCurrency", "transfer.preservedInstant", "transfer.preservedZone", "transfer.sourceId", "transfer.targetId", "transfer.feeAccountId", "refund.editingId", "refund.preservedInstant", "refund.preservedZone", "refund.parentId", "refund.transferVersion", "refund.accountId", "adjustment.accountId", "adjustment.editingId" -> ApiClient.json.decodeFromString<String?>(value)
             "account.editingVersion", "account.editingBalance", "account.name", "account.type", "account.currency", "account.balance", "account.opened", "account.zone", "catalog.collection", "catalog.version", "catalog.name", "transaction.editingVersion", "transaction.kind", "transaction.amount", "transaction.note", "transaction.payee", "transaction.occurred", "transaction.zone", "transfer.editingVersion", "transfer.feeDraftId", "transfer.sourceAmount", "transfer.targetAmount", "transfer.note", "transfer.payee", "transfer.occurred", "transfer.zone", "transfer.feeAmount", "transfer.feeNote", "refund.editingVersion", "refund.parentVersion", "refund.note", "refund.payee", "refund.occurred", "refund.zone", "adjustment.balanceVersion", "adjustment.target", "adjustment.reason", "adjustment.note", "adjustment.zone", "adjustment.editingVersion" -> ApiClient.json.decodeFromString<String>(value)
             "account.archived", "catalog.archived", "transfer.feeEnabled" -> ApiClient.json.decodeFromString<Boolean>(value)
@@ -102,9 +103,25 @@ class FinancialDraftScope internal constructor(
         private set
     @Volatile private var revision = 0L
 
-    fun read(key: String): String? = fields[key]
+    private var changes by mutableIntStateOf(0)
+    val initiallyPresent = initial.keys.toSet()
+    fun snapshot(prefix: String): Map<String, String> {
+        changes
+        return fields.filterKeys { it.startsWith("$prefix.") }
+    }
+    fun replace(prefix: String, values: Map<String, String>) {
+        fields.keys.filter { it.startsWith("$prefix.") }.forEach { fields.remove(it) }
+        values.forEach { (key, value) -> put(key, value) }
+        changes++
+        epoch++
+    }
+    var epoch by mutableIntStateOf(0)
+        private set
+    fun read(key: String): String? { changes; return fields[key] }
     fun put(key: String, value: String) {
-        if (fields.put(key, value) == value || scheduled) return
+        if (fields.put(key, value) == value) return
+        changes++
+        if (scheduled) return
         scheduled = true
         // One main-loop task sees the complete event/composition, even when only a child recomposes.
         main.post {
@@ -131,7 +148,7 @@ val LocalFinancialDraftScope = staticCompositionLocalOf<FinancialDraftScope> { e
 @Composable
 inline fun <reified T> rememberFinancialDraft(key: String, noinline initial: () -> T): MutableState<T> {
     val scope = LocalFinancialDraftScope.current
-    val value = remember(scope, key) {
+    val value = remember(scope, key, scope.epoch) {
         val stored = scope.read(key)
         val state = mutableStateOf(if (stored == null) initial() else ApiClient.json.decodeFromString<T>(stored))
         object : MutableState<T> {

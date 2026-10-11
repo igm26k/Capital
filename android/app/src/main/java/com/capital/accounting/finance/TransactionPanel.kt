@@ -19,6 +19,7 @@ import java.util.*
 fun TransactionPanel(model: AuthViewModel) {
     val state = model.state
     val enabled = !state.busy && !state.financeBlocked && state.persisted
+    val guard = rememberDraftGuard("transaction", enabled)
     var handledReceipt by remember { mutableStateOf(state.transactionReceipt?.commandId) }
     var editingId by rememberFinancialDraft<String?>("transaction.editingId") { null }
     var editingVersion by rememberFinancialDraft("transaction.editingVersion") { "" }
@@ -44,10 +45,11 @@ fun TransactionPanel(model: AuthViewModel) {
         if (command == null && state.transactionReceipt?.commandId != handledReceipt) {
             val receipt = state.transactionReceipt
             handledReceipt = receipt?.commandId
-            if (receipt?.created == true && receipt.kind in listOf("income", "expense") && editingId == null) parts = parts.map { it.copy(id = UUID.randomUUID().toString()) }
+            if (receipt?.created == true && receipt.kind in listOf("income", "expense") && editingId == null) { parts = parts.map { it.copy(id = UUID.randomUUID().toString()) }; guard.markClean() }
             if (receipt != null && receipt.transactionId == editingId) {
                 if (receipt.deleted) { editingId = null; original = null; amount = ""; note = ""; parts = listOf(AllocationDraft()); selectedTags = emptyList() }
                 else receipt.transaction?.let { original = it; editingVersion = it.version }
+                guard.markClean()
             }
         }
         if (command != null && command.method in listOf("POST", "PUT") && command.path.contains("/transactions")) {
@@ -149,7 +151,7 @@ fun TransactionPanel(model: AuthViewModel) {
             Text("Версия операции на сервере: ${current.version}; версия черновика: $editingVersion")
             Button(enabled = enabled, onClick = { editingVersion = current.version }) { Text("Использовать обновленную версию операции") }
         }
-        TextButton(enabled = enabled, onClick = { editingId = null; original = null; amount = ""; note = ""; parts = listOf(AllocationDraft()); selectedTags = emptyList(); error = "" }) { Text("Отменить изменение операции") }
+        TextButton(enabled = enabled, onClick = { guard.request { editingId = null; editingVersion = ""; original = null; kind = "expense"; accountId = null; amount = ""; note = ""; payee = ""; occurred = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.ROOT).format(Date()); zone = TimeZone.getDefault().id; parts = listOf(AllocationDraft()); selectedTags = emptyList(); error = "" } }) { Text("Отменить изменение операции") }
     }
     state.transactionConflict?.takeIf { it.kind in listOf("income", "expense") && it.parent_transaction_id == null }?.let { current ->
         Text("На сервере: ${current.note}; версия ${current.version}; ${current.entries.joinToString { Money.display(it.amount_minor, it.currency) }}")
@@ -177,12 +179,14 @@ fun TransactionPanel(model: AuthViewModel) {
         TextButton(enabled = !state.busy && state.persisted, onClick = { model.openTransactionDetails(transaction.id) }) { Text("Детали операции ${transaction.note.ifEmpty { label }}") }
         if (transaction.kind in listOf("income", "expense") && transaction.parent_transaction_id == null) {
             TextButton(enabled = enabled, onClick = {
+                guard.request {
                 original = transaction; editingId = transaction.id; editingVersion = transaction.version; kind = transaction.kind
                 accountId = transaction.entries.first().account_id
                 amount = Money.display(transaction.allocations.fold(BigInteger.ZERO) { sum, item -> sum + BigInteger(item.amount_minor) }.toString(), transaction.entries.first().currency).removeSuffix(" ${transaction.entries.first().currency}")
                 parts = transaction.allocations.map { AllocationDraft(it.id, it.category_id, Money.display(it.amount_minor, transaction.entries.first().currency).removeSuffix(" ${transaction.entries.first().currency}")) }
                 selectedTags = transaction.tag_ids
                 note = transaction.note; payee = transaction.payee; zone = transaction.occurred_timezone; occurred = openingLocal(transaction.occurred_at, zone); error = ""
+                }
             }) { Text("Изменить операцию ${transaction.note}") }
             TextButton(enabled = enabled, onClick = { deleting = transaction }) { Text("Удалить операцию ${transaction.note}") }
         }
