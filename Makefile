@@ -92,3 +92,7 @@ android-device-check:
 .PHONY: android-auth-e2e
 android-auth-e2e:
 	./scripts/android-auth-e2e.sh
+
+.PHONY: android-web-e2e
+android-web-e2e:
+	./scripts/android-web-e2e.sh

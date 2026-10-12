@@ -148,3 +148,8 @@ ApiFailure получает canonical UUID из X-Request-ID; понятные �
 ### Шаг 46: идентификатор финансового отказа после restart
 
 Room3 хранит nullable requestId для rejected/reconcile command; миграции1→2→3 сохраняют settings/key/body/scope. CommandRunner сохраняет reference вместе с terminal transition, UI показывает его после чтения сохраненной команды, terminal retry не заменяет ID. Целевая приемка — **8/8 actual CommandStore3/CommandApi1/AccountsScreen4, 41/41 unit**, debug/build/lint PASS. Проверены populated SQLite2→Room3, v1 migration, rejected reference reopen, guarded updates и UUID реального version conflict на экране. Скрипт полного gate теперь ожидает66 executions; последний принятый полный65/65 — шаг42. Далее оставшийся UX/spec audit, S3-05 и APP-03.
+
+
+### Шаг 47: счет и расход Android видны в Chrome
+
+`make android-web-e2e` использует отдельный test emulator, TLS API/PostgreSQL и настоящий Chrome. Требуются Node/npm в PATH (приемка Node24.21.0), JDK/SDK и установленный Chrome. Native UI создает KWD100000 account/expense12345, Chrome UI login видит ту же запись и balance87655; GET/version1, reload и SQL ledger подтверждают exact amounts/no duplicate/no writes при чтении. Proof0600 содержит только synthetic email/IDs/minors/flags, без bearer/password. Отдельный Playwright config изолирует cross-platform acceptance от штатных web tests. Итог полного gate — **native1/Chrome1/unit41/build/lint PASS**. Это online сценарий; S3-05 и финальная APP-03 offline/recovery/cursor/conflicts еще впереди.
