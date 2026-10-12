@@ -39,7 +39,11 @@ class OutboxReceiptStore(private val db: CapitalDatabase) {
         if (stored.state == "applied") {
             val existing = requireNotNull(db.receipts().get(command.position))
             require(stored == command.copy(state = "applied") && existing.generation == receipt.generation && existing.sequence == receipt.sequence &&
-                decodeResponse<MutationResult>(existing.payload) == result)
+                (if (existing.payload.isNotEmpty()) decodeResponse<MutationResult>(existing.payload) == result else {
+                    val compact = requireNotNull(db.outcomes().get(command.position))
+                    val refs = identities.map { (type, item) -> ReceiptEntity(type, item.id, item.version) } + result.deleted.map { ReceiptEntity(it.entity_type, it.id, it.version) }
+                    ApiClient.json.decodeFromString<List<ReceiptEntity>>(compact.refs).toSet() == refs.toSet()
+                }))
             return@withTransaction existing
         }
         require(stored == command && command.state in setOf("sending", "uncertain"))

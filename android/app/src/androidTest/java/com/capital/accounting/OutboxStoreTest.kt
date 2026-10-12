@@ -19,7 +19,7 @@ class OutboxStoreTest {
     private val context get() = ApplicationProvider.getApplicationContext<CapitalApplication>()
     private fun id() = UUID.randomUUID().toString()
     private fun open(name: String) = Room.databaseBuilder(context, CapitalDatabase::class.java, name)
-        .addMigrations(CapitalDatabase.MIGRATION_7_8, CapitalDatabase.MIGRATION_8_9, CapitalDatabase.MIGRATION_9_10).build()
+        .addMigrations(CapitalDatabase.MIGRATION_7_8, CapitalDatabase.MIGRATION_8_9, CapitalDatabase.MIGRATION_9_10, CapitalDatabase.MIGRATION_10_11).build()
     private val date = "2026-10-12T12:00:00Z"
     private suspend fun baseline(db: CapitalDatabase, saved: StoredSession): Tag {
         val tag = Tag(id(), saved.workspaceId, "1", date, date, null, "Confirmed", null)
@@ -86,7 +86,7 @@ class OutboxStoreTest {
             val command = FinancialCommand(id(), saved.origin, saved.ownerId, saved.workspaceId, saved.sessionId, saved.generationId, "/workspaces/${saved.workspaceId}/tags", "POST", "{}")
             db.commands().insert(command); db.settings().save(ConnectionSettings(origin = saved.origin)); db.close()
             context.openOrCreateDatabase(name, 0, null).use { old ->
-                old.execSQL("DROP TABLE outbox_failures"); old.execSQL("DROP TABLE outbox_receipts"); old.execSQL("DROP TABLE outbox_overlays"); old.execSQL("DROP TABLE outbox_commands")
+                old.execSQL("DROP TABLE outbox_outcomes"); old.execSQL("DROP TABLE outbox_failures"); old.execSQL("DROP TABLE outbox_receipts"); old.execSQL("DROP TABLE outbox_overlays"); old.execSQL("DROP TABLE outbox_commands")
                 old.execSQL("DROP TABLE room_master_table"); old.execSQL("PRAGMA user_version=7")
             }
             db = open(name); assertEquals(mirror, SnapshotStore(db).read(scope)); assertEquals(command, db.commands().get(saved.origin, saved.ownerId, saved.workspaceId))

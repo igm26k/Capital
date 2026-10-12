@@ -65,9 +65,16 @@ class OutboxSenderApiTest {
             assertEquals(confirmed, current.items.filterIsInstance<SnapshotItemTag>().first { it.data.id == local.id }.data)
             val wrong = StoredSession(origin, s.token, s.ownerId, s.workspaceId, id(), s.sessionId)
             try { OutboxSender(db).sendNext(wrong); fail("Generation changed") } catch (_: IllegalArgumentException) { }
+            assertEquals("applied", OutboxReconciler(db).inspect(s, first.actionId)!!.state)
+            assertEquals("rejected", OutboxReconciler(db).inspect(s, rejected.actionId)!!.state)
+            val unknownTag = local.copy(id = id(), name = "Unknown command")
+            val unknown = OutboxStore(db).enqueue(s, "tags", "POST", ApiClient.json.encodeToString(TagCreate(unknownTag.id, unknownTag.name)), emptyList(), emptyList(), listOf(OverlayEffect.upsert(SnapshotItemTag("tag", unknownTag))))
+            db.outbox().transition(scope.key, unknown.actionId, "queued", "uncertain")
+            assertNull(OutboxReconciler(db).inspect(s, unknown.actionId))
+            assertEquals(unknown.copy(state = "uncertain"), db.outbox().commands(scope.key).last())
             api.request("/auth/logout", "POST", session = s)
             try { OutboxSender(db).sendNext(s); fail("Revoked bearer accepted") } catch (e: ApiFailure) { assertEquals(401, e.status) }
-            assertEquals(rejected.copy(state = "rejected"), db.outbox().commands(scope.key).last())
+            assertEquals(rejected.copy(state = "rejected"), db.outbox().commands(scope.key).first { it.actionId == rejected.actionId })
         } finally { db.close(); context.deleteDatabase(name) }
     }
 }

@@ -19,7 +19,7 @@ import java.util.UUID
 class OutboxFailureTest {
     private val context get() = ApplicationProvider.getApplicationContext<CapitalApplication>()
     private fun id() = UUID.randomUUID().toString()
-    private fun open(name: String) = Room.databaseBuilder(context, CapitalDatabase::class.java, name).addMigrations(CapitalDatabase.MIGRATION_9_10).build()
+    private fun open(name: String) = Room.databaseBuilder(context, CapitalDatabase::class.java, name).addMigrations(CapitalDatabase.MIGRATION_9_10, CapitalDatabase.MIGRATION_10_11).build()
     private fun saved() = StoredSession("https://accounting.example", "x".repeat(64), id(), id(), id(), id())
     private suspend fun prepare(db: CapitalDatabase, s: StoredSession): Pair<OutboxCommand, Tag> {
         val scope = MirrorScope(s.origin, s.ownerId, s.workspaceId)
@@ -47,7 +47,7 @@ class OutboxFailureTest {
         val name = "outbox-failure-migration.db"; context.deleteDatabase(name); var db = open(name); val s = saved()
         try {
             val (command, _) = prepare(db, s); val effects = db.outbox().overlays(command.position); db.close()
-            context.openOrCreateDatabase(name, 0, null).use { old -> old.execSQL("DROP TABLE outbox_failures"); old.execSQL("DROP TABLE room_master_table"); old.execSQL("PRAGMA user_version=9") }
+            context.openOrCreateDatabase(name, 0, null).use { old -> old.execSQL("DROP TABLE outbox_outcomes"); old.execSQL("DROP TABLE outbox_failures"); old.execSQL("DROP TABLE room_master_table"); old.execSQL("PRAGMA user_version=9") }
             db = open(name); assertEquals(command, db.outbox().commands(command.scope).single()); assertEquals(effects, db.outbox().overlays(command.position))
             OutboxLifecycle(db).failed(command, "rejected", ApiFailure(422, "unsafe\nresponse-canary", "untrusted request id"))
             val failure = db.failures().get(command.position)!!; assertEquals(422, failure.status); assertNull(failure.code); assertNull(failure.requestId)
