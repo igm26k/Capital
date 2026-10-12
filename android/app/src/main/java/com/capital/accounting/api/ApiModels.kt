@@ -571,3 +571,20 @@ data class AdjustmentReplace(
     }
     override fun toString() = "AdjustmentReplace([redacted])"
 }
+
+@Serializable
+data class BulkItem(
+    val id: String,
+    val expected_version: String,
+) {
+    override fun toString() = "BulkItem([redacted])"
+}
+
+@Serializable
+data class BulkClassification(
+    val items: List<BulkItem>,
+    val category_id: String?,
+    val tag_ids: List<String>,
+) {
+    override fun toString() = "BulkClassification([redacted])"
+}

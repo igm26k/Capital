@@ -107,6 +107,7 @@ fun TransferPanel(model: AuthViewModel) {
             }
             return@LaunchedEffect
         }
+        if (command.path.endsWith("/classification")) return@LaunchedEffect
         if (command.method !in listOf("POST", "PUT") || !command.path.contains("/transactions")) return@LaunchedEffect
         if (ApiClient.json.parseToJsonElement(command.body).jsonObject.getValue("kind").jsonPrimitive.content != "transfer") return@LaunchedEffect
         navigation.value = "transfer"

@@ -26,6 +26,7 @@ fun TransactionPanel(model: AuthViewModel) {
     val enabled = !state.busy && !state.financeBlocked && state.persisted
     val guard = rememberDraftGuard("transaction", enabled, render = false)
     val scope = LocalFinancialDraftScope.current
+    val bulk = rememberBulkClassification(model)
     val navigation = LocalFinancialEditor.current
     val editorOpen = navigation.value == "transaction"
     var handledReceipt by remember { mutableStateOf(state.transactionReceipt?.commandId) }
@@ -81,7 +82,7 @@ fun TransactionPanel(model: AuthViewModel) {
                 if (navigation.value == "transaction") navigation.value = null
             }
         }
-        if (command != null && command.method in listOf("POST", "PUT") && command.path.contains("/transactions")) {
+        if (command != null && command.method in listOf("POST", "PUT") && command.path.contains("/transactions") && !command.path.endsWith("/classification")) {
             val commandKind = ApiClient.json.parseToJsonElement(command.body).jsonObject.getValue("kind").jsonPrimitive.content
             if (commandKind !in listOf("expense", "income")) return@LaunchedEffect
             navigation.value = "transaction"
@@ -122,6 +123,7 @@ fun TransactionPanel(model: AuthViewModel) {
     }
     if (navigation.value == null) Button(enabled = !state.busy, onClick = model::loadTransactions) { Text("Обновить историю") }
     if (!editorOpen && LocalFinancialSection.current.value == "operations") {
+        BulkClassificationControls(bulk)
         Text("Новая операция", style = MaterialTheme.typography.titleLarge)
         Row {
             TextButton(enabled = enabled && !scope.saving, onClick = { createOperation("expense") }) { Text("Расход") }
@@ -230,6 +232,7 @@ fun TransactionPanel(model: AuthViewModel) {
         Text("История операций", style = MaterialTheme.typography.titleLarge)
         HistoryFilters(model)
         (state.historyItems ?: state.transactions).forEach { transaction ->
+            if (navigation.value == null) BulkClassificationRow(bulk, transaction)
             val label = when (transaction.kind) {
                 "expense" -> "Расход"
                 "income" -> "Доход"

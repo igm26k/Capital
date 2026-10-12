@@ -25,6 +25,7 @@ data class TransactionReceipt(val commandId: String, val transactionId: String, 
 }
 
 data class CollectionReceipt(val commandId: String, val collection: String, val recordId: String, val created: Boolean, val result: MutationResult)
+data class ClassificationReceipt(val commandId: String, val ids: Set<String>)
 
 data class AuthState(
     val origin: String = "", val busy: Boolean = true, val message: String = "",
@@ -34,6 +35,7 @@ data class AuthState(
     val accounts: List<Account> = emptyList(), val transactions: List<Transaction> = emptyList(), val categories: List<Category> = emptyList(), val tags: List<Tag> = emptyList(), val financialCommand: FinancialCommand? = null,
     val detailStack: List<String> = emptyList(), val detailTransaction: Transaction? = null, val detailMissing: Boolean = false, val detailError: String = "",
     val collectionReceipt: CollectionReceipt? = null,
+    val classificationReceipt: ClassificationReceipt? = null,
     val transactionsLoaded: Boolean = false, val transactionReceipt: TransactionReceipt? = null,
     val historyFilter: TransactionFilter? = null, val historyItems: List<Transaction>? = null,
     val historyLimit: Int = 50, val historyNextCursor: String? = null, val historyCursors: List<String> = emptyList(), val historyError: String = "",
@@ -363,6 +365,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     fun submitAccount(body: String, id: String? = null) = submitFinancial(body, if (id == null) "accounts" else "accounts/$id", if (id == null) "POST" else "PUT")
     fun submitAdjustment(body: String, accountId: String) = submitFinancial(body, "accounts/$accountId/adjustments", "POST")
     fun submitTransaction(body: String, id: String? = null, delete: Boolean = false) = submitFinancial(body, if (id == null) "transactions" else "transactions/$id", if (delete) "DELETE" else if (id == null) "POST" else "PUT")
+    fun submitClassification(body: String) = submitFinancial(body, "transactions/classification", "POST")
 
     fun submitCatalog(body: String, collection: String, id: String? = null) {
         require(collection in setOf("categories", "tags"))
@@ -412,15 +415,16 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             val page = state.historyFilter?.let { ApiClient(saved.origin).transactionPage(saved, it, state.historyLimit) }
             val collection = collectionReceipt(result) ?: state.collectionReceipt
             val receipt = transactionReceipt(result) ?: state.transactionReceipt
+            val classification = classificationReceipt(result) ?: state.classificationReceipt
             require(app.database.commands().remove(result.commandId, "confirmed") == 1)
             state = state.copy(busy = false, accounts = accounts, transactions = history, transactionsLoaded = true, categories = categories, tags = tags, financialCommand = null, financeBlocked = false, historyItems = page?.items, historyNextCursor = page?.next_cursor,
-                historyCursors = listOfNotNull(page?.next_cursor), historyError = "", transactionReceipt = receipt, collectionReceipt = collection, message = savedMessage(result.path))
+                historyCursors = listOfNotNull(page?.next_cursor), historyError = "", transactionReceipt = receipt, collectionReceipt = collection, classificationReceipt = classification, message = savedMessage(result.path))
         } else {
             var current: Account? = null
             var transaction: Transaction? = null
             var category: Category? = null
             var tag: Tag? = null
-            if (result.errorCode == "version_conflict" && result.path.contains("/transactions/")) {
+            if (result.errorCode == "version_conflict" && result.path.contains("/transactions/") && !result.path.endsWith("/classification")) {
                 try { transaction = decodeResponse<Transaction>(ApiClient(saved.origin).request(result.path, session = saved)) }
                 catch (e: CancellationException) { throw e }
                 catch (_: Exception) { }
@@ -463,10 +467,11 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                 val page = state.historyFilter?.let { ApiClient(saved.origin).transactionPage(saved, it, state.historyLimit) }
                 val collection = if (command.state == "confirmed") collectionReceipt(command) ?: state.collectionReceipt else state.collectionReceipt
                 val receipt = if (command.state == "confirmed") transactionReceipt(command) ?: state.transactionReceipt else state.transactionReceipt
+                val classification = if (command.state == "confirmed") classificationReceipt(command) ?: state.classificationReceipt else state.classificationReceipt
                 require(app.database.commands().remove(command.commandId, command.state) == 1)
                 state = state.copy(busy = false, accounts = accounts, transactions = history, transactionsLoaded = true, categories = categories, tags = tags, financialCommand = null, financeBlocked = false,
                     historyItems = page?.items, historyNextCursor = page?.next_cursor, historyCursors = listOfNotNull(page?.next_cursor), historyError = "",
-                    transactionReceipt = receipt, collectionReceipt = collection,
+                    transactionReceipt = receipt, collectionReceipt = collection, classificationReceipt = classification,
                     accountConflict = null, transactionConflict = null, categoryConflict = null, tagConflict = null, message = if (command.state == "confirmed") savedMessage(command.path) else "Данные обновлены. Проверьте поля перед новой командой.")
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) { if (!financialFailure(saved, e)) state = state.copy(busy = false, message = "Не удалось обновить данные. Команда сохранена.") }
@@ -527,6 +532,7 @@ private fun errorMessage(error: Exception, authAttempt: Boolean = false): String
 }
 
 private fun savedMessage(path: String): String = when {
+    path.endsWith("/transactions/classification") -> "Классификация выбранных операций сохранена"
     path.endsWith("/adjustments") -> "Операция сохранена"
     path.contains("/accounts") -> "Счет сохранен"
     path.contains("/categories") -> "Категория сохранена"
@@ -535,6 +541,7 @@ private fun savedMessage(path: String): String = when {
 }
 
 private fun transactionReceipt(command: FinancialCommand): TransactionReceipt? {
+    if (command.path.endsWith("/transactions/classification")) return null
     if (!command.path.contains("/transactions") && !command.path.endsWith("/adjustments")) return null
     val id = if (command.method == "POST") ApiClient.json.parseToJsonElement(command.body).jsonObject.getValue("id").jsonPrimitive.content
         else command.path.substringAfterLast('/')
@@ -543,6 +550,18 @@ private fun transactionReceipt(command: FinancialCommand): TransactionReceipt? {
     val records = decodeResponse<MutationResult>(requireNotNull(command.result)).transactions
     require(command.method == "DELETE" || records.any { it.id == id })
     return TransactionReceipt(command.commandId, id, command.method == "DELETE", command.method == "POST", kind, records)
+}
+
+private fun classificationReceipt(command: FinancialCommand): ClassificationReceipt? {
+    if (command.path != "/workspaces/${command.workspaceId}/transactions/classification" || command.method != "POST") return null
+    val request = decodeResponse<BulkClassification>(command.body)
+    val records = decodeResponse<MutationResult>(requireNotNull(command.result)).transactions
+    val ids = request.items.map { it.id }.toSet()
+    require(request.items.size in 1..100 && ids.size == request.items.size && records.size == ids.size && records.map { it.id }.toSet() == ids)
+    require(records.all { record -> record.workspace_id == command.workspaceId &&
+        java.math.BigInteger(record.version) == java.math.BigInteger(request.items.single { it.id == record.id }.expected_version) + java.math.BigInteger.ONE &&
+        record.allocations.single().category_id == request.category_id && record.tag_ids.toSet() == request.tag_ids.toSet() })
+    return ClassificationReceipt(command.commandId, ids)
 }
 
 private fun collectionReceipt(command: FinancialCommand): CollectionReceipt? {

@@ -38,6 +38,7 @@ run_suite com.capital.accounting.DevicesScreenTest 1 ops/.runtime/checks/android
 run_suite com.capital.accounting.AccountsScreenTest 4 ops/.runtime/checks/android-accounts-ui-instrumentation.txt
 run_suite com.capital.accounting.TransactionsScreenTest 2 ops/.runtime/checks/android-transactions-ui-instrumentation.txt
 run_suite com.capital.accounting.TransactionDetailsScreenTest 5 ops/.runtime/checks/android-transaction-details-ui-instrumentation.txt
+run_suite com.capital.accounting.BulkClassificationScreenTest 4 ops/.runtime/checks/android-bulk-ui-instrumentation.txt
 run_suite com.capital.accounting.DeletedTransactionsScreenTest 2 ops/.runtime/checks/android-deleted-transactions-ui-instrumentation.txt
 run_suite com.capital.accounting.HistoryScreenTest 3 ops/.runtime/checks/android-history-ui-instrumentation.txt
 run_suite com.capital.accounting.AdjustmentsScreenTest 3 ops/.runtime/checks/android-adjustments-ui-instrumentation.txt
@@ -49,4 +50,4 @@ run_suite com.capital.accounting.AuthScreenTest 1 ops/.runtime/checks/android-ui
 python3 scripts/check-android-auth-runtime.py "$adb" "$serial"
 python3 scripts/check-android-financial-runtime.py "$adb" "$serial"
 python3 scripts/check-android-release-trust.py "$sdk"
-echo 'PASS 53/53 real Android instrumentation executions and auth runtime acceptance'
+echo 'PASS 57/57 real Android instrumentation executions and auth runtime acceptance'
