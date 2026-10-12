@@ -30,12 +30,13 @@ fun AdjustmentPanel(model: AuthViewModel) {
     var editingVersion by rememberFinancialDraft("adjustment.editingVersion") { "" }
     var deleting by remember { mutableStateOf<Transaction?>(null) }
     var error by remember { mutableStateOf("") }
+    val validation = remember(scope, scope.epoch) { FieldValidation() }
     val account = state.accounts.find { it.id == accountId }
     val edited = state.transactions.find { it.id == editingId }
     val difference = try {
         account?.let { Money.display((BigInteger(Money.minor(target, it.currency)) - BigInteger(it.posted_balance_minor)).toString(), it.currency) }
     } catch (_: Exception) { null }
-    fun reset() { accountId = null; balanceVersion = ""; editingId = null; editingVersion = ""; target = ""; note = ""; reason = ""; zone = TimeZone.getDefault().id; error = "" }
+    fun reset() { accountId = null; balanceVersion = ""; editingId = null; editingVersion = ""; target = ""; note = ""; reason = ""; zone = TimeZone.getDefault().id; error = ""; validation.reset() }
     fun close() { if (enabled && !scope.saving) guard.request { reset(); navigation.value = null } }
     fun createAdjustment(item: Account) { guard.request {
         reset(); navigation.value = "adjustment"
@@ -44,7 +45,7 @@ fun AdjustmentPanel(model: AuthViewModel) {
         error = ""
     } }
     HandleFinancialCreate("adjustment", enabled) { createAdjustment(requireNotNull(it.account)) }
-    fun editAdjustment(item: Transaction) { guard.request { editingId = item.id; editingVersion = item.version; accountId = item.entries.single().account_id; note = item.note; error = ""; navigation.value = "adjustment" } }
+    fun editAdjustment(item: Transaction) { guard.request { validation.reset(); editingId = item.id; editingVersion = item.version; accountId = item.entries.single().account_id; note = item.note; error = ""; navigation.value = "adjustment" } }
     fun deleteAdjustment(item: Transaction) { deleting = item }
     HandleFinancialTransaction("adjustment", enabled) { if (it.action == FinancialTransactionAction.EDIT) editAdjustment(it.transaction) else deleteAdjustment(it.transaction) }
     LaunchedEffect(state.financialCommand?.commandId, state.transactionReceipt?.commandId, state.accounts, state.transactions) {
@@ -88,11 +89,11 @@ fun AdjustmentPanel(model: AuthViewModel) {
             if (account != null) {
                 Text("Корректируемый счет: ${account.name}")
                 Text("Текущий остаток: ${Money.display(account.posted_balance_minor, account.currency)}")
-                OutlinedTextField(target, { target = it }, label = { Text("Фактический остаток") }, enabled = enabled, singleLine = true)
+                ValidatedTextField(target, { target = it }, "Фактический остаток", "target", validation, enabled)
                 if (difference != null) Text("Разница нового остатка: $difference")
                 else Text("Введите допустимый остаток и разницу в пределах денежного лимита.")
-                OutlinedTextField(reason, { reason = it }, label = { Text("Причина корректировки") }, enabled = enabled)
-                OutlinedTextField(zone, { zone = it }, label = { Text("Часовой пояс корректировки") }, enabled = enabled, singleLine = true)
+                ValidatedTextField(reason, { reason = it }, "Причина корректировки", "reason", validation, enabled, singleLine = false)
+                ValidatedTextField(zone, { zone = it }, "Часовой пояс корректировки", "zone", validation, enabled)
                 if (account.balance_version != balanceVersion) {
                     Text("Версия остатка на сервере: ${account.balance_version}; черновика: $balanceVersion")
                     Button(enabled = enabled, onClick = { balanceVersion = account.balance_version }) { Text("Использовать обновленную версию остатка") }
@@ -114,9 +115,12 @@ fun AdjustmentPanel(model: AuthViewModel) {
             state.transactionConflict?.takeIf { it.kind == "adjustment" }?.let { Text("Корректировка на сервере: ${it.note}; версия ${it.version}") }
         }
         if (accountId != null || editingId != null) {
-            OutlinedTextField(note, { note = it }, label = { Text("Примечание корректировки") }, enabled = enabled)
+            ValidatedTextField(note, { note = it }, "Примечание корректировки", "note", validation, enabled, singleLine = false)
             if (error.isNotEmpty()) Text(error)
-            Button(enabled = enabled && (editingId == null || edited != null) && account != null && account.archived_at == null && account.deleted_at == null, onClick = {
+            Button(enabled = enabled && (editingId == null || edited != null) && account != null && account.archived_at == null && account.deleted_at == null, onClick = save@{
+                error = ""
+                val selected = account ?: return@save
+                if (!validation.submit(adjustmentFieldErrors(target, selected.posted_balance_minor, selected.currency, reason, zone, note, editingId == null))) return@save
                 try {
                     require(note.length <= 2000)
                     if (editingId == null) {

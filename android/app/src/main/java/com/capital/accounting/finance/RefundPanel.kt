@@ -41,6 +41,7 @@ fun RefundPanel(model: AuthViewModel) {
     var zone by rememberFinancialDraft("refund.zone") { TimeZone.getDefault().id }
     var tags by rememberFinancialDraft<List<String>>("refund.tags") { emptyList() }
     var error by remember { mutableStateOf("") }
+    val validation = remember(scope, scope.epoch) { FieldValidation() }
     val parent = state.transactions.find { it.id == parentId }
     val edited = state.transactions.find { it.id == editingId }
     val remaining = try { refundRemaining(parent?.allocations ?: emptyList(), edited?.allocations ?: emptyList()) } catch (_: Exception) { emptyMap() }
@@ -49,9 +50,10 @@ fun RefundPanel(model: AuthViewModel) {
     val currency = originalAccount?.currency
     val accounts = state.accounts.filter { it.archived_at == null && it.deleted_at == null && it.currency == currency }
     val account = accounts.find { it.id == accountId }
-    fun reset() { editingId = null; editingVersion = ""; parentId = null; parentVersion = ""; transferVersion = null; accountId = null; parts = emptyList(); note = ""; payee = ""; tags = emptyList(); zone = TimeZone.getDefault().id; occurred = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.ROOT).format(Date()); preservedInstant = null; preservedZone = null; error = "" }
+    fun reset() { editingId = null; editingVersion = ""; parentId = null; parentVersion = ""; transferVersion = null; accountId = null; parts = emptyList(); note = ""; payee = ""; tags = emptyList(); zone = TimeZone.getDefault().id; occurred = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.ROOT).format(Date()); preservedInstant = null; preservedZone = null; error = ""; validation.reset() }
     fun close() { if (enabled && !scope.saving) guard.request { reset(); navigation.value = null } }
     fun createRefund(expense: Transaction, linked: Transaction?) { guard.request {
+        validation.reset()
         reset(); navigation.value = "refund"
         parentId = expense.id; parentVersion = expense.version; transferVersion = linked?.version
         accountId = expense.entries.single().account_id; parts = expense.allocations.map { RefundDraft(it.id) }
@@ -59,6 +61,7 @@ fun RefundPanel(model: AuthViewModel) {
     } }
     HandleFinancialCreate("refund", enabled) { createRefund(requireNotNull(it.expense), it.transfer) }
     fun editRefund(refund: Transaction, original: Transaction, linked: Transaction?) { guard.request {
+        validation.reset()
         editingId = refund.id; editingVersion = refund.version; parentId = original.id; parentVersion = original.version; transferVersion = linked?.version
         accountId = refund.entries.single().account_id; note = refund.note; payee = refund.payee; tags = refund.tag_ids; zone = refund.occurred_timezone; occurred = openingLocal(refund.occurred_at, zone)
         preservedInstant = refund.occurred_at; preservedZone = zone
@@ -133,14 +136,14 @@ fun RefundPanel(model: AuthViewModel) {
                 val original = parent?.allocations?.find { it.id == part.originalId }
                 Text("Часть возврата ${index + 1}: ${categoryPath(original?.category_id, state.categories)}")
                 Text(if (original == null || currency == null) "Обновите данные исходной части." else "Доступно для части возврата ${index + 1}: ${Money.display(remaining[original.id] ?: "0", currency)}")
-                OutlinedTextField(part.amount, { value -> parts = parts.map { if (it.id == part.id) it.copy(amount = value) else it } }, label = { Text("Сумма части возврата ${index + 1}") }, enabled = enabled, singleLine = true)
+                key(part.id) { ValidatedTextField(part.amount, { value -> parts = parts.map { if (it.id == part.id) it.copy(amount = value) else it } }, "Сумма части возврата ${index + 1}", "refund.${part.id}", validation, enabled) }
             }
             val total = try { if (currency == null) null else refundInputs(currency, parts, remaining).first } catch (_: Exception) { null }
             if (total != null && currency != null) Text("Сумма возврата: ${Money.display(total, currency)}")
-            OutlinedTextField(occurred, { occurred = it }, label = { Text("Дата возврата (YYYY-MM-DDTHH:MM:SS)") }, enabled = enabled, singleLine = true)
-            OutlinedTextField(zone, { zone = it }, label = { Text("Часовой пояс возврата") }, enabled = enabled, singleLine = true)
-            OutlinedTextField(payee, { payee = it }, label = { Text("Получатель возврата") }, enabled = enabled, singleLine = true)
-            OutlinedTextField(note, { note = it }, label = { Text("Примечание возврата") }, enabled = enabled)
+            ValidatedTextField(occurred, { occurred = it }, "Дата возврата (YYYY-MM-DDTHH:MM:SS)", "occurred", validation, enabled)
+            ValidatedTextField(zone, { zone = it }, "Часовой пояс возврата", "zone", validation, enabled)
+            ValidatedTextField(payee, { payee = it }, "Получатель возврата", "payee", validation, enabled)
+            ValidatedTextField(note, { note = it }, "Примечание возврата", "note", validation, enabled, singleLine = false)
             state.tags.filter { it.archived_at == null || it.id in tags }.forEach { tag ->
                 Row {
                     Checkbox(tag.id in tags, { checked -> tags = if (checked) (tags + tag.id).distinct() else tags - tag.id }, enabled = enabled, modifier = Modifier.semantics { contentDescription = "Тег возврата ${tag.name}" })
@@ -154,7 +157,10 @@ fun RefundPanel(model: AuthViewModel) {
             }
             if (error.isNotEmpty()) Text(error)
             if (editingId != null && state.transactionsLoaded && edited == null) Text("Возврат удален на сервере. Черновик сохранен; отмените редактирование.")
-            Button(enabled = enabled && (editingId == null || edited != null) && parent != null && originalAccount?.archived_at == null && account != null && (parent.parent_transaction_id == null || transfer != null), onClick = {
+            Button(enabled = enabled && (editingId == null || edited != null) && parent != null && originalAccount?.archived_at == null && account != null && (parent.parent_transaction_id == null || transfer != null), onClick = save@{
+                error = ""
+                val selectedCurrency = account?.currency ?: return@save
+                if (!validation.submit(refundFieldErrors(selectedCurrency, parts, remaining, occurred, zone, payee, note))) return@save
                 try {
                     val selected = requireNotNull(account)
                     require(parent?.kind == "expense" && parent.status == "posted" && note.length <= 2000 && payee.length <= 200 && tags.size <= 50)

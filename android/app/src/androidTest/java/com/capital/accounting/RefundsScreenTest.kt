@@ -156,7 +156,7 @@ class RefundsScreenTest {
         click("Создать возврат расхода Refund expense")
         field("Сумма части возврата $firstIndex", "4.001")
         click("Сохранить возврат")
-        waitFor("Проверьте положительные суммы частей, доступный возврат, счет, дату и длину текста.")
+        waitFor("Сумма части возврата превышает доступную.")
         assertEquals(1, history().count { it.kind == "refund" })
         field("Сумма части возврата $firstIndex", "0")
         click("Сохранить возврат")

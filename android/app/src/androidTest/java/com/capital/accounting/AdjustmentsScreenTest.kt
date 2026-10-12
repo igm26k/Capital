@@ -120,7 +120,7 @@ class AdjustmentsScreenTest {
         click("Корректировать счет Adjustment cash · KWD")
         field("Причина корректировки", "Cash count")
         click("Сохранить корректировку")
-        waitFor("Проверьте остаток, причину, часовой пояс и длину текста. Остаток должен измениться.")
+        waitFor("Фактический остаток должен отличаться от текущего.")
         assertEquals(0, history().count { it.kind == "adjustment" })
         field("Фактический остаток", "-1.234")
         compose.financialNode("Разница нового остатка: −101,234 KWD").assertExists()

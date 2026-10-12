@@ -182,4 +182,54 @@ class FieldValidationScreenTest {
         assertNull(runBlocking { app.database.commands().get(origin, auth.profile.id, auth.workspace.id) })
     }
 
+    @Test fun refundQuotasAndAdjustmentDeltaErrorsNeverCreateCommands() {
+        waitFor("Создайте первый счет")
+        click("Добавить счет"); field("Название счета", "Linked validation")
+        field("Дата открытия (YYYY-MM-DDTHH:MM:SS)", "2026-10-01T12:00:00")
+        field("Часовой пояс открытия", "UTC"); click("Создать счет"); waitFor("Изменить счет Linked validation")
+        click("Расход"); field("Сумма операции", "3,00")
+        field("Дата операции (YYYY-MM-DDTHH:MM:SS)", "2026-10-06T12:00:00")
+        field("Часовой пояс операции", "UTC"); field("Примечание операции", "Validation parent")
+        click("Сохранить операцию"); waitFor("Создать возврат расхода Validation parent")
+        val session = auth.credential(origin)
+        var baseline = runBlocking { api.accounts(session) }
+        var count = 2
+        fun unchanged() = runBlocking {
+            assertEquals(baseline, api.accounts(session)); assertEquals(count, api.transactions(session).size)
+            assertNull(app.database.commands().get(origin, auth.profile.id, auth.workspace.id))
+        }
+        click("Создать возврат расхода Validation parent")
+        click("Сохранить возврат"); focus("Сумма части возврата 1"); unchanged()
+        field("Сумма части возврата 1", "3,01"); click("Сохранить возврат")
+        waitFor("Сумма части возврата превышает доступную."); focus("Сумма части возврата 1"); unchanged()
+        field("Сумма части возврата 1", "1,00")
+        field("Дата возврата (YYYY-MM-DDTHH:MM:SS)", "2026-02-30T12:00:00")
+        field("Часовой пояс возврата", "Unknown/Zone")
+        click("Сохранить возврат"); focus("Дата возврата (YYYY-MM-DDTHH:MM:SS)"); unchanged()
+        field("Дата возврата (YYYY-MM-DDTHH:MM:SS)", "2026-10-07T12:00:00")
+        click("Сохранить возврат"); focus("Часовой пояс возврата"); unchanged()
+        field("Часовой пояс возврата", "UTC"); field("Примечание возврата", "Validated refund")
+        click("Сохранить возврат"); waitFor("Детали операции Validated refund")
+        baseline = runBlocking { api.accounts(session) }; count = 3
+        assertEquals("-200", baseline.single().posted_balance_minor)
+        click("Корректировать счет Linked validation · EUR")
+        click("Сохранить корректировку"); focus("Фактический остаток"); unchanged()
+        field("Фактический остаток", "-1,00"); field("Часовой пояс корректировки", "Unknown/Zone")
+        click("Сохранить корректировку"); focus("Причина корректировки"); unchanged()
+        field("Причина корректировки", "Recount"); click("Сохранить корректировку"); focus("Часовой пояс корректировки"); unchanged()
+        field("Часовой пояс корректировки", "UTC"); field("Примечание корректировки", "Validated adjustment")
+        click("Сохранить корректировку"); waitFor("Изменить корректировку Validated adjustment")
+        baseline = runBlocking { api.accounts(session) }; count = 4
+        assertEquals("-100", baseline.single().posted_balance_minor)
+        click("Изменить корректировку Validated adjustment")
+        field("Примечание корректировки", "x".repeat(2001)); click("Сохранить примечание корректировки")
+        focus("Примечание корректировки"); unchanged()
+        field("Примечание корректировки", "Validated edit"); click("Сохранить примечание корректировки")
+        waitFor("Изменить корректировку Validated edit")
+        unchanged()
+        val record = runBlocking { api.transactions(session) }.single { it.kind == "adjustment" }
+        assertEquals("Validated edit", record.note); assertEquals("Recount", record.reason)
+        assertEquals("100", record.entries.single().amount_minor)
+    }
+
 }

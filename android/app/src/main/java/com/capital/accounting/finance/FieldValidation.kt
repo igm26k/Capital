@@ -107,3 +107,45 @@ fun transferFieldErrors(sourceAmount: String, targetAmount: String, sourceCurren
     }
     return errors
 }
+
+
+fun refundFieldErrors(currency: String, parts: List<RefundDraft>, remaining: Map<String, String>, occurred: String, zone: String, payee: String, note: String): Map<String, String> {
+    val errors = linkedMapOf<String, String>()
+    var total = java.math.BigInteger.ZERO
+    val filled = parts.filter { it.amount.isNotEmpty() }
+    if (filled.isEmpty()) parts.firstOrNull()?.let { errors["refund.${it.id}"] = "Введите сумму хотя бы одной части возврата." }
+    filled.forEach { part ->
+        val key = "refund.${part.id}"
+        try {
+            val minor = java.math.BigInteger(Money.minor(part.amount, currency))
+            val available = remaining[part.originalId]?.let { java.math.BigInteger(it) }
+            if (minor.signum() <= 0) errors[key] = "Сумма части возврата должна быть больше нуля."
+            else if (available == null) errors[key] = "Обновите данные исходной части возврата."
+            else if (minor > available) errors[key] = "Сумма части возврата превышает доступную."
+            total += minor
+        } catch (e: IllegalArgumentException) { errors[key] = e.message ?: "Проверьте сумму части возврата." }
+    }
+    if (errors.isEmpty() && filled.isNotEmpty()) {
+        try { Money.display(total.toString(), currency) }
+        catch (_: IllegalArgumentException) { filled.forEach { errors["refund.${it.id}"] = "Общая сумма возврата выходит за допустимый диапазон." } }
+    }
+    transactionFieldErrors("1", occurred, zone, payee, note, currency, listOf(AllocationDraft(id = "validation")))
+        .filterKeys { it != "amount" }.forEach { (key, message) -> errors[key] = message }
+    return errors
+}
+
+fun adjustmentFieldErrors(target: String, current: String, currency: String, reason: String, zone: String, note: String, creating: Boolean): Map<String, String> {
+    val errors = linkedMapOf<String, String>()
+    if (creating) {
+        try {
+            val minor = Money.minor(target, currency)
+            if (java.math.BigInteger(minor) == java.math.BigInteger(current)) errors["target"] = "Фактический остаток должен отличаться от текущего."
+            else try { Money.display((java.math.BigInteger(minor) - java.math.BigInteger(current)).toString(), currency) }
+            catch (_: IllegalArgumentException) { errors["target"] = "Разница остатков выходит за допустимый диапазон." }
+        } catch (e: IllegalArgumentException) { errors["target"] = e.message ?: "Проверьте фактический остаток." }
+        if (reason.isEmpty() || reason.length > 500) errors["reason"] = "Введите причину от 1 до 500 символов."
+        if (zone !in TimeZone.getAvailableIDs()) errors["zone"] = "Введите известный часовой пояс, например UTC или Europe/Nicosia."
+    }
+    if (note.length > 2000) errors["note"] = "Примечание должно содержать не более 2000 символов."
+    return errors
+}
