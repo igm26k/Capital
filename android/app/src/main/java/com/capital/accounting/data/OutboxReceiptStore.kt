@@ -37,8 +37,10 @@ class OutboxReceiptStore(private val db: CapitalDatabase) {
         val stored = requireNotNull(db.outbox().commands(command.scope).find { it.actionId == command.actionId })
         val receipt = OutboxReceipt(command.position, result.generation_id, result.sync_group_sequence, response)
         if (stored.state == "applied") {
-            require(stored == command.copy(state = "applied") && db.receipts().get(command.position) == receipt)
-            return@withTransaction receipt
+            val existing = requireNotNull(db.receipts().get(command.position))
+            require(stored == command.copy(state = "applied") && existing.generation == receipt.generation && existing.sequence == receipt.sequence &&
+                decodeResponse<MutationResult>(existing.payload) == result)
+            return@withTransaction existing
         }
         require(stored == command && command.state in setOf("sending", "uncertain"))
         require(db.outbox().overlays(command.position).all { (it.entityType to it.entityId) in keys })

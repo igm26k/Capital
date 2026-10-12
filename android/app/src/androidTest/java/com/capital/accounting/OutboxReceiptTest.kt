@@ -9,6 +9,8 @@ import com.capital.accounting.auth.StoredSession
 import com.capital.accounting.data.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -45,6 +47,8 @@ class OutboxReceiptTest {
             assertEquals(1, db.outbox().overlays(c.position).size)
             db.close(); db = open(name); assertEquals(receipt, db.receipts().get(c.position))
             assertEquals(receipt, OutboxReceiptStore(db).applied(c, body))
+            val reordered = JsonObject(ApiClient.json.parseToJsonElement(body).jsonObject.entries.reversed().associate { it.toPair() }).toString()
+            assertEquals(receipt, OutboxReceiptStore(db).applied(c, reordered)); assertEquals(body, db.receipts().get(c.position)!!.payload)
             snapshot(db, s, "0", null); assertEquals(1, db.outbox().overlays(c.position).size)
             try { db.withTransaction { snapshot(db, s, "1", tag); throw IOException("Synthetic interruption") }; fail("Missing fault") } catch (_: IOException) { }
             assertEquals("0", SnapshotStore(db).read(scope(s))!!.head.sequence); assertEquals(1, db.outbox().overlays(c.position).size)

@@ -41,6 +41,7 @@ python3 scripts/check-android-overview-runtime.py "$adb" "$serial"
 run_suite com.capital.accounting.FinancialAddScreenTest 1 ops/.runtime/checks/android-add-ui-instrumentation.txt
 python3 scripts/check-android-draft-runtime.py "$adb" "$serial"
 run_suite com.capital.accounting.ApiAuthTest 1 ops/.runtime/checks/android-api-auth-instrumentation.txt
+run_suite com.capital.accounting.OutboxSenderApiTest 1 ops/.runtime/checks/android-outbox-sender-api-instrumentation.txt
 run_suite com.capital.accounting.CommandApiTest 1 ops/.runtime/checks/android-command-api-instrumentation.txt
 run_suite com.capital.accounting.SnapshotApiTest 1 ops/.runtime/checks/android-snapshot-api-instrumentation.txt
 run_suite com.capital.accounting.SnapshotBootstrapApiTest 2 ops/.runtime/checks/android-snapshot-bootstrap-api-instrumentation.txt
