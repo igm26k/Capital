@@ -195,3 +195,8 @@ MirrorSynchronizer проходит signed pages до convergence, вместе 
 ### Шаг 55: кеш несекретной идентичности
 
 Room7 хранит Profile/Workspace/Session projection отдельно от Keystore bearer; сохранение выполняется после подтвержденной авторизации. Read проверяет scope/session/generation, logout/revoke intents, idle/absolute expiry и clock rollback; corrupt metadata даетnull. Целевая приемка — **native20/20 +enhanced Auth1/1, unit50/50**, debug/build/lint/generator PASS, migration6→7/reopen и actual bearer exclusion. Cold offline UI еще не включен; это следующий шаг. Full gate ожидает86 executions, последний общий85/85 — шаг54 (resumed groups на неизменном app APK).
+
+
+### Шаг 56: холодное офлайн-чтение
+
+Сохраненная Keystore session +действующая scoped public identity +same-generation mirror дают read-only UI при отсутствии API. Offline/stale status явен, финансовые writes/retry/ACK/rebind отключены, reconnect заново проверяет сервер; pending form имеет session-check control. Logout без financial command сохраняет прежний durable intent. Denied401/403/404 скрывает кеш и credential. Целевая приемка — **26/26 actual native +auth runtime, 50/50 unit**, debug/build/lint/generator PASS: actual API stop/process restart, cache account/history, explicit reconnect/pull/raw preservation и SQL-revoked session/cold hidden cache, прежние financial/overview/auth drills. Full gate ожидает90 executions; последний общий85/85 — шаг54. Offline multi-command writes/overlay/worker еще впереди.

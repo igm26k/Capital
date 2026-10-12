@@ -67,6 +67,10 @@ class MainActivity : ComponentActivity() {
                                     Text("Пространство: ${state.auth.workspace.name}")
                                     Text("Устройство: ${state.auth.session.device_name}")
                                     Text("Сессия действует до: ${state.auth.session.expires_at}")
+                                    if (state.offline) {
+                                        Text("Нет соединения. Показаны сохраненные данные только для чтения; они могут быть устаревшими.")
+                                        Button(enabled = !state.busy, onClick = model::loadOverview) { Text("Проверить соединение") }
+                                    }
                                     Button(enabled = !state.busy && state.persisted, onClick = model::loadOverview) { Text("Обновить финансовые данные") }
                                     if (state.busy && !state.overviewLoaded) Text("Загрузка финансовых данных…")
                                     if (state.busy && state.overviewCached) Text("Показаны сохраненные финансовые данные. Выполняется синхронизация.")
@@ -76,7 +80,7 @@ class MainActivity : ComponentActivity() {
                                     }
                                     if (!state.persisted) Button(enabled = !state.busy, onClick = model::persist) { Text("Повторить сохранение сессии") }
                                     Button(enabled = !state.busy && !state.financeBlocked, onClick = model::renew) { Text("Продлить сессию") }
-                                    Button(enabled = !state.busy && !state.financeBlocked, onClick = model::logout) { Text("Выйти") }
+                                    Button(enabled = !state.busy && (!state.financeBlocked || (state.offline && state.financialCommand == null)), onClick = model::logout) { Text("Выйти") }
                                     if (section.value == "more") {
                                         Text("Профиль: ${state.auth.profile.email}")
                                         Text("Часовой пояс профиля: ${state.auth.profile.timezone}")

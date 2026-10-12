@@ -42,7 +42,7 @@ data class AuthState(
     val detailStack: List<String> = emptyList(), val detailTransaction: Transaction? = null, val detailMissing: Boolean = false, val detailError: String = "",
     val collectionReceipt: CollectionReceipt? = null,
     val classificationReceipt: ClassificationReceipt? = null,
-    val accountsLoaded: Boolean = false, val overviewLoaded: Boolean = false, val overviewError: String = "", val overviewCached: Boolean = false,
+    val accountsLoaded: Boolean = false, val overviewLoaded: Boolean = false, val overviewError: String = "", val overviewCached: Boolean = false, val offline: Boolean = false,
     val transactionsLoaded: Boolean = false, val transactionReceipt: TransactionReceipt? = null,
     val historyFilter: TransactionFilter? = null, val historyItems: List<Transaction>? = null,
     val historyLimit: Int = 50, val historyNextCursor: String? = null, val historyCursors: List<String> = emptyList(), val historyError: String = "",
@@ -120,12 +120,25 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             val result = decodeResponse<BearerAuth>(ApiClient(saved.origin).request(if (renew) "/auth/renew" else "/auth/session", if (renew) "POST" else "GET", session = saved))
             require(result.profile.id == saved.ownerId && result.session.id == saved.sessionId && result.access_token == saved.token && result.workspace.id == saved.workspaceId)
             accept(result, saved.origin, holdBusy)
-        } catch (e: ApiFailure) {
-            if (e.status != 401) throw e
-            app.credentialVault.clear()
-            candidate = null
-            state = AuthState(saved.origin, busy = false, message = "Сессия завершена. Войдите снова.")
+        } catch (e: CancellationException) { throw e }
+        catch (e: Exception) {
+            if (e is ApiFailure && e.status in setOf(401, 403, 404)) {
+                expireSession(saved.origin, "Сессия завершена. Войдите снова.")
+            } else if (!renew && e is java.io.IOException && (e !is ApiFailure || e.status >= 500) && restoreOffline(saved, holdBusy)) {
+                // Cached identity permits only local reading until explicit online verification.
+            } else throw e
         }
+    }
+
+    private suspend fun restoreOffline(saved: StoredSession, holdBusy: Boolean): Boolean {
+        val identity = IdentityStore(app.database).read(saved) ?: return false
+        val mirror = SnapshotStore(app.database).read(MirrorScope(saved.origin, saved.ownerId, saved.workspaceId)) ?: return false
+        if (mirror.head.generation != saved.generationId) return false
+        val command = app.database.commands().get(saved.origin, saved.ownerId, saved.workspaceId)
+        candidate = saved
+        state = AuthState(saved.origin, busy = holdBusy, auth = BearerAuth(identity.profile, identity.workspace, identity.session, "bearer", saved.token, "Bearer"),
+            offline = true, overviewCached = true, financeBlocked = true, financialCommand = command).withFinance(mirror.finance())
+        return true
     }
 
     private suspend fun accept(auth: BearerAuth, origin: String, holdBusy: Boolean = false) {
@@ -145,7 +158,11 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         val saved = candidate ?: return
         if (state.busy || state.auth == null || !state.persisted || state.logoutPending || state.revokePendingId != null) return
         state = state.copy(busy = true, overviewError = "")
-        viewModelScope.launch { fetchOverview(saved) }
+        viewModelScope.launch {
+            try { if (state.offline) refreshSaved(saved) else fetchOverview(saved) }
+            catch (e: CancellationException) { throw e }
+            catch (e: Exception) { if (!financialFailure(saved, e)) state = state.copy(busy = false, overviewError = errorMessage(e)) }
+        }
     }
 
     private fun AuthState.withFinance(finance: MirrorFinance): AuthState = copy(accounts = finance.accounts, accountsLoaded = true,
@@ -402,7 +419,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     fun retryAccountCommand() {
         val saved = candidate ?: return
         val command = state.financialCommand ?: return
-        if (state.busy || command.state != "pending" || !command.matches(saved)) return
+        if (state.busy || state.offline || command.state != "pending" || !command.matches(saved)) return
         state = state.copy(busy = true, message = "")
         viewModelScope.launch {
             try { sendAccountCommand(saved) }
@@ -491,7 +508,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     fun rebindAccountCommand() {
         val saved = candidate ?: return
         val command = state.financialCommand ?: return
-        if (state.busy || command.state != "pending" || command.origin != saved.origin || command.ownerId != saved.ownerId ||
+        if (state.busy || state.offline || command.state != "pending" || command.origin != saved.origin || command.ownerId != saved.ownerId ||
             command.workspaceId != saved.workspaceId || command.generationId != saved.generationId) return
         state = state.copy(busy = true)
         viewModelScope.launch {
@@ -505,7 +522,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
 
     fun logout() {
         val saved = candidate ?: return
-        if (state.busy || (state.financeBlocked && !state.logoutPending) || state.revokePendingId != null) return
+        if (state.busy || (state.financeBlocked && !state.logoutPending && !(state.offline && state.financialCommand == null)) || state.revokePendingId != null) return
         state = AuthState(saved.origin, auth = state.auth, logoutPending = true)
         viewModelScope.launch {
             try {
