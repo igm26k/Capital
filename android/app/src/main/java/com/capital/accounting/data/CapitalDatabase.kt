@@ -20,13 +20,18 @@ interface SettingsDao {
     suspend fun save(settings: ConnectionSettings)
 }
 
-@Database(entities = [ConnectionSettings::class, FinancialCommand::class, SnapshotStage::class, SnapshotRecord::class, SnapshotToken::class, MirrorHead::class, MirrorRecord::class], version = 4, exportSchema = true)
+@Database(entities = [ConnectionSettings::class, FinancialCommand::class, SnapshotAttempt::class, SnapshotStage::class, SnapshotRecord::class, SnapshotToken::class, MirrorHead::class, MirrorRecord::class], version = 5, exportSchema = true)
 abstract class CapitalDatabase : RoomDatabase() {
     abstract fun settings(): SettingsDao
     abstract fun commands(): CommandDao
     abstract fun snapshots(): SnapshotDao
 
     companion object {
+        val MIGRATION_4_5 = object : androidx.room.migration.Migration(4, 5) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE snapshot_attempts (scope TEXT NOT NULL PRIMARY KEY, snapshot TEXT NOT NULL)")
+            }
+        }
         val MIGRATION_3_4 = object : androidx.room.migration.Migration(3, 4) {
             override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
                 db.execSQL("CREATE TABLE snapshot_stages (scope TEXT NOT NULL PRIMARY KEY, snapshot TEXT NOT NULL, descriptor TEXT NOT NULL, nextToken TEXT, received INTEGER NOT NULL, bytes INTEGER NOT NULL, lastKey TEXT, complete INTEGER NOT NULL)")

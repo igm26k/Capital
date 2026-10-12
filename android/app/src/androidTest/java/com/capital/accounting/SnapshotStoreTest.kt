@@ -18,7 +18,7 @@ class SnapshotStoreTest {
     private val context get() = ApplicationProvider.getApplicationContext<CapitalApplication>()
     private fun id() = UUID.randomUUID().toString()
     private fun open(name: String) = Room.databaseBuilder(context, CapitalDatabase::class.java, name)
-        .addMigrations(CapitalDatabase.MIGRATION_1_2, CapitalDatabase.MIGRATION_2_3, CapitalDatabase.MIGRATION_3_4).build()
+        .addMigrations(CapitalDatabase.MIGRATION_1_2, CapitalDatabase.MIGRATION_2_3, CapitalDatabase.MIGRATION_3_4, CapitalDatabase.MIGRATION_4_5).build()
     private fun snapshot(scope: MirrorScope, count: Int, sequence: String) = Snapshot(id(), scope.workspace, sequence, "cursor-$sequence", "2026-10-12T12:00:00Z", "2026-10-12T12:15:00Z", count, "first-${id()}", id())
     private fun tag(scope: MirrorScope, name: String, key: String = id()): SnapshotItem = SnapshotItemTag("tag", Tag(key, scope.workspace, "1", "2026-10-12T12:00:00Z", "2026-10-12T12:00:00Z", null, name, null))
     private fun page(meta: Snapshot, items: List<SnapshotItem>, next: String? = null) = SnapshotPage(meta.id, meta.workspace_id, meta.base_sequence, items, next, meta.generation_id)
@@ -101,6 +101,28 @@ class SnapshotStoreTest {
             try { store.begin(scope, meta.copy(id = id(), item_count = 50001)); fail("Oversized snapshot accepted") } catch (_: IllegalArgumentException) { }
             assertEquals(baseline, db.snapshots().stage(scope.key))
             store.append(scope, "next", good); store.install(scope); assertEquals(2, store.read(scope)?.items?.size)
+        } finally { db.close(); context.deleteDatabase(name) }
+    }
+
+    @Test fun versionFourMigrationKeepsConfirmedMirrorAndPartialStaging() = runBlocking<Unit> {
+        val name = "snapshot-v4-migration.db"; context.deleteDatabase(name)
+        val scope = MirrorScope("https://accounting.example", id(), id()); var db = open(name)
+        try {
+            val store = SnapshotStore(db); val old = snapshot(scope, 1, "1")
+            store.begin(scope, old); store.append(scope, old.first_page_token, page(old, listOf(tag(scope, "Confirmed")))); store.install(scope)
+            val confirmed = store.read(scope); val next = snapshot(scope, 2, "2")
+            store.begin(scope, next); store.append(scope, next.first_page_token, page(next, listOf(tag(scope, "Staged")), "next-token"))
+            val staged = db.snapshots().stage(scope.key)
+            db.close()
+            // The v4 tables are unchanged in v5; remove only the added table from this private fixture.
+            context.openOrCreateDatabase(name, 0, null).use { legacy ->
+                legacy.execSQL("DROP TABLE snapshot_attempts")
+                legacy.execSQL("DROP TABLE room_master_table")
+                legacy.execSQL("PRAGMA user_version=4")
+            }
+            db = open(name)
+            assertEquals(confirmed, SnapshotStore(db).read(scope)); assertEquals(staged, db.snapshots().stage(scope.key))
+            assertEquals(1, db.snapshots().staged(scope.key).size); assertNull(db.snapshots().attempt(scope.key))
         } finally { db.close(); context.deleteDatabase(name) }
     }
 

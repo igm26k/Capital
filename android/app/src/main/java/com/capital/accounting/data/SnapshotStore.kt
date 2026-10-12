@@ -20,6 +20,10 @@ private fun sequence(value: String, positive: Boolean = false) {
     require(BigInteger(value) <= BigInteger.valueOf(Long.MAX_VALUE))
 }
 
+@Entity(tableName = "snapshot_attempts")
+data class SnapshotAttempt(@PrimaryKey val scope: String, val snapshot: String) {
+    override fun toString() = "SnapshotAttempt([redacted])"
+}
 @Entity(tableName = "snapshot_stages")
 data class SnapshotStage(@PrimaryKey val scope: String, val snapshot: String, val descriptor: String,
     val nextToken: String?, val received: Int = 0, val bytes: Long = 0, val lastKey: String? = null, val complete: Boolean = false) {
@@ -42,6 +46,9 @@ data class MirrorRecord(val scope: String, val entityType: String, val entityId:
 
 @Dao
 interface SnapshotDao {
+    @Query("SELECT * FROM snapshot_attempts WHERE scope=:scope") suspend fun attempt(scope: String): SnapshotAttempt?
+    @Insert(onConflict = OnConflictStrategy.IGNORE) suspend fun start(attempt: SnapshotAttempt): Long
+    @Query("DELETE FROM snapshot_attempts WHERE scope=:scope AND snapshot=:snapshot") suspend fun finish(scope: String, snapshot: String): Int
     @Query("SELECT * FROM snapshot_stages WHERE scope=:scope") suspend fun stage(scope: String): SnapshotStage?
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun save(stage: SnapshotStage)
     @Insert suspend fun insert(records: List<SnapshotRecord>)
