@@ -2,6 +2,7 @@ package com.capital.accounting.data
 
 import androidx.room.withTransaction
 import com.capital.accounting.api.ApiClient
+import com.capital.accounting.api.ApiFailure
 import com.capital.accounting.auth.StoredSession
 
 /** Call recovery once on startup, before any sender, while holding the scope SyncGate. */
@@ -27,10 +28,13 @@ class OutboxLifecycle(private val db: CapitalDatabase) {
     }
 
     /** Only unresolved/terminal failure states are handled here; success requires a durable receipt. */
-    suspend fun failed(command: OutboxCommand, outcome: String): OutboxCommand = db.withTransaction {
+    suspend fun failed(command: OutboxCommand, outcome: String, failure: ApiFailure? = null): OutboxCommand = db.withTransaction {
         require(command.state == "sending" && outcome in setOf("uncertain", "rejected", "reconcile"))
         val stored = requireNotNull(db.outbox().commands(command.scope).find { it.actionId == command.actionId })
         require(stored == command)
+        val code = failure?.code?.takeIf { it.matches(Regex("[a-z][a-z0-9_]{0,95}")) }
+        val status = failure?.status?.takeIf { it in 400..599 }
+        db.failures().save(OutboxFailure(command.position, status, code, failure?.requestId))
         require(db.outbox().transition(command.scope, command.actionId, "sending", outcome) == 1)
         command.copy(state = outcome)
     }

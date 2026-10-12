@@ -45,6 +45,7 @@ class OutboxReceiptStore(private val db: CapitalDatabase) {
         require(stored == command && command.state in setOf("sending", "uncertain"))
         require(db.outbox().overlays(command.position).all { (it.entityType to it.entityId) in keys })
         db.receipts().insert(receipt)
+        db.failures().clear(command.position)
         require(db.outbox().transition(command.scope, command.actionId, command.state, "applied") == 1)
         db.snapshots().head(command.scope)?.let { coverLocked(it, authoritativeSnapshot = true) }
         receipt

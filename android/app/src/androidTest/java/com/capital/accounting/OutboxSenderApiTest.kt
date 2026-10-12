@@ -51,6 +51,9 @@ class OutboxSenderApiTest {
             val confirmed = mirror.items.filterIsInstance<SnapshotItemTag>().first { it.data.id == local.id }.data
             val rejected = OutboxStore(db).enqueue(s, "tags/${local.id}", "PUT", ApiClient.json.encodeToString(TagUpdate("999", "Stale change", false)), listOf(OutboxBase("tag", local.id, confirmed.version)), emptyList(), listOf(OverlayEffect.upsert(SnapshotItemTag("tag", confirmed.copy(name = "Stale change")))))
             assertEquals(rejected.copy(state = "rejected"), OutboxSender(db).sendNext(s)); assertNull(OutboxSender(db).sendNext(s))
+            val failure = db.failures().get(rejected.position)!!
+            assertEquals(409, failure.status); assertEquals("version_conflict", failure.code); assertNotNull(failure.requestId)
+            db.close(); db = open(); assertEquals(failure, db.failures().get(rejected.position))
             assertNull(db.receipts().get(rejected.position)); assertEquals(1, db.outbox().overlays(rejected.position).size)
             val current = MirrorSynchronizer(db).refresh(s); assertEquals("2", current.head.sequence)
             assertEquals(confirmed, current.items.filterIsInstance<SnapshotItemTag>().first { it.data.id == local.id }.data)

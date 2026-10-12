@@ -20,7 +20,7 @@ interface SettingsDao {
     suspend fun save(settings: ConnectionSettings)
 }
 
-@Database(entities = [ConnectionSettings::class, FinancialCommand::class, SnapshotAttempt::class, SnapshotStage::class, SnapshotRecord::class, SnapshotToken::class, MirrorHead::class, MirrorRecord::class, MirrorTombstone::class, MirrorChange::class, CachedIdentity::class, OutboxCommand::class, OutboxOverlay::class, OutboxReceipt::class], version = 9, exportSchema = true)
+@Database(entities = [ConnectionSettings::class, FinancialCommand::class, SnapshotAttempt::class, SnapshotStage::class, SnapshotRecord::class, SnapshotToken::class, MirrorHead::class, MirrorRecord::class, MirrorTombstone::class, MirrorChange::class, CachedIdentity::class, OutboxCommand::class, OutboxOverlay::class, OutboxReceipt::class, OutboxFailure::class], version = 10, exportSchema = true)
 abstract class CapitalDatabase : RoomDatabase() {
     abstract fun settings(): SettingsDao
     abstract fun commands(): CommandDao
@@ -29,8 +29,14 @@ abstract class CapitalDatabase : RoomDatabase() {
     abstract fun identities(): IdentityDao
     abstract fun outbox(): OutboxDao
     abstract fun receipts(): OutboxReceiptDao
+    abstract fun failures(): OutboxFailureDao
 
     companion object {
+        val MIGRATION_9_10 = object : androidx.room.migration.Migration(9, 10) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE outbox_failures (commandPosition INTEGER NOT NULL PRIMARY KEY, status INTEGER, code TEXT, requestId TEXT, FOREIGN KEY(commandPosition) REFERENCES outbox_commands(position) ON DELETE CASCADE)")
+            }
+        }
         val MIGRATION_8_9 = object : androidx.room.migration.Migration(8, 9) {
             override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
                 db.execSQL("CREATE TABLE outbox_receipts (commandPosition INTEGER NOT NULL PRIMARY KEY, generation TEXT NOT NULL, sequence TEXT NOT NULL, payload TEXT NOT NULL, FOREIGN KEY(commandPosition) REFERENCES outbox_commands(position) ON DELETE CASCADE)")

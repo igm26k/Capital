@@ -29,7 +29,7 @@ class OutboxSender(private val db: CapitalDatabase) {
                     e.status in 400..499 && e.status !in setOf(401, 408, 425, 429) -> "rejected"
                     else -> "uncertain"
                 }
-                withContext(NonCancellable) { failIfSending(command, outcome, lifecycle) }
+                withContext(NonCancellable) { failIfSending(command, outcome, lifecycle, e) }
                 if (outcome == "uncertain") throw e
             } catch (e: Exception) {
                 // Cancellation, transport loss, malformed response and local receipt failure do not prove rejection.
@@ -39,10 +39,10 @@ class OutboxSender(private val db: CapitalDatabase) {
             requireNotNull(db.outbox().commands(scope.key).find { it.actionId == command.actionId })
         }
     }
-    private suspend fun failIfSending(command: OutboxCommand, outcome: String, lifecycle: OutboxLifecycle) {
+    private suspend fun failIfSending(command: OutboxCommand, outcome: String, lifecycle: OutboxLifecycle, failure: ApiFailure? = null) {
         // Cancellation may be delivered after Room has already committed the applied receipt.
         val current = requireNotNull(db.outbox().commands(command.scope).find { it.actionId == command.actionId })
-        if (current.state == "sending") lifecycle.failed(command, outcome)
+        if (current.state == "sending") lifecycle.failed(command, outcome, failure)
         else require(current == command.copy(state = "applied") && db.receipts().get(command.position) != null)
     }
 }

@@ -15,7 +15,7 @@ import java.util.UUID
 class IdentityStoreTest {
     private val context get() = ApplicationProvider.getApplicationContext<CapitalApplication>()
     private fun id() = UUID.randomUUID().toString()
-    private fun open(name: String) = Room.databaseBuilder(context, CapitalDatabase::class.java, name).addMigrations(CapitalDatabase.MIGRATION_1_2, CapitalDatabase.MIGRATION_2_3, CapitalDatabase.MIGRATION_3_4, CapitalDatabase.MIGRATION_4_5, CapitalDatabase.MIGRATION_5_6, CapitalDatabase.MIGRATION_6_7, CapitalDatabase.MIGRATION_7_8, CapitalDatabase.MIGRATION_8_9).build()
+    private fun open(name: String) = Room.databaseBuilder(context, CapitalDatabase::class.java, name).addMigrations(CapitalDatabase.MIGRATION_1_2, CapitalDatabase.MIGRATION_2_3, CapitalDatabase.MIGRATION_3_4, CapitalDatabase.MIGRATION_4_5, CapitalDatabase.MIGRATION_5_6, CapitalDatabase.MIGRATION_6_7, CapitalDatabase.MIGRATION_7_8, CapitalDatabase.MIGRATION_8_9, CapitalDatabase.MIGRATION_9_10).build()
     @Test fun metadataReopenContainsNoBearerAndRejectsAnotherSession() = runBlocking<Unit> {
         val name = "identity-store.db"; context.deleteDatabase(name); var db = open(name)
         val token = "synthetic-secret-canary-" + id()
@@ -31,7 +31,7 @@ class IdentityStoreTest {
             val other = auth.copy(session = auth.session.copy(id = id())).credential(saved.origin)
             assertNull(IdentityStore(db).read(other))
             db.close()
-            context.openOrCreateDatabase(name, 0, null).use { legacy -> legacy.execSQL("DROP TABLE cached_identities"); legacy.execSQL("DROP TABLE outbox_receipts"); legacy.execSQL("DROP TABLE outbox_overlays"); legacy.execSQL("DROP TABLE outbox_commands")
+            context.openOrCreateDatabase(name, 0, null).use { legacy -> legacy.execSQL("DROP TABLE cached_identities"); legacy.execSQL("DROP TABLE outbox_failures"); legacy.execSQL("DROP TABLE outbox_receipts"); legacy.execSQL("DROP TABLE outbox_overlays"); legacy.execSQL("DROP TABLE outbox_commands")
                 legacy.execSQL("DROP TABLE room_master_table"); legacy.execSQL("PRAGMA user_version=6") }
             db = open(name); assertNull(IdentityStore(db).read(saved)); IdentityStore(db).save(auth, saved.origin)
             assertNotNull(IdentityStore(db).read(saved))
