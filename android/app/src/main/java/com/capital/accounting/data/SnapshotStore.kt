@@ -151,7 +151,7 @@ internal fun validateSnapshotGraph(items: List<SnapshotItem>) {
     val entryIds = mutableSetOf<String>(); val allocationIds = mutableSetOf<String>()
     val posted = mutableMapOf<String, BigInteger>(); val pending = mutableMapOf<String, BigInteger>()
     for (transaction in transactions.values) {
-        require(transaction.entries.isNotEmpty() && transaction.tag_ids.toSet().size == transaction.tag_ids.size && transaction.tag_ids.all { it in tags })
+        require((transaction.entries.isNotEmpty() || (transaction.kind == "opening" && transaction.allocations.isEmpty())) && transaction.tag_ids.toSet().size == transaction.tag_ids.size && transaction.tag_ids.all { it in tags })
         transaction.parent_transaction_id?.let { require(it in transactions && it != transaction.id) }
         transaction.fee_transaction_id?.let { require(it in transactions && it != transaction.id) }
         for (entry in transaction.entries) {

@@ -7,6 +7,9 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.capital.accounting.api.*
 import com.capital.accounting.data.ConnectionSettings
+import com.capital.accounting.data.MirrorScope
+import com.capital.accounting.data.SnapshotStore
+import com.capital.accounting.data.finance
 import com.capital.accounting.finance.FinancialDrafts
 import kotlinx.coroutines.*
 import kotlinx.serialization.encodeToString
@@ -79,6 +82,9 @@ class InitialOverviewScreenTest {
         waitFor("Детали операции Updated overview expense")
         val before = runBlocking { api.transactions(auth.credential(origin)) }
         val balances = runBlocking { api.accounts(auth.credential(origin)) }
+        val mirror = runBlocking { SnapshotStore(app.database).read(MirrorScope(origin, auth.profile.id, auth.workspace.id))!! }
+        assertEquals(auth.workspace.sync_generation_id, mirror.head.generation)
+        assertEquals(balances, mirror.finance().accounts); assertEquals(before, mirror.finance().transactions)
         click("Открыть черновик операции")
         waitFor("Версия операции на сервере: 2; версия черновика: 1")
         compose.onNodeWithText("Примечание операции").assertTextContains("Overview retained raw draft")

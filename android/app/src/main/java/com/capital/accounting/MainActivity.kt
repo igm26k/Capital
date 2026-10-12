@@ -69,6 +69,7 @@ class MainActivity : ComponentActivity() {
                                     Text("Сессия действует до: ${state.auth.session.expires_at}")
                                     Button(enabled = !state.busy && state.persisted, onClick = model::loadOverview) { Text("Обновить финансовые данные") }
                                     if (state.busy && !state.overviewLoaded) Text("Загрузка финансовых данных…")
+                                    if (state.busy && state.overviewCached) Text("Показаны сохраненные финансовые данные. Выполняется синхронизация.")
                                     if (state.overviewError.isNotEmpty()) {
                                         Text(state.overviewError)
                                         Button(enabled = !state.busy && state.persisted, onClick = model::loadOverview) { Text("Повторить загрузку финансовых данных") }

@@ -10,6 +10,11 @@ import com.capital.accounting.CapitalApplication
 import com.capital.accounting.api.*
 import com.capital.accounting.data.ConnectionSettings
 import com.capital.accounting.data.FinancialCommand
+import com.capital.accounting.data.MirrorFinance
+import com.capital.accounting.data.MirrorScope
+import com.capital.accounting.data.SnapshotStore
+import com.capital.accounting.data.finance
+import com.capital.accounting.sync.MirrorSynchronizer
 import com.capital.accounting.finance.CommandRunner
 import com.capital.accounting.normalizedOrigin
 import kotlinx.coroutines.CancellationException
@@ -36,7 +41,7 @@ data class AuthState(
     val detailStack: List<String> = emptyList(), val detailTransaction: Transaction? = null, val detailMissing: Boolean = false, val detailError: String = "",
     val collectionReceipt: CollectionReceipt? = null,
     val classificationReceipt: ClassificationReceipt? = null,
-    val accountsLoaded: Boolean = false, val overviewLoaded: Boolean = false, val overviewError: String = "",
+    val accountsLoaded: Boolean = false, val overviewLoaded: Boolean = false, val overviewError: String = "", val overviewCached: Boolean = false,
     val transactionsLoaded: Boolean = false, val transactionReceipt: TransactionReceipt? = null,
     val historyFilter: TransactionFilter? = null, val historyItems: List<Transaction>? = null,
     val historyLimit: Int = 50, val historyNextCursor: String? = null, val historyCursors: List<String> = emptyList(), val historyError: String = "",
@@ -141,23 +146,34 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { fetchOverview(saved) }
     }
 
+    private fun AuthState.withFinance(finance: MirrorFinance): AuthState = copy(accounts = finance.accounts, accountsLoaded = true,
+        transactions = finance.transactions, transactionsLoaded = true, categories = finance.categories, tags = finance.tags, overviewLoaded = true)
+
+    private suspend fun readFinance(saved: StoredSession): MirrorFinance {
+        val mirror = MirrorSynchronizer(app.database).refresh(saved)
+        if (state.auth?.workspace?.sync_generation_id != mirror.head.generation) {
+            val auth = decodeResponse<BearerAuth>(ApiClient(saved.origin).request("/auth/session", session = saved))
+            require(auth.profile.id == saved.ownerId && auth.workspace.id == saved.workspaceId && auth.session.id == saved.sessionId && auth.access_token == saved.token && auth.workspace.sync_generation_id == mirror.head.generation)
+            val updated = auth.credential(saved.origin)
+            app.credentialVault.save(updated); candidate = updated; state = state.copy(auth = auth)
+        }
+        return mirror.finance()
+    }
+
     private suspend fun fetchOverview(saved: StoredSession, holdBusy: Boolean = false) {
-        val previous = state
         try {
-            val api = ApiClient(saved.origin)
+            if (!state.overviewLoaded) {
+                SnapshotStore(app.database).read(MirrorScope(saved.origin, saved.ownerId, saved.workspaceId))?.takeIf { it.head.generation == state.auth?.workspace?.sync_generation_id }?.let { state = state.withFinance(it.finance()).copy(overviewCached = true) }
+            }
+            val finance = readFinance(saved)
             val command = app.database.commands().get(saved.origin, saved.ownerId, saved.workspaceId)
-            val accounts = api.accounts(saved)
-            val categories = api.categories(saved)
-            val tags = api.tags(saved)
-            val history = api.transactions(saved)
-            val page = previous.historyFilter?.let { api.transactionPage(saved, it, previous.historyLimit) }
-            state = previous.copy(busy = holdBusy, accounts = accounts, accountsLoaded = true, categories = categories, tags = tags,
-                transactions = history, transactionsLoaded = true, overviewLoaded = true, overviewError = "",
-                financialCommand = command, financeBlocked = command != null, historyItems = page?.items, historyNextCursor = page?.next_cursor,
-                historyCursors = listOfNotNull(page?.next_cursor), historyError = "")
+            val page = state.historyFilter?.let { ApiClient(saved.origin).transactionPage(saved, it, state.historyLimit) }
+            state = state.withFinance(finance).copy(busy = holdBusy, overviewError = "", overviewCached = false, financialCommand = command, financeBlocked = command != null,
+                historyItems = page?.items, historyNextCursor = page?.next_cursor, historyCursors = listOfNotNull(page?.next_cursor), historyError = "")
         } catch (e: CancellationException) { throw e }
         catch (e: Exception) {
-            if (!financialFailure(saved, e)) state = previous.copy(busy = holdBusy,
+            if (e is ApiFailure && e.status in setOf(403, 404)) expireSession(saved.origin, "Пространство недоступно. Войдите снова.")
+            else if (!financialFailure(saved, e)) state = state.copy(busy = holdBusy,
                 overviewError = "Не удалось загрузить финансовые данные. Повторите загрузку. Ранее загруженные данные могут быть устаревшими.")
         }
     }
@@ -253,37 +269,9 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun loadAccounts() {
-        val saved = candidate ?: return
-        if (state.busy || state.auth == null || !state.persisted || state.logoutPending || state.revokePendingId != null) return
-        val previous = state
-        state = previous.copy(busy = true)
-        viewModelScope.launch {
-            try {
-                val command = app.database.commands().get(saved.origin, saved.ownerId, saved.workspaceId)
-                val accounts = ApiClient(saved.origin).accounts(saved)
-                state = previous.copy(busy = false, accounts = accounts, accountsLoaded = true, financialCommand = command, financeBlocked = command != null)
-            } catch (e: CancellationException) { throw e }
-            catch (e: Exception) { if (!financialFailure(saved, e)) state = previous.copy(busy = false, message = "Не удалось загрузить счета. Повторите обновление.") }
-        }
-    }
+    fun loadAccounts() = loadOverview()
 
-    fun loadTransactions() {
-        val saved = candidate ?: return
-        if (state.busy || state.auth == null || !state.persisted || state.logoutPending || state.revokePendingId != null) return
-        val previous = state
-        state = state.copy(busy = true)
-        viewModelScope.launch {
-            try {
-                val history = ApiClient(saved.origin).transactions(saved)
-                val page = previous.historyFilter?.let { ApiClient(saved.origin).transactionPage(saved, it, previous.historyLimit) }
-                state = previous.copy(busy = false, transactions = history, transactionsLoaded = true, historyItems = page?.items, historyNextCursor = page?.next_cursor,
-                    historyCursors = listOfNotNull(page?.next_cursor), historyError = "")
-            }
-            catch (e: CancellationException) { throw e }
-            catch (e: Exception) { if (!financialFailure(saved, e)) state = previous.copy(busy = false, message = "Не удалось загрузить историю. Повторите обновление.") }
-        }
-    }
+    fun loadTransactions() = loadOverview()
 
     fun applyHistoryFilter(filter: TransactionFilter, limit: Int = 50) {
         require(limit in 1..100)
@@ -377,20 +365,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun loadCatalog() {
-        val saved = candidate ?: return
-        if (state.busy || state.auth == null || !state.persisted || state.logoutPending || state.revokePendingId != null) return
-        val previous = state
-        state = state.copy(busy = true)
-        viewModelScope.launch {
-            try {
-                val categories = ApiClient(saved.origin).categories(saved)
-                val tags = ApiClient(saved.origin).tags(saved)
-                state = previous.copy(busy = false, categories = categories, tags = tags)
-            } catch (e: CancellationException) { throw e }
-            catch (e: Exception) { if (!financialFailure(saved, e)) state = previous.copy(busy = false, message = "Не удалось загрузить категории и теги. Повторите обновление.") }
-        }
-    }
+    fun loadCatalog() = loadOverview()
 
     fun submitAccount(body: String, id: String? = null) = submitFinancial(body, if (id == null) "accounts" else "accounts/$id", if (id == null) "POST" else "PUT")
     fun submitAdjustment(body: String, accountId: String) = submitFinancial(body, "accounts/$accountId/adjustments", "POST")
@@ -438,10 +413,8 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         val result = CommandRunner(app.database.commands()).send(saved)
         state = state.copy(financialCommand = result, financeBlocked = true)
         if (result.state == "confirmed") {
-            val accounts = ApiClient(saved.origin).accounts(saved)
-            val history = ApiClient(saved.origin).transactions(saved)
-            val categories = ApiClient(saved.origin).categories(saved)
-            val tags = ApiClient(saved.origin).tags(saved)
+            val finance = readFinance(saved)
+            val accounts = finance.accounts; val history = finance.transactions; val categories = finance.categories; val tags = finance.tags
             val page = state.historyFilter?.let { ApiClient(saved.origin).transactionPage(saved, it, state.historyLimit) }
             val collection = collectionReceipt(result) ?: state.collectionReceipt
             val receipt = transactionReceipt(result) ?: state.transactionReceipt
@@ -490,10 +463,8 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                     refreshSaved(saved, holdBusy = true)
                     require(state.auth != null && state.persisted)
                 }
-                val accounts = ApiClient(saved.origin).accounts(saved)
-                val history = ApiClient(saved.origin).transactions(saved)
-                val categories = ApiClient(saved.origin).categories(saved)
-                val tags = ApiClient(saved.origin).tags(saved)
+                val finance = readFinance(requireNotNull(candidate))
+                val accounts = finance.accounts; val history = finance.transactions; val categories = finance.categories; val tags = finance.tags
                 val page = state.historyFilter?.let { ApiClient(saved.origin).transactionPage(saved, it, state.historyLimit) }
                 val collection = if (command.state == "confirmed") collectionReceipt(command) ?: state.collectionReceipt else state.collectionReceipt
                 val receipt = if (command.state == "confirmed") transactionReceipt(command) ?: state.transactionReceipt else state.transactionReceipt

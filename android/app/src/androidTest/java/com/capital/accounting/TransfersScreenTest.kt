@@ -202,6 +202,7 @@ class TransfersScreenTest {
         compose.financialNode("Выйти").assertIsNotEnabled()
         assertEquals(body, runBlocking { app.database.commands().get(origin, auth.profile.id, auth.workspace.id)!!.body })
         click("Повторить сохраненную команду")
+        compose.waitUntil(30000) { compose.onAllNodesWithText("Сохраненная команда: ${command.commandId}").fetchSemanticsNodes().isEmpty() && compose.onAllNodesWithText("Вернуться к истории переводов").fetchSemanticsNodes().isEmpty() }
         waitTransfer("Replay transfer")
         assertNull(runBlocking { app.database.commands().get(origin, auth.profile.id, auth.workspace.id) })
         assertEquals(appliedCount, history().size)
@@ -211,7 +212,11 @@ class TransfersScreenTest {
         assertEquals("4335", accounts()[target.id]!!.posted_balance_minor)
         assertEquals("2026-10-06T09:15:30.123456Z", history().single { it.id == replay.id }.occurred_at)
         assertEquals(replayFee.allocations.map { it.id }.toSet(), history().single { it.id == replayFee.id }.allocations.map { it.id }.toSet())
+        compose.waitUntil(30000) { compose.onAllNodesWithText("Вернуться к истории переводов").fetchSemanticsNodes().isEmpty() }
         compose.activityRule.scenario.recreate()
+        compose.waitUntil(30000) { compose.onAllNodesWithContentDescription("Раздел Счета").fetchSemanticsNodes().isNotEmpty() }
+        compose.prepareFinancialSection("76,053 KWD")
+        waitFor("76,053 KWD")
         compose.financialNode("76,053 KWD").assertExists()
         click("Списать со счета: Transfer source · KWD")
         val latest = accounts()[source.id]!!

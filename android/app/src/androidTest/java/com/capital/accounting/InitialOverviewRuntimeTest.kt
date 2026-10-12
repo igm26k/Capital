@@ -7,6 +7,9 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.capital.accounting.api.*
 import com.capital.accounting.data.ConnectionSettings
+import com.capital.accounting.data.MirrorScope
+import com.capital.accounting.data.SnapshotStore
+import com.capital.accounting.data.finance
 import com.capital.accounting.finance.FinancialDrafts
 import kotlinx.coroutines.*
 import kotlinx.serialization.encodeToString
@@ -67,6 +70,11 @@ class InitialOverviewRuntimeTest {
         compose.waitUntil(30000) { compose.onAllNodes(hasText(text) and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText(text).performScrollTo().performClick()
     }
+    private fun roomMirror(version: String) = runBlocking {
+        val mirror = SnapshotStore(app.database).read(MirrorScope(origin, auth.profile.id, auth.workspace.id))!!
+        assertEquals("99000", mirror.finance().accounts.single().posted_balance_minor)
+        assertEquals(version, mirror.finance().transactions.single { it.id == expense.id }.version)
+    }
     private fun rawDraft() = runBlocking {
         val scope = app.financialDrafts.open(origin, auth.profile.id, auth.workspace.id)
         assertEquals("1", ApiClient.json.decodeFromString<String>(scope.read("transaction.editingVersion")!!))
@@ -77,13 +85,13 @@ class InitialOverviewRuntimeTest {
     @Test fun readonlyOverviewOutageRetainsCacheAndExplicitRetryDoesNotAdoptDraftVersion() {
         waitFor("Изменить счет Overview runtime cash")
         compose.onNodeWithText("Итого: 99,000 KWD").assertExists()
-        publish("ready"); waitHost("offline")
+        roomMirror("1"); publish("ready"); waitHost("offline")
         click("Обновить финансовые данные")
         waitFor("Не удалось загрузить финансовые данные. Повторите загрузку. Ранее загруженные данные могут быть устаревшими.")
         compose.onNodeWithText("Изменить счет Overview runtime cash").assertExists()
         compose.onNodeWithText("Итого: 99,000 KWD").assertExists()
         compose.onNodeWithText("Создайте первый счет").assertDoesNotExist()
-        rawDraft(); publish("offline_verified"); waitHost("online")
+        rawDraft(); roomMirror("1"); publish("offline_verified"); waitHost("online")
         val session = auth.credential(origin)
         runBlocking { api.request("/workspaces/${auth.workspace.id}/transactions/${expense.id}", "PUT", ApiClient.json.encodeToString(ExpenseReplace(expense.occurred_at, expense.occurred_timezone, "Overview runtime expense v2", expense.payee, expense.tag_ids, "expense", expense.entries.single().account_id, "1000", expense.allocations.map { AllocationInput(it.id, it.category_id, it.amount_minor) }, expense.version, null)), session, UUID.randomUUID().toString(), auth.workspace.sync_generation_id) }
         val expected = runBlocking { api.transactions(session) }
@@ -100,6 +108,6 @@ class InitialOverviewRuntimeTest {
         assertEquals(balances, runBlocking { api.accounts(session) })
         assertEquals(2, expected.size)
         assertEquals("2", expected.single { it.id == expense.id }.version)
-        publish("verified")
+        roomMirror("2"); publish("verified")
     }
 }
