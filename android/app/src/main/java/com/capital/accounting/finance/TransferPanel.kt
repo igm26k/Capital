@@ -52,6 +52,7 @@ fun TransferPanel(model: AuthViewModel) {
     var feeTags by rememberFinancialDraft<List<String>>("transfer.feeTags") { emptyList() }
     var feeParts by rememberFinancialDraft("transfer.feeParts") { listOf(AllocationDraft()) }
     var error by remember { mutableStateOf("") }
+    val validation = remember(scope, scope.epoch) { FieldValidation() }
     val source = accounts.find { it.id == sourceId } ?: if (sourceId == null) accounts.firstOrNull() else null
     val target = accounts.find { it.id == targetId } ?: if (targetId == null) accounts.firstOrNull { it.id != source?.id } else null
     val feeAccount = accounts.find { it.id == feeAccountId } ?: if (feeAccountId == null) source else null
@@ -62,7 +63,7 @@ fun TransferPanel(model: AuthViewModel) {
         sourceCurrency = null; targetCurrency = null; feeCurrency = null
         preservedInstant = null; preservedZone = null; sourceId = null; targetId = null
         sourceAmount = ""; targetAmount = ""; note = ""; payee = ""; tags = emptyList(); zone = TimeZone.getDefault().id; occurred = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.ROOT).format(Date())
-        feeEnabled = false; feeAccountId = null; feeAmount = ""; feeNote = ""; feeTags = emptyList(); feeParts = listOf(AllocationDraft()); feeDraftId = UUID.randomUUID().toString(); error = ""
+        feeEnabled = false; feeAccountId = null; feeAmount = ""; feeNote = ""; feeTags = emptyList(); feeParts = listOf(AllocationDraft()); feeDraftId = UUID.randomUUID().toString(); error = ""; validation.reset()
     }
     fun close() {
         if (enabled && !scope.saving) guard.request { reset(); navigation.value = null }
@@ -71,6 +72,7 @@ fun TransferPanel(model: AuthViewModel) {
     fun createTransfer() { if (state.accountsLoaded && !createRouter.routeToFirstAccount(state)) guard.request { reset(); navigation.value = "transfer" } }
     HandleFinancialCreate("transfer", enabled) { createTransfer() }
     fun editTransfer(transfer: Transaction, fee: Transaction?) { guard.request {
+        validation.reset()
         val from = transfer.entries.single { it.amount_minor.startsWith("-") }
         val to = transfer.entries.single { !it.amount_minor.startsWith("-") }
         editingId = transfer.id; editingVersion = transfer.version; expectedFeeVersion = fee?.version; feeAnchorId = transfer.fee_transaction_id
@@ -162,17 +164,17 @@ fun TransferPanel(model: AuthViewModel) {
             TextButton(enabled = enabled && item.id != source?.id && (editingId == null || targetCurrency == item.currency), onClick = { targetId = item.id }) { Text("Зачислить на счет: ${item.name} · ${item.currency}") }
         }
         Text("Списание: ${source?.name ?: "Выберите счет"}; зачисление: ${target?.name ?: "Выберите другой счет"}")
-        OutlinedTextField(sourceAmount, { sourceAmount = it }, label = { Text("Сумма списания перевода") }, enabled = enabled, singleLine = true)
-        OutlinedTextField(receivingAmount, { targetAmount = it }, label = { Text("Сумма зачисления перевода") }, enabled = enabled && !sameCurrency, singleLine = true)
+        ValidatedTextField(sourceAmount, { sourceAmount = it }, "Сумма списания перевода", "sourceAmount", validation, enabled)
+        ValidatedTextField(receivingAmount, { targetAmount = it }, "Сумма зачисления перевода", "targetAmount", validation, enabled && !sameCurrency)
         if (sameCurrency) Text("В одной валюте зачисление равно списанию.")
         val rate = try {
             if (source == null || target == null) null else transferRate(Money.minor(sourceAmount, source.currency), Money.minor(receivingAmount, target.currency), source.currency, target.currency)
         } catch (_: Exception) { null }
         rate?.let { Text("Точный курс: ${it.numerator}/${it.denominator} ${target?.currency} за ${source?.currency}") }
-        OutlinedTextField(occurred, { occurred = it }, label = { Text("Дата перевода (YYYY-MM-DDTHH:MM:SS)") }, enabled = enabled, singleLine = true)
-        OutlinedTextField(zone, { zone = it }, label = { Text("Часовой пояс перевода") }, enabled = enabled, singleLine = true)
-        OutlinedTextField(payee, { payee = it }, label = { Text("Получатель перевода") }, enabled = enabled, singleLine = true)
-        OutlinedTextField(note, { note = it }, label = { Text("Примечание перевода") }, enabled = enabled)
+        ValidatedTextField(occurred, { occurred = it }, "Дата перевода (YYYY-MM-DDTHH:MM:SS)", "occurred", validation, enabled)
+        ValidatedTextField(zone, { zone = it }, "Часовой пояс перевода", "zone", validation, enabled)
+        ValidatedTextField(payee, { payee = it }, "Получатель перевода", "payee", validation, enabled)
+        ValidatedTextField(note, { note = it }, "Примечание перевода", "note", validation, enabled, singleLine = false)
         state.tags.filter { it.archived_at == null || it.id in tags }.forEach { tag ->
             Row {
                 Checkbox(tag.id in tags, { checked -> tags = if (checked) (tags + tag.id).distinct() else tags - tag.id }, enabled = enabled, modifier = Modifier.semantics { contentDescription = "Тег перевода ${tag.name}" })
@@ -184,8 +186,8 @@ fun TransferPanel(model: AuthViewModel) {
             Text("Комиссия — отдельный расход, сохраняемый вместе с переводом.")
             accounts.forEach { item -> TextButton(enabled = enabled && (feeCurrency == null || feeCurrency == item.currency), onClick = { feeAccountId = item.id }) { Text("Счет комиссии: ${item.name} · ${item.currency}") } }
             Text("Комиссия списывается: ${feeAccount?.name ?: "Выберите счет"}")
-            OutlinedTextField(feeAmount, { feeAmount = it }, label = { Text("Сумма комиссии перевода") }, enabled = enabled, singleLine = true)
-            OutlinedTextField(feeNote, { feeNote = it }, label = { Text("Примечание комиссии перевода") }, enabled = enabled)
+            ValidatedTextField(feeAmount, { feeAmount = it }, "Сумма комиссии перевода", "feeAmount", validation, enabled)
+            ValidatedTextField(feeNote, { feeNote = it }, "Примечание комиссии перевода", "feeNote", validation, enabled, singleLine = false)
             feeParts.forEachIndexed { index, part ->
                 Text("Часть комиссии ${index + 1}: ${categoryPath(part.categoryId, state.categories)}")
                 TextButton(enabled = enabled, onClick = { feeParts = feeParts.map { if (it.id == part.id) it.copy(categoryId = null) else it } }) { Text("Без категории комиссии ${index + 1}") }
@@ -193,7 +195,7 @@ fun TransferPanel(model: AuthViewModel) {
                     TextButton(enabled = enabled, onClick = { feeParts = feeParts.map { if (it.id == part.id) it.copy(categoryId = category.id) else it } }) { Text("Категория комиссии ${index + 1}: ${categoryPath(category.id, state.categories)}") }
                 }
                 if (feeParts.size > 1) {
-                    OutlinedTextField(part.amount, { value -> feeParts = feeParts.map { if (it.id == part.id) it.copy(amount = value) else it } }, label = { Text("Сумма части комиссии ${index + 1}") }, enabled = enabled, singleLine = true)
+                    key(part.id) { ValidatedTextField(part.amount, { value -> feeParts = feeParts.map { if (it.id == part.id) it.copy(amount = value) else it } }, "Сумма части комиссии ${index + 1}", "fee.part.${part.id}", validation, enabled) }
                     TextButton(enabled = enabled, onClick = { feeParts = feeParts.filterNot { it.id == part.id } }) { Text("Убрать часть комиссии ${index + 1}") }
                 }
             }
@@ -207,7 +209,11 @@ fun TransferPanel(model: AuthViewModel) {
         }
         if (error.isNotEmpty()) Text(error)
         if (editingId != null && state.transactionsLoaded && state.transactions.none { it.id == editingId }) Text("Перевод удален на сервере. Черновик сохранен; отмените редактирование.")
-        Button(enabled = enabled && (editingId == null || state.transactions.any { it.id == editingId }) && source != null && target != null && source.id != target.id && (!feeEnabled || feeAccount != null), onClick = {
+        Button(enabled = enabled && (editingId == null || state.transactions.any { it.id == editingId }) && source != null && target != null && source.id != target.id && (!feeEnabled || feeAccount != null), onClick = save@{
+            error = ""
+            val fromCurrency = source?.currency ?: return@save
+            val toCurrency = target?.currency ?: return@save
+            if (!validation.submit(transferFieldErrors(sourceAmount, targetAmount, fromCurrency, toCurrency, occurred, zone, payee, note, feeEnabled, feeAccount?.currency ?: fromCurrency, feeAmount, feeNote, feeParts))) return@save
             try {
                 val from = requireNotNull(source); val to = requireNotNull(target)
                 require(from.id != to.id && note.length <= 2000 && payee.length <= 200 && tags.size <= 50)

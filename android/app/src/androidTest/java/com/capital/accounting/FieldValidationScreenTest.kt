@@ -133,4 +133,53 @@ class FieldValidationScreenTest {
         assertNull(runBlocking { app.database.commands().get(origin, auth.profile.id, auth.workspace.id) })
     }
 
+    @Test fun transferAndFeeErrorsFocusInOrderAndPreserveLedgerUntilValid() {
+        waitFor("Создайте первый счет")
+        for ((name, currency) in listOf("Validation source" to "EUR", "Validation target" to "KWD")) {
+            click("Добавить счет"); field("Название счета", name); click(currency)
+            field("Дата открытия (YYYY-MM-DDTHH:MM:SS)", "2026-10-01T12:00:00")
+            field("Часовой пояс открытия", "UTC"); click("Создать счет"); waitFor("Изменить счет $name")
+        }
+        val session = auth.credential(origin)
+        val baseline = runBlocking { api.accounts(session) }
+        fun unchanged() = runBlocking {
+            assertEquals(baseline, api.accounts(session))
+            assertEquals(2, api.transactions(session).size)
+            assertNull(app.database.commands().get(origin, auth.profile.id, auth.workspace.id))
+        }
+        click("Новый перевод")
+        click("Списать со счета: Validation source · EUR")
+        click("Зачислить на счет: Validation target · KWD")
+        field("Сумма списания перевода", "bad"); field("Сумма зачисления перевода", "0")
+        field("Дата перевода (YYYY-MM-DDTHH:MM:SS)", "2026-02-30T12:00:00")
+        field("Часовой пояс перевода", "Unknown/Zone")
+        click("Добавить комиссию перевода")
+        click("Счет комиссии: Validation source · EUR")
+        field("Сумма комиссии перевода", "bad")
+        field("Примечание комиссии перевода", "x".repeat(2001))
+        click("Сохранить перевод"); focus("Сумма списания перевода"); unchanged()
+        field("Сумма списания перевода", "3,00"); click("Сохранить перевод"); focus("Сумма зачисления перевода"); unchanged()
+        field("Сумма зачисления перевода", "1,234"); click("Сохранить перевод"); focus("Дата перевода (YYYY-MM-DDTHH:MM:SS)"); unchanged()
+        field("Дата перевода (YYYY-MM-DDTHH:MM:SS)", "2026-10-06T12:00:00"); click("Сохранить перевод"); focus("Часовой пояс перевода"); unchanged()
+        field("Часовой пояс перевода", "UTC"); click("Сохранить перевод"); focus("Сумма комиссии перевода"); unchanged()
+        field("Сумма комиссии перевода", "0,30"); click("Сохранить перевод"); focus("Примечание комиссии перевода"); unchanged()
+        field("Примечание комиссии перевода", "Validated fee")
+        field("Примечание перевода", "Validated transfer")
+        click("Добавить часть комиссии")
+        field("Сумма части комиссии 1", "0,10"); field("Сумма части комиссии 2", "0,10")
+        click("Сохранить перевод"); focus("Сумма части комиссии 1"); unchanged()
+        field("Сумма части комиссии 2", "0,20"); click("Сохранить перевод")
+        waitFor("Детали операции Validated transfer")
+        val records = runBlocking { api.transactions(session) }
+        assertEquals(4, records.size)
+        val transfer = records.single { it.note == "Validated transfer" }
+        val fee = records.single { it.note == "Validated fee" }
+        assertEquals(fee.id, transfer.fee_transaction_id)
+        assertEquals(listOf("10", "20"), fee.allocations.map { it.amount_minor }.sorted())
+        val balances = runBlocking { api.accounts(session) }
+        assertEquals("-330", balances.single { it.name == "Validation source" }.posted_balance_minor)
+        assertEquals("1234", balances.single { it.name == "Validation target" }.posted_balance_minor)
+        assertNull(runBlocking { app.database.commands().get(origin, auth.profile.id, auth.workspace.id) })
+    }
+
 }

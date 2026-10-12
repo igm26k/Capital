@@ -164,7 +164,7 @@ class TransfersScreenTest {
         click("Категория комиссии 1: Bank fee")
         compose.onNodeWithContentDescription("Тег комиссии Transfer tag").performScrollTo().performClick()
         click("Сохранить перевод")
-        waitFor("Проверьте разные счета, положительные суммы, точную сумму частей комиссии, дату и длину текста.")
+        waitFor("Сумма частей должна точно совпадать с суммой операции.")
         assertEquals(1, history().count { it.kind == "transfer" })
         field("Сумма части комиссии 2", "0.301")
         click("Сохранить перевод")

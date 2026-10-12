@@ -86,3 +86,24 @@ fun transactionFieldErrors(amount: String, occurred: String, zone: String, payee
     }
     return errors
 }
+
+
+fun transferFieldErrors(sourceAmount: String, targetAmount: String, sourceCurrency: String, targetCurrency: String,
+    occurred: String, zone: String, payee: String, note: String, feeEnabled: Boolean,
+    feeCurrency: String, feeAmount: String, feeNote: String, feeParts: List<AllocationDraft>): Map<String, String> {
+    val base = transactionFieldErrors(sourceAmount, occurred, zone, payee, note, sourceCurrency, listOf(AllocationDraft(id = "validation")))
+    val errors = linkedMapOf<String, String>()
+    base["amount"]?.let { errors["sourceAmount"] = it }
+    if (sourceCurrency != targetCurrency) {
+        val target = transactionFieldErrors(targetAmount, occurred, zone, "", "", targetCurrency, listOf(AllocationDraft(id = "validation")))
+        target["amount"]?.let { errors["targetAmount"] = it }
+    }
+    base.filterKeys { it != "amount" }.forEach { (key, message) -> errors[key] = message }
+    if (feeEnabled) {
+        val fee = transactionFieldErrors(feeAmount, occurred, zone, "", feeNote, feeCurrency, feeParts)
+        fee["amount"]?.let { errors["feeAmount"] = it }
+        fee["note"]?.let { errors["feeNote"] = it }
+        fee.filterKeys { it.startsWith("part.") }.forEach { (key, message) -> errors["fee.$key"] = message }
+    }
+    return errors
+}
