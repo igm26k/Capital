@@ -20,15 +20,23 @@ interface SettingsDao {
     suspend fun save(settings: ConnectionSettings)
 }
 
-@Database(entities = [ConnectionSettings::class, FinancialCommand::class, SnapshotAttempt::class, SnapshotStage::class, SnapshotRecord::class, SnapshotToken::class, MirrorHead::class, MirrorRecord::class, MirrorTombstone::class, MirrorChange::class, CachedIdentity::class], version = 7, exportSchema = true)
+@Database(entities = [ConnectionSettings::class, FinancialCommand::class, SnapshotAttempt::class, SnapshotStage::class, SnapshotRecord::class, SnapshotToken::class, MirrorHead::class, MirrorRecord::class, MirrorTombstone::class, MirrorChange::class, CachedIdentity::class, OutboxCommand::class, OutboxOverlay::class], version = 8, exportSchema = true)
 abstract class CapitalDatabase : RoomDatabase() {
     abstract fun settings(): SettingsDao
     abstract fun commands(): CommandDao
     abstract fun snapshots(): SnapshotDao
     abstract fun pull(): PullDao
     abstract fun identities(): IdentityDao
+    abstract fun outbox(): OutboxDao
 
     companion object {
+        val MIGRATION_7_8 = object : androidx.room.migration.Migration(7, 8) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE outbox_commands (position INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, scope TEXT NOT NULL, actionId TEXT NOT NULL, origin TEXT NOT NULL, owner TEXT NOT NULL, workspace TEXT NOT NULL, issuerSession TEXT NOT NULL, generation TEXT NOT NULL, path TEXT NOT NULL, method TEXT NOT NULL, body TEXT NOT NULL, baseVersions TEXT NOT NULL, dependencies TEXT NOT NULL, state TEXT NOT NULL)")
+                db.execSQL("CREATE UNIQUE INDEX index_outbox_commands_scope_actionId ON outbox_commands(scope,actionId)")
+                db.execSQL("CREATE TABLE outbox_overlays (commandPosition INTEGER NOT NULL, entityType TEXT NOT NULL, entityId TEXT NOT NULL, operation TEXT NOT NULL, payload TEXT, PRIMARY KEY(commandPosition,entityType,entityId), FOREIGN KEY(commandPosition) REFERENCES outbox_commands(position) ON DELETE CASCADE)")
+            }
+        }
         val MIGRATION_6_7 = object : androidx.room.migration.Migration(6, 7) {
             override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
                 db.execSQL("CREATE TABLE cached_identities (scope TEXT NOT NULL PRIMARY KEY, payload TEXT NOT NULL, validatedAt INTEGER NOT NULL)")

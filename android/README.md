@@ -200,3 +200,10 @@ Room7 хранит Profile/Workspace/Session projection отдельно от Ke
 ### Шаг 56: холодное офлайн-чтение
 
 Сохраненная Keystore session +действующая scoped public identity +same-generation mirror дают read-only UI при отсутствии API. Offline/stale status явен, финансовые writes/retry/ACK/rebind отключены, reconnect заново проверяет сервер; pending form имеет session-check control. Logout без financial command сохраняет прежний durable intent. Denied401/403/404 скрывает кеш и credential. Целевая приемка — **26/26 actual native +auth runtime, 50/50 unit**, debug/build/lint/generator PASS: actual API stop/process restart, cache account/history, explicit reconnect/pull/raw preservation и SQL-revoked session/cold hidden cache, прежние financial/overview/auth drills. Full gate ожидает90 executions; последний общий85/85 — шаг54. Offline multi-command writes/overlay/worker еще впереди.
+
+
+## Шаг 57: атомарное хранилище multi-command outbox — 2026-10-12
+
+Room8 добавляет упорядоченную scoped очередь и отдельные optimistic effects с каскадным удалением. Body/action/session/generation/base versions/dependencies сохраняются неизменными одной транзакцией с overlay; confirmed mirror не изменяется. Проверяются существующие confirmed bases, зависимости на более ранние команды, scope и размеры payload. Отмена разрешена только queued leaf без зависимых команд. Snapshot replacement сохраняет очередь и effects, включая исходную generation. Это foundation: sender, receipt coverage, projection и включение offline writes в UI еще не реализованы.
+
+Целевая приемка **15/15 native Room tests**, включая4 новых outbox tests: reopen/order/confirmed isolation, snapshot generation replacement, rollback обеих таблиц, duplicate action/stale base/unknown dependency, leaf cancellation/cascade и populated SQLite7→Room8; прежние command/snapshot/pull/identity tests проходят. **50/50 unit**, debug/build/lint/generator PASS. Full script теперь ожидает94 executions; общий gate этого изменения не запускался. Общий план in_progress.
