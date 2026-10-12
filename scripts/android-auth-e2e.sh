@@ -26,6 +26,7 @@ run_suite() {
 run_suite 'com.capital.accounting.FoundationTest,com.capital.accounting.CommandStoreTest,com.capital.accounting.CredentialVaultTest,com.capital.accounting.SettingsScreenTest' 7 ops/.runtime/checks/android-foundation-instrumentation.txt
 run_suite com.capital.accounting.FinancialDraftStoreTest 2 ops/.runtime/checks/android-draft-store-instrumentation.txt
 run_suite com.capital.accounting.SnapshotStoreTest 4 ops/.runtime/checks/android-snapshot-store-instrumentation.txt
+run_suite com.capital.accounting.LocalProjectionTest 2 ops/.runtime/checks/android-local-projection-instrumentation.txt
 run_suite com.capital.accounting.OutboxOutcomeTest 2 ops/.runtime/checks/android-outbox-outcome-instrumentation.txt
 run_suite com.capital.accounting.OutboxFailureTest 2 ops/.runtime/checks/android-outbox-failure-instrumentation.txt
 run_suite com.capital.accounting.OutboxReceiptTest 4 ops/.runtime/checks/android-outbox-receipt-instrumentation.txt
@@ -70,4 +71,4 @@ python3 scripts/check-android-cursor-runtime.py "$adb" "$serial"
 python3 scripts/check-android-offline-mirror.py "$adb" "$serial"
 python3 scripts/check-android-outbox-expiry.py "$adb" "$serial"
 python3 scripts/check-android-release-trust.py "$sdk"
-echo 'PASS 108/108 real Android instrumentation executions and auth runtime acceptance'
+echo 'PASS 110/110 real Android instrumentation executions and auth runtime acceptance'
