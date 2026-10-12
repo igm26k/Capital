@@ -36,6 +36,10 @@ interface OutboxDao {
     @Insert suspend fun overlays(items: List<OutboxOverlay>)
     @Query("SELECT * FROM outbox_commands WHERE scope=:scope ORDER BY position") suspend fun commands(scope: String): List<OutboxCommand>
     @Query("SELECT * FROM outbox_overlays WHERE commandPosition=:position ORDER BY entityType,entityId") suspend fun overlays(position: Long): List<OutboxOverlay>
+    @Query("UPDATE outbox_commands SET state=:next WHERE scope=:scope AND actionId=:action AND state=:expected")
+    suspend fun transition(scope: String, action: String, expected: String, next: String): Int
+    @Query("UPDATE outbox_commands SET state='uncertain' WHERE scope=:scope AND state='sending'")
+    suspend fun recoverInterrupted(scope: String): Int
     @Query("DELETE FROM outbox_commands WHERE scope=:scope AND actionId=:action AND state='queued'") suspend fun cancel(scope: String, action: String): Int
 }
 
