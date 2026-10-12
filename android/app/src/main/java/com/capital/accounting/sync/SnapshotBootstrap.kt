@@ -4,8 +4,6 @@ import androidx.room.withTransaction
 import com.capital.accounting.api.*
 import com.capital.accounting.auth.StoredSession
 import com.capital.accounting.data.*
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.encodeToString
 import java.io.IOException
 import java.net.URLEncoder
@@ -13,11 +11,11 @@ import java.util.UUID
 
 /** Read-only bootstrap; it never sends, rebinds or acknowledges financial commands. */
 class SnapshotBootstrap(private val db: CapitalDatabase) {
-    suspend fun load(session: StoredSession): ConfirmedMirror {
+    suspend fun load(session: StoredSession): ConfirmedMirror = SyncGate.serialized(MirrorScope(session.origin, session.ownerId, session.workspaceId)) { loadLocked(session) }
+    internal suspend fun loadLocked(session: StoredSession): ConfirmedMirror {
         require(!session.logoutPending && session.revokeSessionId == null)
         val scope = MirrorScope(session.origin, session.ownerId, session.workspaceId)
-        val gate = synchronized(gates) { gates[scope.key] ?: Mutex().also { gates[scope.key] = it } }
-        return gate.withLock {
+        return run {
             val api = ApiClient(session.origin)
             val root = "/workspaces/${session.workspaceId}/sync/snapshots"
             suspend fun generation(): String {
@@ -52,9 +50,9 @@ class SnapshotBootstrap(private val db: CapitalDatabase) {
                         SnapshotStore(db).install(scope)
                         require(db.snapshots().finish(scope.key, attempt.snapshot) == 1)
                     }
-                    return@withLock requireNotNull(SnapshotStore(db).read(scope))
+                    return@run requireNotNull(SnapshotStore(db).read(scope))
                 } catch (e: SnapshotSuperseded) {
-                    return@withLock db.withTransaction {
+                    return@run db.withTransaction {
                         val newer = requireNotNull(SnapshotStore(db).read(scope))
                         require(newer.head.generation == e.newer.generation && java.math.BigInteger(newer.head.sequence) >= java.math.BigInteger(e.newer.sequence))
                         SnapshotStore(db).discard(scope, attempt.snapshot)
@@ -72,5 +70,4 @@ class SnapshotBootstrap(private val db: CapitalDatabase) {
             throw IOException("Snapshot changed during bootstrap")
         }
     }
-    companion object { private val gates = mutableMapOf<String, Mutex>() }
 }
