@@ -51,7 +51,9 @@ class FinancialSectionsScreenTest {
         compose.onNodeWithText("Сохранить черновик и продолжить").performClick()
     }
     @Test fun realSectionsHideOtherListsAndRetainScopedDraftsAcrossNavigationAndRecreation() {
-        waitFor("История операций")
+        waitFor("Добавить счет")
+        compose.onNodeWithContentDescription("Раздел Счета").assertIsSelected()
+        section("Операции"); waitFor("История операций")
         compose.onNodeWithContentDescription("Раздел Операции").assertIsSelected()
         compose.onNodeWithText("Добавить счет").assertDoesNotExist()
         click("Обновить счета"); click("Обновить категории и теги")

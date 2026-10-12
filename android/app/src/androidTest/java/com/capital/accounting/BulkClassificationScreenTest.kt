@@ -74,6 +74,7 @@ class BulkClassificationScreenTest {
     private fun waitFor(text: String) { compose.waitUntil(30000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() } }
     private fun load() {
         waitFor("Вы вошли: ${auth.profile.email}")
+        compose.onNodeWithContentDescription("Раздел Операции").performClick()
         click("Обновить счета"); waitFor("Для операции: Bulk cash · EUR")
         click("Обновить категории и теги")
         click("Обновить историю"); waitFor("Детали операции Bulk expense")

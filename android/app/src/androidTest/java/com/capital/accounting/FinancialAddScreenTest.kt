@@ -68,6 +68,7 @@ class FinancialAddScreenTest {
     }
     @Test fun fixedAddRoutesAllKindsGuardsPersistedDraftAndOnlySubmitWritesLedger() {
         waitFor("Вы вошли: ${auth.profile.email}")
+        compose.onNodeWithContentDescription("Раздел Операции").performClick()
         click("Обновить счета"); click("Обновить историю")
         waitFor("Расход · −1,000 KWD · Add expense")
         compose.onNodeWithText("Удалить операцию Add expense").performScrollTo()

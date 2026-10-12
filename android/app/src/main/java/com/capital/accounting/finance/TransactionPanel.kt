@@ -28,6 +28,7 @@ fun TransactionPanel(model: AuthViewModel) {
     val scope = LocalFinancialDraftScope.current
     val bulk = rememberBulkClassification(model)
     val navigation = LocalFinancialEditor.current
+    val createRouter = LocalFinancialCreateRouter.current
     val editorOpen = navigation.value == "transaction"
     var handledReceipt by remember { mutableStateOf(state.transactionReceipt?.commandId) }
     var editingId by rememberFinancialDraft<String?>("transaction.editingId") { null }
@@ -57,7 +58,7 @@ fun TransactionPanel(model: AuthViewModel) {
     fun close() {
         if (enabled && !scope.saving) guard.request { reset(); navigation.value = null }
     }
-    fun createOperation(targetKind: String) { guard.request { reset(targetKind); navigation.value = "transaction" } }
+    fun createOperation(targetKind: String) { if (state.accountsLoaded && !createRouter.routeToFirstAccount(state)) guard.request { reset(targetKind); navigation.value = "transaction" } }
     HandleFinancialCreate("transaction", enabled) { createOperation(if (it.kind == FinancialCreation.INCOME) "income" else "expense") }
     fun editOperation(transaction: Transaction) { guard.request {
         original = transaction; editingId = transaction.id; editingVersion = transaction.version; kind = transaction.kind
@@ -126,8 +127,8 @@ fun TransactionPanel(model: AuthViewModel) {
         if (navigation.value == null) BulkClassificationControls(bulk)
         Text("Новая операция", style = MaterialTheme.typography.titleLarge)
         Row {
-            TextButton(enabled = enabled && !scope.saving, onClick = { createOperation("expense") }) { Text("Расход") }
-            TextButton(enabled = enabled && !scope.saving, onClick = { createOperation("income") }) { Text("Доход") }
+            TextButton(enabled = enabled && state.accountsLoaded && !scope.saving, onClick = { createOperation("expense") }) { Text("Расход") }
+            TextButton(enabled = enabled && state.accountsLoaded && !scope.saving, onClick = { createOperation("income") }) { Text("Доход") }
         }
         state.accounts.filter { it.deleted_at == null && it.archived_at == null }.forEach { item ->
             TextButton(enabled = enabled && !scope.saving, onClick = { guard.request { reset(); accountId = item.id; navigation.value = "transaction" } }) { Text("Для операции: ${item.name} · ${item.currency}") }

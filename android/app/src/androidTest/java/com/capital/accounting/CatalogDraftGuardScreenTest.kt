@@ -58,6 +58,7 @@ class CatalogDraftGuardScreenTest {
         compose.waitUntil(10000) { compose.onAllNodes(hasText(text) and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
         if (text == "Остаться в редакторе") compose.financialNode(text).performClick()
         else compose.financialNode(text).performScrollTo().performClick()
+        if (text == "Остаться в редакторе") compose.waitUntil(10000) { compose.onAllNodesWithText("Сохранить измененный черновик?").fetchSemanticsNodes().isEmpty() }
     }
     private fun field(label: String, value: String) {
         compose.financialNode(label).performScrollTo().performTextClearance()
@@ -68,6 +69,7 @@ class CatalogDraftGuardScreenTest {
         waitFor("Сохранить измененный черновик?")
         compose.waitUntil(10000) { compose.onAllNodes(hasText(text) and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
         compose.financialNode(text).performClick()
+        compose.waitUntil(10000) { compose.onAllNodesWithText("Сохранить измененный черновик?").fetchSemanticsNodes().isEmpty() }
     }
     @Test fun accountAndCatalogDraftChoicesSurviveRecreationAndOwnReceipts() {
         waitFor("Вы вошли: ${auth.profile.email}"); waitFor("Обновить счета")

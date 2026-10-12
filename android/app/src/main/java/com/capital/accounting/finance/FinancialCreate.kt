@@ -10,6 +10,7 @@ import androidx.compose.ui.unit.dp
 import com.capital.accounting.api.Account
 import com.capital.accounting.api.Transaction
 import com.capital.accounting.auth.AuthViewModel
+import com.capital.accounting.auth.AuthState
 
 enum class FinancialCreation(val prefix: String, val section: String, val label: String) {
     EXPENSE("transaction", "operations", "Создать расход"),
@@ -35,6 +36,11 @@ class FinancialCreateRouter {
     var transactionRequest by mutableStateOf<FinancialTransactionRequest?>(null)
     var canCreate by mutableStateOf(false)
     var editorOpen by mutableStateOf(false)
+    fun routeToFirstAccount(state: AuthState): Boolean {
+        if (!state.accountsLoaded || state.accounts.any { it.archived_at == null && it.deleted_at == null }) return false
+        request = FinancialCreationRequest(FinancialCreation.ACCOUNT)
+        return true
+    }
 }
 
 @Composable
@@ -109,8 +115,16 @@ fun FinancialAddButton(model: AuthViewModel, router: FinancialCreateRouter) {
                             TextButton(enabled = enabled, onClick = { select(FinancialCreationRequest(FinancialCreation.ADJUSTMENT, account = account)) }) { Text("Остаток счета ${account.name} · ${account.currency}") }
                         }
                     }
-                    else -> FinancialCreation.entries.forEach { kind ->
-                        TextButton(enabled = enabled, onClick = { if (kind in listOf(FinancialCreation.REFUND, FinancialCreation.ADJUSTMENT)) choosing = kind else select(FinancialCreationRequest(kind)) }) { Text(kind.label) }
+                    else -> {
+                        if (state.accountsLoaded && state.accounts.none { it.archived_at == null && it.deleted_at == null }) Text("Сначала создайте активный счет для операций.")
+                        FinancialCreation.entries.forEach { kind ->
+                            val financial = kind in listOf(FinancialCreation.EXPENSE, FinancialCreation.INCOME, FinancialCreation.TRANSFER, FinancialCreation.REFUND, FinancialCreation.ADJUSTMENT)
+                            TextButton(enabled = enabled && (!financial || state.accountsLoaded), onClick = {
+                                if (financial && router.routeToFirstAccount(state)) dismiss()
+                                else if (kind in listOf(FinancialCreation.REFUND, FinancialCreation.ADJUSTMENT)) choosing = kind
+                                else select(FinancialCreationRequest(kind))
+                            }) { Text(kind.label) }
+                        }
                     }
                 }
             }

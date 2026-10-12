@@ -86,7 +86,7 @@ fun AccountPanel(model: AuthViewModel) {
         visibleAccounts.groupBy { it.currency }.toSortedMap().forEach { (currency, accounts) ->
             Text("Итого: ${Money.displayTotal(accounts.map { it.posted_balance_minor }, currency)}")
         }
-        if (visibleAccounts.isEmpty() && !state.busy) Text("В выбранном фильтре счетов нет.")
+        if (state.accountsLoaded && visibleAccounts.isEmpty() && !state.busy) Text(if (state.accounts.isEmpty()) "Создайте первый счет" else "В выбранном фильтре счетов нет.")
         visibleAccounts.forEach { account ->
             Text("${account.name}${if (account.archived_at != null) " · В архиве" else ""}")
             Text("Тип: ${when (account.type) { "bank" -> "Банк"; "card" -> "Карта"; else -> "Наличные" }} · Валюта: ${account.currency}")

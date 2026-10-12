@@ -36,6 +36,7 @@ data class AuthState(
     val detailStack: List<String> = emptyList(), val detailTransaction: Transaction? = null, val detailMissing: Boolean = false, val detailError: String = "",
     val collectionReceipt: CollectionReceipt? = null,
     val classificationReceipt: ClassificationReceipt? = null,
+    val accountsLoaded: Boolean = false, val overviewLoaded: Boolean = false, val overviewError: String = "",
     val transactionsLoaded: Boolean = false, val transactionReceipt: TransactionReceipt? = null,
     val historyFilter: TransactionFilter? = null, val historyItems: List<Transaction>? = null,
     val historyLimit: Int = 50, val historyNextCursor: String? = null, val historyCursors: List<String> = emptyList(), val historyError: String = "",
@@ -127,9 +128,38 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         try {
             app.credentialVault.save(saved)
             val command = app.database.commands().get(saved.origin, saved.ownerId, saved.workspaceId)
-            state = AuthState(origin, busy = holdBusy, auth = auth, financialCommand = command, financeBlocked = command != null)
+            state = AuthState(origin, busy = true, auth = auth, financialCommand = command, financeBlocked = command != null)
         } catch (e: CancellationException) { throw e }
-        catch (_: Exception) { state = AuthState(origin, busy = holdBusy, auth = auth, persisted = false, message = "Вход выполнен, но сессия не сохранена. Повторите сохранение.") }
+        catch (_: Exception) { state = AuthState(origin, busy = holdBusy, auth = auth, persisted = false, message = "Вход выполнен, но сессия не сохранена. Повторите сохранение."); return }
+        fetchOverview(saved, holdBusy)
+    }
+
+    fun loadOverview() {
+        val saved = candidate ?: return
+        if (state.busy || state.auth == null || !state.persisted || state.logoutPending || state.revokePendingId != null) return
+        state = state.copy(busy = true, overviewError = "")
+        viewModelScope.launch { fetchOverview(saved) }
+    }
+
+    private suspend fun fetchOverview(saved: StoredSession, holdBusy: Boolean = false) {
+        val previous = state
+        try {
+            val api = ApiClient(saved.origin)
+            val command = app.database.commands().get(saved.origin, saved.ownerId, saved.workspaceId)
+            val accounts = api.accounts(saved)
+            val categories = api.categories(saved)
+            val tags = api.tags(saved)
+            val history = api.transactions(saved)
+            val page = previous.historyFilter?.let { api.transactionPage(saved, it, previous.historyLimit) }
+            state = previous.copy(busy = holdBusy, accounts = accounts, accountsLoaded = true, categories = categories, tags = tags,
+                transactions = history, transactionsLoaded = true, overviewLoaded = true, overviewError = "",
+                financialCommand = command, financeBlocked = command != null, historyItems = page?.items, historyNextCursor = page?.next_cursor,
+                historyCursors = listOfNotNull(page?.next_cursor), historyError = "")
+        } catch (e: CancellationException) { throw e }
+        catch (e: Exception) {
+            if (!financialFailure(saved, e)) state = previous.copy(busy = holdBusy,
+                overviewError = "Не удалось загрузить финансовые данные. Повторите загрузку. Ранее загруженные данные могут быть устаревшими.")
+        }
     }
 
     fun persist() {
@@ -232,7 +262,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val command = app.database.commands().get(saved.origin, saved.ownerId, saved.workspaceId)
                 val accounts = ApiClient(saved.origin).accounts(saved)
-                state = previous.copy(busy = false, accounts = accounts, financialCommand = command, financeBlocked = command != null)
+                state = previous.copy(busy = false, accounts = accounts, accountsLoaded = true, financialCommand = command, financeBlocked = command != null)
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) { if (!financialFailure(saved, e)) state = previous.copy(busy = false, message = "Не удалось загрузить счета. Повторите обновление.") }
         }
@@ -417,7 +447,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             val receipt = transactionReceipt(result) ?: state.transactionReceipt
             val classification = classificationReceipt(result) ?: state.classificationReceipt
             require(app.database.commands().remove(result.commandId, "confirmed") == 1)
-            state = state.copy(busy = false, accounts = accounts, transactions = history, transactionsLoaded = true, categories = categories, tags = tags, financialCommand = null, financeBlocked = false, historyItems = page?.items, historyNextCursor = page?.next_cursor,
+            state = state.copy(busy = false, accounts = accounts, accountsLoaded = true, overviewLoaded = true, overviewError = "", transactions = history, transactionsLoaded = true, categories = categories, tags = tags, financialCommand = null, financeBlocked = false, historyItems = page?.items, historyNextCursor = page?.next_cursor,
                 historyCursors = listOfNotNull(page?.next_cursor), historyError = "", transactionReceipt = receipt, collectionReceipt = collection, classificationReceipt = classification, message = savedMessage(result.path))
         } else {
             var current: Account? = null
@@ -469,7 +499,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                 val receipt = if (command.state == "confirmed") transactionReceipt(command) ?: state.transactionReceipt else state.transactionReceipt
                 val classification = if (command.state == "confirmed") classificationReceipt(command) ?: state.classificationReceipt else state.classificationReceipt
                 require(app.database.commands().remove(command.commandId, command.state) == 1)
-                state = state.copy(busy = false, accounts = accounts, transactions = history, transactionsLoaded = true, categories = categories, tags = tags, financialCommand = null, financeBlocked = false,
+                state = state.copy(busy = false, accounts = accounts, accountsLoaded = true, overviewLoaded = true, overviewError = "", transactions = history, transactionsLoaded = true, categories = categories, tags = tags, financialCommand = null, financeBlocked = false,
                     historyItems = page?.items, historyNextCursor = page?.next_cursor, historyCursors = listOfNotNull(page?.next_cursor), historyError = "",
                     transactionReceipt = receipt, collectionReceipt = collection, classificationReceipt = classification,
                     accountConflict = null, transactionConflict = null, categoryConflict = null, tagConflict = null, message = if (command.state == "confirmed") savedMessage(command.path) else "Данные обновлены. Проверьте поля перед новой командой.")

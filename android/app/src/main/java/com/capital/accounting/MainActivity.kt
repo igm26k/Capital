@@ -44,7 +44,7 @@ class MainActivity : ComponentActivity() {
             var email by remember { mutableStateOf("") }
             var password by remember { mutableStateOf("") }
             var device by remember { mutableStateOf("Android") }
-            val section = rememberSaveable(state.origin, state.auth?.profile?.id, state.auth?.workspace?.id) { mutableStateOf("operations") }
+            val section = rememberSaveable(state.origin, state.auth?.profile?.id, state.auth?.workspace?.id) { mutableStateOf("accounts") }
             val createRouter = remember(state.origin, state.auth?.profile?.id, state.auth?.workspace?.id) { FinancialCreateRouter() }
             LaunchedEffect(state.auth) { if (state.auth != null) password = "" }
             MaterialTheme(colorScheme = if (isSystemInDarkTheme()) darkColorScheme() else lightColorScheme()) {
@@ -67,10 +67,18 @@ class MainActivity : ComponentActivity() {
                                     Text("Пространство: ${state.auth.workspace.name}")
                                     Text("Устройство: ${state.auth.session.device_name}")
                                     Text("Сессия действует до: ${state.auth.session.expires_at}")
+                                    Button(enabled = !state.busy && state.persisted, onClick = model::loadOverview) { Text("Обновить финансовые данные") }
+                                    if (state.busy && !state.overviewLoaded) Text("Загрузка финансовых данных…")
+                                    if (state.overviewError.isNotEmpty()) {
+                                        Text(state.overviewError)
+                                        Button(enabled = !state.busy && state.persisted, onClick = model::loadOverview) { Text("Повторить загрузку финансовых данных") }
+                                    }
                                     if (!state.persisted) Button(enabled = !state.busy, onClick = model::persist) { Text("Повторить сохранение сессии") }
                                     Button(enabled = !state.busy && !state.financeBlocked, onClick = model::renew) { Text("Продлить сессию") }
                                     Button(enabled = !state.busy && !state.financeBlocked, onClick = model::logout) { Text("Выйти") }
                                     if (section.value == "more") {
+                                        Text("Профиль: ${state.auth.profile.email}")
+                                        Text("Часовой пояс профиля: ${state.auth.profile.timezone}")
                                         Text("Устройства", style = MaterialTheme.typography.titleLarge)
                                         Button(enabled = !state.busy && state.persisted, onClick = model::loadSessions) { Text("Обновить устройства") }
                                         state.sessions.forEach { session ->

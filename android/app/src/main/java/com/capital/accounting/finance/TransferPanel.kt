@@ -67,7 +67,8 @@ fun TransferPanel(model: AuthViewModel) {
     fun close() {
         if (enabled && !scope.saving) guard.request { reset(); navigation.value = null }
     }
-    fun createTransfer() { guard.request { reset(); navigation.value = "transfer" } }
+    val createRouter = LocalFinancialCreateRouter.current
+    fun createTransfer() { if (state.accountsLoaded && !createRouter.routeToFirstAccount(state)) guard.request { reset(); navigation.value = "transfer" } }
     HandleFinancialCreate("transfer", enabled) { createTransfer() }
     fun editTransfer(transfer: Transaction, fee: Transaction?) { guard.request {
         val from = transfer.entries.single { it.amount_minor.startsWith("-") }
@@ -148,7 +149,7 @@ fun TransferPanel(model: AuthViewModel) {
     }
     if (!editorOpen && LocalFinancialSection.current.value == "operations") {
         Text("Переводы", style = MaterialTheme.typography.titleLarge)
-        Button(enabled = enabled && !scope.saving, onClick = ::createTransfer) { Text("Новый перевод") }
+        Button(enabled = enabled && state.accountsLoaded && !scope.saving, onClick = ::createTransfer) { Text("Новый перевод") }
         TextButton(enabled = enabled && !scope.saving, onClick = { navigation.value = "transfer" }) { Text("Открыть черновик перевода") }
         accounts.forEach { item ->
             TextButton(enabled = enabled && !scope.saving, onClick = { guard.request { reset(); sourceId = item.id; navigation.value = "transfer" } }) { Text("Списать со счета: ${item.name} · ${item.currency}") }

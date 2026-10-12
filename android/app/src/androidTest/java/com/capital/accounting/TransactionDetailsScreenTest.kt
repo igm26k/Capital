@@ -92,7 +92,7 @@ class TransactionDetailsScreenTest {
         if (text in setOf("Остаться в редакторе", "Сохранить черновик и продолжить", "Отбросить черновик и продолжить")) node.performClick() else node.performScrollTo().performClick()
     }
     private fun directField(label: String, value: String) { compose.onNodeWithText(label).performScrollTo().performTextReplacement(value) }
-    private fun openDetails(note: String) { directClick("Детали операции $note"); waitFor("Примечание детали: $note") }
+    private fun openDetails(note: String) { compose.prepareFinancialSection("Детали операции $note"); directClick("Детали операции $note"); waitFor("Примечание детали: $note") }
     private fun editNote(note: String, field: String, changed: String, save: String) {
         openDetails(note); directClick("Редактировать операцию")
         directField(field, changed); directClick(save)
