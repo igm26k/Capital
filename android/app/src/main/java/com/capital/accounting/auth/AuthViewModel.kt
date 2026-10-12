@@ -10,6 +10,7 @@ import com.capital.accounting.CapitalApplication
 import com.capital.accounting.api.*
 import com.capital.accounting.data.ConnectionSettings
 import com.capital.accounting.data.FinancialCommand
+import com.capital.accounting.data.IdentityStore
 import com.capital.accounting.data.MirrorFinance
 import com.capital.accounting.data.MirrorScope
 import com.capital.accounting.data.SnapshotStore
@@ -132,6 +133,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         candidate = saved
         try {
             app.credentialVault.save(saved)
+            IdentityStore(app.database).save(auth, origin)
             val command = app.database.commands().get(saved.origin, saved.ownerId, saved.workspaceId)
             state = AuthState(origin, busy = true, auth = auth, financialCommand = command, financeBlocked = command != null)
         } catch (e: CancellationException) { throw e }
@@ -155,7 +157,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             val auth = decodeResponse<BearerAuth>(ApiClient(saved.origin).request("/auth/session", session = saved))
             require(auth.profile.id == saved.ownerId && auth.workspace.id == saved.workspaceId && auth.session.id == saved.sessionId && auth.access_token == saved.token && auth.workspace.sync_generation_id == mirror.head.generation)
             val updated = auth.credential(saved.origin)
-            app.credentialVault.save(updated); candidate = updated; state = state.copy(auth = auth)
+            app.credentialVault.save(updated); IdentityStore(app.database).save(auth, saved.origin); candidate = updated; state = state.copy(auth = auth)
         }
         return mirror.finance()
     }

@@ -12,6 +12,8 @@ import com.capital.accounting.api.*
 import kotlinx.serialization.encodeToString
 import com.capital.accounting.auth.VaultRead
 import com.capital.accounting.data.ConnectionSettings
+import com.capital.accounting.data.IdentityStore
+import com.capital.accounting.data.MirrorScope
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 import org.junit.Assert.*
@@ -57,6 +59,10 @@ class AuthScreenTest {
         compose.onNodeWithText("Устройство: <svg onload=alert(1)>").assertExists()
         val app = ApplicationProvider.getApplicationContext<CapitalApplication>()
         val registered = runBlocking { (app.credentialVault.load(origin) as VaultRead.Available).session }
+        val identity = runBlocking { IdentityStore(app.database).read(registered)!! }
+        assertEquals(email, identity.profile.email); assertEquals(registered.sessionId, identity.session.id)
+        val cached = runBlocking { app.database.identities().get(MirrorScope(origin, registered.ownerId, registered.workspaceId).key)!! }
+        assertFalse(cached.payload.contains(registered.token)); assertFalse(cached.payload.contains("access_token"))
         compose.onNodeWithText("Выйти").performScrollTo().performClick()
         compose.waitUntil(30000) { compose.onAllNodesWithText("Вы вышли из аккаунта").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Email").assertTextContains(email)

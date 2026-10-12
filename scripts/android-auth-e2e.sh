@@ -26,6 +26,7 @@ run_suite() {
 run_suite 'com.capital.accounting.FoundationTest,com.capital.accounting.CommandStoreTest,com.capital.accounting.CredentialVaultTest,com.capital.accounting.SettingsScreenTest' 7 ops/.runtime/checks/android-foundation-instrumentation.txt
 run_suite com.capital.accounting.FinancialDraftStoreTest 2 ops/.runtime/checks/android-draft-store-instrumentation.txt
 run_suite com.capital.accounting.SnapshotStoreTest 4 ops/.runtime/checks/android-snapshot-store-instrumentation.txt
+run_suite com.capital.accounting.IdentityStoreTest 1 ops/.runtime/checks/android-identity-store-instrumentation.txt
 run_suite com.capital.accounting.PullStoreTest 3 ops/.runtime/checks/android-pull-store-instrumentation.txt
 run_suite com.capital.accounting.DraftGuardScreenTest 1 ops/.runtime/checks/android-draft-guard-instrumentation.txt
 run_suite com.capital.accounting.LinkedDraftGuardScreenTest 1 ops/.runtime/checks/android-linked-draft-guard-instrumentation.txt
@@ -61,4 +62,4 @@ python3 scripts/check-android-financial-runtime.py "$adb" "$serial"
 python3 scripts/check-android-snapshot-bootstrap.py "$adb" "$serial"
 python3 scripts/check-android-cursor-runtime.py "$adb" "$serial"
 python3 scripts/check-android-release-trust.py "$sdk"
-echo 'PASS 85/85 real Android instrumentation executions and auth runtime acceptance'
+echo 'PASS 86/86 real Android instrumentation executions and auth runtime acceptance'

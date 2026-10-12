@@ -18,7 +18,7 @@ class SnapshotStoreTest {
     private val context get() = ApplicationProvider.getApplicationContext<CapitalApplication>()
     private fun id() = UUID.randomUUID().toString()
     private fun open(name: String) = Room.databaseBuilder(context, CapitalDatabase::class.java, name)
-        .addMigrations(CapitalDatabase.MIGRATION_1_2, CapitalDatabase.MIGRATION_2_3, CapitalDatabase.MIGRATION_3_4, CapitalDatabase.MIGRATION_4_5, CapitalDatabase.MIGRATION_5_6).build()
+        .addMigrations(CapitalDatabase.MIGRATION_1_2, CapitalDatabase.MIGRATION_2_3, CapitalDatabase.MIGRATION_3_4, CapitalDatabase.MIGRATION_4_5, CapitalDatabase.MIGRATION_5_6, CapitalDatabase.MIGRATION_6_7).build()
     private fun snapshot(scope: MirrorScope, count: Int, sequence: String) = Snapshot(id(), scope.workspace, sequence, "cursor-$sequence", "2026-10-12T12:00:00Z", "2026-10-12T12:15:00Z", count, "first-${id()}", id())
     private fun tag(scope: MirrorScope, name: String, key: String = id()): SnapshotItem = SnapshotItemTag("tag", Tag(key, scope.workspace, "1", "2026-10-12T12:00:00Z", "2026-10-12T12:00:00Z", null, name, null))
     private fun page(meta: Snapshot, items: List<SnapshotItem>, next: String? = null) = SnapshotPage(meta.id, meta.workspace_id, meta.base_sequence, items, next, meta.generation_id)
@@ -119,6 +119,7 @@ class SnapshotStoreTest {
                 legacy.execSQL("DROP TABLE snapshot_attempts")
                 legacy.execSQL("DROP TABLE mirror_tombstones")
                 legacy.execSQL("DROP TABLE mirror_changes")
+                legacy.execSQL("DROP TABLE cached_identities")
                 legacy.execSQL("DROP TABLE room_master_table")
                 legacy.execSQL("PRAGMA user_version=4")
             }
@@ -129,6 +130,7 @@ class SnapshotStoreTest {
             db.close()
             context.openOrCreateDatabase(name, 0, null).use { legacy ->
                 legacy.execSQL("DROP TABLE mirror_tombstones"); legacy.execSQL("DROP TABLE mirror_changes")
+                legacy.execSQL("DROP TABLE cached_identities")
                 legacy.execSQL("DROP TABLE room_master_table"); legacy.execSQL("PRAGMA user_version=5")
             }
             db = open(name)
