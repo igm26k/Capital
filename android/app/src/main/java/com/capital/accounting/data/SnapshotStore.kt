@@ -117,7 +117,9 @@ class SnapshotStore(private val db: CapitalDatabase) {
         db.pull().clearTombstones(scope.key); db.pull().clearChanges(scope.key)
         dao.deleteConfirmed(scope.key)
         dao.confirmed(records.map { MirrorRecord(it.scope, it.entityType, it.entityId, it.payload) })
-        dao.head(MirrorHead(scope.key, snapshot.generation_id, snapshot.base_sequence, snapshot.resume_cursor))
+        val installed = MirrorHead(scope.key, snapshot.generation_id, snapshot.base_sequence, snapshot.resume_cursor)
+        dao.head(installed)
+        OutboxReceiptStore(db).coverLocked(installed, authoritativeSnapshot = true)
         clearStage(scope.key)
     }
     suspend fun read(scope: MirrorScope): ConfirmedMirror? = db.withTransaction {

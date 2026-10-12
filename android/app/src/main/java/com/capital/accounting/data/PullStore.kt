@@ -61,7 +61,9 @@ class PullStore(private val db: CapitalDatabase) {
             }
             validateSnapshotGraph(records.values.map { decodeResponse<SnapshotItem>(it.payload) })
         }
-        db.snapshots().head(captured.copy(sequence = last, cursor = page.next_cursor))
+        val installed = captured.copy(sequence = last, cursor = page.next_cursor)
+        db.snapshots().head(installed)
+        OutboxReceiptStore(db).coverLocked(installed, authoritativeSnapshot = false)
     }
 }
 private fun tombstone(change: WorkspaceChange): Tombstone = when (change) {

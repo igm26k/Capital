@@ -14,7 +14,7 @@ import java.util.UUID
 class CommandStoreTest {
     private val context get() = ApplicationProvider.getApplicationContext<CapitalApplication>()
     private fun open(name: String) = Room.databaseBuilder(context, CapitalDatabase::class.java, name)
-        .addMigrations(CapitalDatabase.MIGRATION_1_2, CapitalDatabase.MIGRATION_2_3, CapitalDatabase.MIGRATION_3_4, CapitalDatabase.MIGRATION_4_5, CapitalDatabase.MIGRATION_5_6, CapitalDatabase.MIGRATION_6_7, CapitalDatabase.MIGRATION_7_8).build()
+        .addMigrations(CapitalDatabase.MIGRATION_1_2, CapitalDatabase.MIGRATION_2_3, CapitalDatabase.MIGRATION_3_4, CapitalDatabase.MIGRATION_4_5, CapitalDatabase.MIGRATION_5_6, CapitalDatabase.MIGRATION_6_7, CapitalDatabase.MIGRATION_7_8, CapitalDatabase.MIGRATION_8_9).build()
     @Test fun versionOneSettingsSurviveRealMigration() = runBlocking<Unit> {
         val name = "command-migration-test.db"
         context.deleteDatabase(name)

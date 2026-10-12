@@ -20,7 +20,7 @@ interface SettingsDao {
     suspend fun save(settings: ConnectionSettings)
 }
 
-@Database(entities = [ConnectionSettings::class, FinancialCommand::class, SnapshotAttempt::class, SnapshotStage::class, SnapshotRecord::class, SnapshotToken::class, MirrorHead::class, MirrorRecord::class, MirrorTombstone::class, MirrorChange::class, CachedIdentity::class, OutboxCommand::class, OutboxOverlay::class], version = 8, exportSchema = true)
+@Database(entities = [ConnectionSettings::class, FinancialCommand::class, SnapshotAttempt::class, SnapshotStage::class, SnapshotRecord::class, SnapshotToken::class, MirrorHead::class, MirrorRecord::class, MirrorTombstone::class, MirrorChange::class, CachedIdentity::class, OutboxCommand::class, OutboxOverlay::class, OutboxReceipt::class], version = 9, exportSchema = true)
 abstract class CapitalDatabase : RoomDatabase() {
     abstract fun settings(): SettingsDao
     abstract fun commands(): CommandDao
@@ -28,8 +28,14 @@ abstract class CapitalDatabase : RoomDatabase() {
     abstract fun pull(): PullDao
     abstract fun identities(): IdentityDao
     abstract fun outbox(): OutboxDao
+    abstract fun receipts(): OutboxReceiptDao
 
     companion object {
+        val MIGRATION_8_9 = object : androidx.room.migration.Migration(8, 9) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE outbox_receipts (commandPosition INTEGER NOT NULL PRIMARY KEY, generation TEXT NOT NULL, sequence TEXT NOT NULL, payload TEXT NOT NULL, FOREIGN KEY(commandPosition) REFERENCES outbox_commands(position) ON DELETE CASCADE)")
+            }
+        }
         val MIGRATION_7_8 = object : androidx.room.migration.Migration(7, 8) {
             override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
                 db.execSQL("CREATE TABLE outbox_commands (position INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, scope TEXT NOT NULL, actionId TEXT NOT NULL, origin TEXT NOT NULL, owner TEXT NOT NULL, workspace TEXT NOT NULL, issuerSession TEXT NOT NULL, generation TEXT NOT NULL, path TEXT NOT NULL, method TEXT NOT NULL, body TEXT NOT NULL, baseVersions TEXT NOT NULL, dependencies TEXT NOT NULL, state TEXT NOT NULL)")
