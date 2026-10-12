@@ -30,8 +30,9 @@ fun CatalogPanel(model: AuthViewModel) {
     var parentId by rememberFinancialDraft<String?>("catalog.parentId") { null }
     var archived by rememberFinancialDraft("catalog.archived") { false }
     var error by remember { mutableStateOf("") }
+    val validation = remember(scope, scope.epoch) { FieldValidation() }
     fun reset(target: String = "categories") {
-        collection = target; id = null; version = ""; name = ""; parentId = null; archived = false; error = ""
+        collection = target; id = null; version = ""; name = ""; parentId = null; archived = false; error = ""; validation.reset()
     }
     fun close() {
         if (enabled && !scope.saving) guard.request { reset(); navigation.value = null }
@@ -84,11 +85,11 @@ fun CatalogPanel(model: AuthViewModel) {
         DraftGuardControls(guard, "catalog", enabled) { navigation.value = "catalog" }
         state.categories.forEach { item ->
             Text("Категория: ${categoryPath(item.id, state.categories)}${if (item.archived_at != null) " · В архиве" else ""}")
-            TextButton(enabled = enabled, onClick = { guard.request { collection = "categories"; id = item.id; version = item.version; name = item.name; parentId = item.parent_id; archived = item.archived_at != null; error = ""; navigation.value = "catalog"  } }) { Text("Изменить категорию ${categoryPath(item.id, state.categories)}") }
+            TextButton(enabled = enabled, onClick = { guard.request { collection = "categories"; id = item.id; version = item.version; name = item.name; parentId = item.parent_id; archived = item.archived_at != null; error = ""; validation.reset(); navigation.value = "catalog"  } }) { Text("Изменить категорию ${categoryPath(item.id, state.categories)}") }
         }
         state.tags.forEach { item ->
             Text("Тег: ${item.name}${if (item.archived_at != null) " · В архиве" else ""}")
-            TextButton(enabled = enabled, onClick = { guard.request { collection = "tags"; id = item.id; version = item.version; name = item.name; parentId = null; archived = item.archived_at != null; error = ""; navigation.value = "catalog"  } }) { Text("Изменить тег ${item.name}") }
+            TextButton(enabled = enabled, onClick = { guard.request { collection = "tags"; id = item.id; version = item.version; name = item.name; parentId = null; archived = item.archived_at != null; error = ""; validation.reset(); navigation.value = "catalog"  } }) { Text("Изменить тег ${item.name}") }
         }
     } else if (editorOpen) Dialog(onDismissRequest = ::close, properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)) {
         Surface(Modifier.fillMaxSize()) {
@@ -108,7 +109,7 @@ fun CatalogPanel(model: AuthViewModel) {
                 TextButton(enabled = enabled && !scope.saving, onClick = { createCatalog("tags") }) { Text("Новый тег") }
                 val category = collection == "categories"
                 Text(if (category) "Редактор категории" else "Редактор тега")
-                OutlinedTextField(name, { name = it }, label = { Text(if (category) "Название категории" else "Название тега") }, enabled = enabled, singleLine = true)
+                ValidatedTextField(name, { name = it }, if (category) "Название категории" else "Название тега", "name", validation, enabled)
                 if (category) {
                     Text("Родитель: ${if (parentId == null) "Корень" else categoryPath(parentId, state.categories)}")
                     TextButton(enabled = enabled, onClick = { parentId = null }) { Text("Категория в корне") }
@@ -126,7 +127,10 @@ fun CatalogPanel(model: AuthViewModel) {
                 state.categoryConflict?.let { Text("Категория на сервере: ${it.name}; версия ${it.version}") }
                 state.tagConflict?.let { Text("Тег на сервере: ${it.name}; версия ${it.version}") }
                 if (error.isNotEmpty()) Text(error)
-                Button(enabled = enabled, onClick = {
+                Button(enabled = enabled, onClick = save@{
+                    error = ""
+                    val issue = nameFieldError(name, if (category) 100 else 50)
+                    if (!validation.submit(if (issue == null) emptyMap() else mapOf("name" to issue))) return@save
                     try {
                         require(name.isNotBlank() && name.length <= if (category) 100 else 50)
                         val body = if (category) {

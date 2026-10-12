@@ -38,9 +38,10 @@ fun AccountPanel(model: AuthViewModel) {
     var zone by rememberFinancialDraft("account.zone") { TimeZone.getDefault().id }
     var archived by rememberFinancialDraft("account.archived") { false }
     var error by remember { mutableStateOf("") }
+    val validation = remember(scope, scope.epoch) { FieldValidation() }
     fun reset() {
         editingId = null; editingVersion = ""; editingBalance = "0"; name = ""; type = "bank"; currency = "EUR"; balance = "0"
-        opened = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.ROOT).format(Date()); zone = TimeZone.getDefault().id; archived = false; error = ""
+        opened = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.ROOT).format(Date()); zone = TimeZone.getDefault().id; archived = false; error = ""; validation.reset()
     }
     fun close() {
         if (enabled && !scope.saving) guard.request { reset(); navigation.value = null }
@@ -95,7 +96,7 @@ fun AccountPanel(model: AuthViewModel) {
                 model.applyHistoryFilter(TransactionFilter(accountId = account.id))
                 section.value = "operations"
             }) { Text("Операции счета ${account.name}") }
-            Button(enabled = enabled, onClick = { guard.request { editingId = account.id; editingVersion = account.version; currency = account.currency; editingBalance = account.posted_balance_minor; name = account.name; type = account.type; archived = account.archived_at != null; error = ""; navigation.value = "account"  } }) { Text("Изменить счет ${account.name}") }
+            Button(enabled = enabled, onClick = { guard.request { editingId = account.id; editingVersion = account.version; currency = account.currency; editingBalance = account.posted_balance_minor; name = account.name; type = account.type; archived = account.archived_at != null; error = ""; validation.reset(); navigation.value = "account"  } }) { Text("Изменить счет ${account.name}") }
         }
         Button(enabled = enabled && !scope.saving, onClick = ::createAccount) { Text("Добавить счет") }
         TextButton(enabled = enabled && !scope.saving, onClick = { navigation.value = "account" }) { Text("Открыть черновик счета") }
@@ -116,7 +117,7 @@ fun AccountPanel(model: AuthViewModel) {
                 DraftGuardControls(guard, "account", enabled)
                 FinancialCommandStatus(model, "Ваш черновик: $name, $type; ${if (archived) "в архив" else "активен"}")
                 Text(if (editingId == null) "Новый счет" else "Изменить счет", style = MaterialTheme.typography.titleMedium)
-                OutlinedTextField(name, { name = it }, label = { Text(if (editingId == null) "Название счета" else "Новое название счета") }, enabled = enabled, singleLine = true)
+                ValidatedTextField(name, { name = it }, if (editingId == null) "Название счета" else "Новое название счета", "name", validation, enabled)
                 Text("Тип счета: $type")
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf("bank" to "Банк", "cash" to "Наличные", "card" to "Карта").forEach { (value, label) ->
@@ -127,9 +128,9 @@ fun AccountPanel(model: AuthViewModel) {
                     Text("Валюта счета: $currency")
                     Row { Money.scales.keys.take(3).forEach { code -> TextButton(enabled = enabled, onClick = { currency = code }) { Text(code) } } }
                     Row { Money.scales.keys.drop(3).forEach { code -> TextButton(enabled = enabled, onClick = { currency = code }) { Text(code) } } }
-                    OutlinedTextField(balance, { balance = it }, label = { Text("Начальный остаток") }, enabled = enabled, singleLine = true)
-                    OutlinedTextField(opened, { opened = it }, label = { Text("Дата открытия (YYYY-MM-DDTHH:MM:SS)") }, enabled = enabled, singleLine = true)
-                    OutlinedTextField(zone, { zone = it }, label = { Text("Часовой пояс открытия") }, enabled = enabled, singleLine = true)
+                    ValidatedTextField(balance, { balance = it }, "Начальный остаток", "balance", validation, enabled)
+                    ValidatedTextField(opened, { opened = it }, "Дата открытия (YYYY-MM-DDTHH:MM:SS)", "opened", validation, enabled)
+                    ValidatedTextField(zone, { zone = it }, "Часовой пояс открытия", "zone", validation, enabled)
                 } else {
                     Text("Валюта: $currency. Остаток: ${Money.display(editingBalance, currency)}")
                     Row { Checkbox(archived, { archived = it }, enabled = enabled); Text("Счет в архиве") }
@@ -143,7 +144,9 @@ fun AccountPanel(model: AuthViewModel) {
                     }
                 }
                 if (error.isNotEmpty()) Text(error)
-                Button(enabled = enabled, onClick = {
+                Button(enabled = enabled, onClick = save@{
+                    error = ""
+                    if (!validation.submit(accountFieldErrors(name, balance, opened, zone, currency, editingId == null))) return@save
                     try {
                         require(name.isNotBlank() && name.length <= 100) { "Введите название счета до 100 символов." }
                         val id = editingId

@@ -1,0 +1,93 @@
+package com.capital.accounting
+
+import androidx.compose.ui.test.*
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.test.core.app.ApplicationProvider
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
+import com.capital.accounting.api.*
+import com.capital.accounting.data.ConnectionSettings
+import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.encodeToString
+import org.junit.Assert.*
+import org.junit.Assume.assumeTrue
+import org.junit.Rule
+import org.junit.Test
+import org.junit.rules.ExternalResource
+import org.junit.runner.RunWith
+import java.util.UUID
+
+@RunWith(AndroidJUnit4::class)
+class FieldValidationScreenTest {
+    private lateinit var api: ApiClient
+    private lateinit var auth: BearerAuth
+    private val app get() = ApplicationProvider.getApplicationContext<CapitalApplication>()
+    private val origin get() = InstrumentationRegistry.getArguments().getString("api_origin")!!
+    @get:Rule(order = 0) val setup = object : ExternalResource() {
+        override fun before() = runBlocking<Unit> {
+            assumeTrue(InstrumentationRegistry.getArguments().getString("api_origin") != null)
+            api = ApiClient(origin)
+            auth = decodeResponse(api.request("/auth/register", "POST", ApiClient.json.encodeToString(Register("field-errors-${UUID.randomUUID()}@example.test", "synthetic field error password", "Field UI", "bearer", "UTC"))))
+            app.database.settings().save(ConnectionSettings(origin = origin))
+            app.credentialVault.save(auth.credential(origin))
+        }
+        override fun after() = runBlocking<Unit> { if (::auth.isInitialized) api.request("/auth/logout", "POST", session = auth.credential(origin)) }
+    }
+    @get:Rule(order = 1) val compose = createAndroidComposeRule<MainActivity>()
+    private fun waitFor(text: String) { compose.waitUntil(30000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() } }
+    private fun click(text: String) {
+        compose.prepareFinancialSection(text)
+        compose.waitUntil(30000) { compose.onAllNodes(hasText(text) and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText(text).performScrollTo().performClick()
+    }
+    private fun field(label: String, value: String) { compose.onNodeWithText(label).performScrollTo().performTextReplacement(value) }
+    private fun focus(label: String) {
+        compose.waitUntil(10000) { compose.onAllNodes(hasText(label) and isFocused()).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText(label).assertIsDisplayed().assertIsFocused()
+    }
+    private fun noAccountMutation() = runBlocking {
+        assertTrue(api.accounts(auth.credential(origin)).isEmpty())
+        assertTrue(api.transactions(auth.credential(origin)).isEmpty())
+        assertNull(app.database.commands().get(origin, auth.profile.id, auth.workspace.id))
+    }
+    @Test fun errorsStayBesideFieldsFocusFirstAndNeverSendInvalidAccountCategoryOrTag() {
+        waitFor("Создайте первый счет")
+        click("Добавить счет"); click("Создать счет")
+        waitFor("Введите название от 1 до 100 символов."); focus("Название счета")
+        noAccountMutation()
+        field("Название счета", "Inline account")
+        field("Начальный остаток", "invalid")
+        field("Дата открытия (YYYY-MM-DDTHH:MM:SS)", "2026-02-30T12:00:00")
+        field("Часовой пояс открытия", "Unknown/Zone")
+        click("Создать счет")
+        waitFor("Введите сумму цифрами, например 12,34.")
+        waitFor("Введите существующую дату в формате YYYY-MM-DDTHH:MM:SS.")
+        waitFor("Введите известный часовой пояс, например UTC или Europe/Nicosia.")
+        focus("Начальный остаток")
+        compose.onNodeWithText("Начальный остаток").assertTextContains("invalid")
+        noAccountMutation()
+        field("Начальный остаток", "12,34"); click("Создать счет"); focus("Дата открытия (YYYY-MM-DDTHH:MM:SS)")
+        noAccountMutation()
+        field("Дата открытия (YYYY-MM-DDTHH:MM:SS)", "2026-10-06T12:00:00"); click("Создать счет"); focus("Часовой пояс открытия")
+        noAccountMutation()
+        field("Часовой пояс открытия", "UTC"); click("Создать счет")
+        waitFor("Изменить счет Inline account")
+        val session = auth.credential(origin)
+        val balances = runBlocking { api.accounts(session) }
+        assertEquals("1234", balances.single().posted_balance_minor)
+        click("Новая категория"); click("Сохранить категорию")
+        waitFor("Введите название от 1 до 100 символов."); focus("Название категории")
+        field("Название категории", "x".repeat(101)); click("Сохранить категорию"); focus("Название категории")
+        assertTrue(runBlocking { api.categories(session) }.isEmpty())
+        field("Название категории", "Inline category"); click("Сохранить категорию"); waitFor("Изменить категорию Inline category")
+        click("Новый тег"); field("Название тега", "x".repeat(51)); click("Сохранить тег")
+        waitFor("Введите название от 1 до 50 символов."); focus("Название тега")
+        assertTrue(runBlocking { api.tags(session) }.isEmpty())
+        field("Название тега", "Inline tag"); click("Сохранить тег"); waitFor("Изменить тег Inline tag")
+        assertEquals(balances, runBlocking { api.accounts(session) })
+        assertEquals(1, runBlocking { api.transactions(session) }.size)
+        assertEquals(1, runBlocking { api.categories(session) }.size)
+        assertEquals(1, runBlocking { api.tags(session) }.size)
+        assertNull(runBlocking { app.database.commands().get(origin, auth.profile.id, auth.workspace.id) })
+    }
+}
