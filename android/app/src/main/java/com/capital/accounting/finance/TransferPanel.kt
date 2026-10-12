@@ -199,6 +199,7 @@ fun TransferPanel(model: AuthViewModel) {
                     TextButton(enabled = enabled, onClick = { feeParts = feeParts.filterNot { it.id == part.id } }) { Text("Убрать часть комиссии ${index + 1}") }
                 }
             }
+            AllocationSummaryView(feeAmount, feeAccount?.currency, feeParts, fee = true)
             TextButton(enabled = enabled && feeParts.size < 100, onClick = { feeParts = feeParts + AllocationDraft() }) { Text("Добавить часть комиссии") }
             state.tags.filter { it.archived_at == null || it.id in feeTags }.forEach { tag ->
                 Row {

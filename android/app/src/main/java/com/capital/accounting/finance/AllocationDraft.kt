@@ -17,3 +17,27 @@ fun allocationInputs(total: String, currency: String, parts: List<AllocationDraf
     require(result.fold(BigInteger.ZERO) { sum, item -> sum + BigInteger(item.amount_minor) } == BigInteger(total)) { "Сумма частей должна точно совпадать с суммой операции." }
     return result
 }
+
+
+data class AllocationSummary(val distributed: String, val remaining: String)
+
+/** Each amount respects the record bound; the preview sum can exceed one record's bound. */
+fun allocationSummary(total: String, currency: String, parts: List<AllocationDraft>): AllocationSummary? = try {
+    val minor = Money.minor(total, currency)
+    val values = parts.map { Money.minor(it.amount, currency) }
+    require(BigInteger(minor).signum() > 0 && values.all { BigInteger(it).signum() > 0 })
+    AllocationSummary(Money.displayTotal(values, currency),
+        Money.displayTotal(listOf(minor) + values.map { BigInteger(it).negate().toString() }, currency))
+} catch (_: IllegalArgumentException) { null }
+
+@androidx.compose.runtime.Composable
+fun AllocationSummaryView(total: String, currency: String?, parts: List<AllocationDraft>, fee: Boolean = false) {
+    if (parts.size > 1) {
+        val summary = currency?.let { allocationSummary(total, it, parts) }
+        if (summary == null) androidx.compose.material3.Text("Для расчета распределения исправьте общую сумму и суммы частей.")
+        else {
+            androidx.compose.material3.Text("${if (fee) "Распределено комиссии" else "Распределено"}: ${summary.distributed}")
+            androidx.compose.material3.Text("${if (fee) "Осталось распределить комиссию" else "Осталось распределить"}: ${summary.remaining}")
+        }
+    }
+}

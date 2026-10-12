@@ -179,6 +179,7 @@ fun TransactionPanel(model: AuthViewModel) {
                         TextButton(enabled = enabled, onClick = { parts = parts.filterNot { it.id == part.id } }) { Text("Убрать часть ${index + 1}") }
                     }
                 }
+                AllocationSummaryView(amount, account?.currency, parts)
                 TextButton(enabled = enabled && parts.size < 100, onClick = { parts = parts + AllocationDraft() }) { Text("Добавить часть операции") }
                 state.tags.filter { it.archived_at == null || it.id in selectedTags }.forEach { tag ->
                     Row {
