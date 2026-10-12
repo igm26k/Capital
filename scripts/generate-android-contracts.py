@@ -5,8 +5,12 @@ import sys
 from pathlib import Path
 root = Path(__file__).resolve().parents[1]
 schemas = json.loads((root / 'contracts/openapi.json').read_text())['components']['schemas']
-names = ['Profile', 'Workspace', 'Session', 'BearerAuth', 'Login', 'Register', 'Acknowledgement', 'SessionList', 'Account', 'AccountCreate', 'AccountUpdate', 'AccountList', 'MutationResult', 'Transaction', 'Category', 'Tag', 'Tombstone', 'Rate', 'Entry', 'Allocation', 'AllocationInput', 'ExpenseCreate', 'IncomeCreate', 'TransactionList', 'ExpenseReplace', 'IncomeReplace', 'TransactionDelete', 'VersionExpectation', 'CategoryList', 'TagList', 'CategoryCreate', 'TagCreate', 'CategoryUpdate', 'TagUpdate', 'TransferCreate', 'FeeInput', 'TransferReplace', 'RefundCreate', 'RefundAllocationInput', 'RefundReplace', 'AdjustmentCreate', 'AdjustmentReplace', 'BulkItem', 'BulkClassification', 'SnapshotCreate', 'Snapshot', 'SnapshotItem', 'SnapshotPage']
+names = ['Profile', 'Workspace', 'Session', 'BearerAuth', 'Login', 'Register', 'Acknowledgement', 'SessionList', 'Account', 'AccountCreate', 'AccountUpdate', 'AccountList', 'MutationResult', 'Transaction', 'Category', 'Tag', 'Tombstone', 'Rate', 'Entry', 'Allocation', 'AllocationInput', 'ExpenseCreate', 'IncomeCreate', 'TransactionList', 'ExpenseReplace', 'IncomeReplace', 'TransactionDelete', 'VersionExpectation', 'CategoryList', 'TagList', 'CategoryCreate', 'TagCreate', 'CategoryUpdate', 'TagUpdate', 'TransferCreate', 'FeeInput', 'TransferReplace', 'RefundCreate', 'RefundAllocationInput', 'RefundReplace', 'AdjustmentCreate', 'AdjustmentReplace', 'BulkItem', 'BulkClassification', 'SnapshotCreate', 'Snapshot', 'SnapshotItem', 'SnapshotPage', 'WorkspaceChange', 'SyncGroup', 'SyncChanges']
 def kotlin_type(schema):
+    if 'allOf' in schema:
+        refs = [x for x in schema['allOf'] if '$ref' in x]
+        assert len(refs) == 1
+        return kotlin_type(refs[0])
     if 'anyOf' in schema:
         values = [x for x in schema['anyOf'] if x.get('type') != 'null']
         assert len(values) == 1
@@ -29,25 +33,40 @@ for name in names:
         continue
     variants = schema['oneOf']
     assert all(v['properties']['entity_type'].get('const') for v in variants)
-    lines += [f'@Serializable(with = {name}Serializer::class)', f'sealed interface {name} {{ val entity_type: String }}', '',
-              f'object {name}Serializer : JsonContentPolymorphicSerializer<{name}>({name}::class) {{',
+    common = {field: value for field, value in variants[0]['properties'].items()
+              if field != 'data' and all(field in variant['properties'] for variant in variants)}
+    common_fields = {field: kotlin_type(value) for field, value in common.items()}
+    operation = 'operation' in common
+    selection = 'element.jsonObject["entity_type"]?.jsonPrimitive?.content'
+    if operation:
+        selection = '(' + selection + ') + ":" + (element.jsonObject["operation"]?.jsonPrimitive?.content)'
+    lines += [f'@Serializable(with = {name}Serializer::class)', f'sealed interface {name} {{']
+    lines += [f'    val {field}: {value}' for field, value in common_fields.items()]
+    lines += ['}', '', f'object {name}Serializer : JsonContentPolymorphicSerializer<{name}>({name}::class) {{',
               f'    override fun selectDeserializer(element: JsonElement): DeserializationStrategy<{name}> =',
-              '        when (element.jsonObject["entity_type"]?.jsonPrimitive?.content) {']
+              f'        when ({selection}) {{']
     for variant in variants:
         entity = variant['properties']['entity_type']['const']
-        variant_name = name + entity.title()
-        lines += [f'            "{entity}" -> {variant_name}.serializer()']
-        models.append((variant_name, variant, name))
+        op = variant['properties']['operation']['const'] if operation else ''
+        variant_name = name + entity.title() + op.title()
+        discriminator = entity + (':' + op if operation else '')
+        lines += [f'            "{discriminator}" -> {variant_name}.serializer()']
+        models.append((variant_name, variant, (name, common_fields)))
     lines += [f'            else -> throw SerializationException("Invalid {name} type")', '        }', '}', '']
 for name, schema, parent in models:
     assert set(schema['required']) == set(schema['properties'])
     lines += ['@Serializable', f'data class {name}(']
-    lines += [f'    {"override " if parent and field == "entity_type" else ""}val {field}: {kotlin_type(value)},' for field, value in schema['properties'].items()]
-    lines += [(') : ' + parent + ' {') if parent else ') {']
+    lines += [f'    {"override " if parent and field in parent[1] else ""}val {field}: {kotlin_type(value)},' for field, value in schema['properties'].items()]
+    lines += [(') : ' + parent[0] + ' {') if parent else ') {']
     checks = []
     for field, value in schema['properties'].items():
         if 'const' in value:
             checks.append(f'        require({field} == {json.dumps(value["const"])}) {{ "Invalid {name}.{field}" }}')
+        if 'allOf' in value:
+            for constraint in value['allOf']:
+                for key, prop in constraint.get('properties', {}).items():
+                    if 'const' in prop:
+                        checks.append(f'        require({field}.{key} == {json.dumps(prop["const"])}) {{ "Invalid {name}.{field}.{key}" }}')
         if 'enum' in value:
             values = ', '.join(json.dumps(x) for x in value['enum'])
             checks.append(f'        require({field} in setOf({values})) {{ "Invalid {name}.{field}" }}')

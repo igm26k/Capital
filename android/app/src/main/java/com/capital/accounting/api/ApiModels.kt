@@ -5,7 +5,9 @@ import kotlinx.serialization.*
 import kotlinx.serialization.json.*
 
 @Serializable(with = SnapshotItemSerializer::class)
-sealed interface SnapshotItem { val entity_type: String }
+sealed interface SnapshotItem {
+    val entity_type: String
+}
 
 object SnapshotItemSerializer : JsonContentPolymorphicSerializer<SnapshotItem>(SnapshotItem::class) {
     override fun selectDeserializer(element: JsonElement): DeserializationStrategy<SnapshotItem> =
@@ -15,6 +17,36 @@ object SnapshotItemSerializer : JsonContentPolymorphicSerializer<SnapshotItem>(S
             "category" -> SnapshotItemCategory.serializer()
             "tag" -> SnapshotItemTag.serializer()
             else -> throw SerializationException("Invalid SnapshotItem type")
+        }
+}
+
+@Serializable(with = WorkspaceChangeSerializer::class)
+sealed interface WorkspaceChange {
+    val schema_version: Int
+    val change_id: String
+    val action_id: String
+    val workspace_id: String
+    val sequence: String
+    val ordinal: Int
+    val group_size: Int
+    val created_at: String
+    val operation: String
+    val entity_type: String
+    val generation_id: String
+}
+
+object WorkspaceChangeSerializer : JsonContentPolymorphicSerializer<WorkspaceChange>(WorkspaceChange::class) {
+    override fun selectDeserializer(element: JsonElement): DeserializationStrategy<WorkspaceChange> =
+        when ((element.jsonObject["entity_type"]?.jsonPrimitive?.content) + ":" + (element.jsonObject["operation"]?.jsonPrimitive?.content)) {
+            "account:upsert" -> WorkspaceChangeAccountUpsert.serializer()
+            "account:delete" -> WorkspaceChangeAccountDelete.serializer()
+            "transaction:upsert" -> WorkspaceChangeTransactionUpsert.serializer()
+            "transaction:delete" -> WorkspaceChangeTransactionDelete.serializer()
+            "category:upsert" -> WorkspaceChangeCategoryUpsert.serializer()
+            "category:delete" -> WorkspaceChangeCategoryDelete.serializer()
+            "tag:upsert" -> WorkspaceChangeTagUpsert.serializer()
+            "tag:delete" -> WorkspaceChangeTagDelete.serializer()
+            else -> throw SerializationException("Invalid WorkspaceChange type")
         }
 }
 
@@ -680,4 +712,216 @@ data class SnapshotPage(
     val generation_id: String,
 ) {
     override fun toString() = "SnapshotPage([redacted])"
+}
+
+@Serializable
+data class WorkspaceChangeAccountUpsert(
+    override val schema_version: Int,
+    override val change_id: String,
+    override val action_id: String,
+    override val workspace_id: String,
+    override val sequence: String,
+    override val ordinal: Int,
+    override val group_size: Int,
+    override val created_at: String,
+    override val operation: String,
+    override val entity_type: String,
+    val data: Account,
+    override val generation_id: String,
+) : WorkspaceChange {
+    init {
+        require(schema_version == 1) { "Invalid WorkspaceChangeAccountUpsert.schema_version" }
+        require(operation == "upsert") { "Invalid WorkspaceChangeAccountUpsert.operation" }
+        require(entity_type == "account") { "Invalid WorkspaceChangeAccountUpsert.entity_type" }
+    }
+    override fun toString() = "WorkspaceChangeAccountUpsert([redacted])"
+}
+
+@Serializable
+data class WorkspaceChangeAccountDelete(
+    override val schema_version: Int,
+    override val change_id: String,
+    override val action_id: String,
+    override val workspace_id: String,
+    override val sequence: String,
+    override val ordinal: Int,
+    override val group_size: Int,
+    override val created_at: String,
+    override val operation: String,
+    override val entity_type: String,
+    val data: Tombstone,
+    override val generation_id: String,
+) : WorkspaceChange {
+    init {
+        require(schema_version == 1) { "Invalid WorkspaceChangeAccountDelete.schema_version" }
+        require(operation == "delete") { "Invalid WorkspaceChangeAccountDelete.operation" }
+        require(entity_type == "account") { "Invalid WorkspaceChangeAccountDelete.entity_type" }
+        require(data.entity_type == "account") { "Invalid WorkspaceChangeAccountDelete.data.entity_type" }
+    }
+    override fun toString() = "WorkspaceChangeAccountDelete([redacted])"
+}
+
+@Serializable
+data class WorkspaceChangeTransactionUpsert(
+    override val schema_version: Int,
+    override val change_id: String,
+    override val action_id: String,
+    override val workspace_id: String,
+    override val sequence: String,
+    override val ordinal: Int,
+    override val group_size: Int,
+    override val created_at: String,
+    override val operation: String,
+    override val entity_type: String,
+    val data: Transaction,
+    override val generation_id: String,
+) : WorkspaceChange {
+    init {
+        require(schema_version == 1) { "Invalid WorkspaceChangeTransactionUpsert.schema_version" }
+        require(operation == "upsert") { "Invalid WorkspaceChangeTransactionUpsert.operation" }
+        require(entity_type == "transaction") { "Invalid WorkspaceChangeTransactionUpsert.entity_type" }
+    }
+    override fun toString() = "WorkspaceChangeTransactionUpsert([redacted])"
+}
+
+@Serializable
+data class WorkspaceChangeTransactionDelete(
+    override val schema_version: Int,
+    override val change_id: String,
+    override val action_id: String,
+    override val workspace_id: String,
+    override val sequence: String,
+    override val ordinal: Int,
+    override val group_size: Int,
+    override val created_at: String,
+    override val operation: String,
+    override val entity_type: String,
+    val data: Tombstone,
+    override val generation_id: String,
+) : WorkspaceChange {
+    init {
+        require(schema_version == 1) { "Invalid WorkspaceChangeTransactionDelete.schema_version" }
+        require(operation == "delete") { "Invalid WorkspaceChangeTransactionDelete.operation" }
+        require(entity_type == "transaction") { "Invalid WorkspaceChangeTransactionDelete.entity_type" }
+        require(data.entity_type == "transaction") { "Invalid WorkspaceChangeTransactionDelete.data.entity_type" }
+    }
+    override fun toString() = "WorkspaceChangeTransactionDelete([redacted])"
+}
+
+@Serializable
+data class WorkspaceChangeCategoryUpsert(
+    override val schema_version: Int,
+    override val change_id: String,
+    override val action_id: String,
+    override val workspace_id: String,
+    override val sequence: String,
+    override val ordinal: Int,
+    override val group_size: Int,
+    override val created_at: String,
+    override val operation: String,
+    override val entity_type: String,
+    val data: Category,
+    override val generation_id: String,
+) : WorkspaceChange {
+    init {
+        require(schema_version == 1) { "Invalid WorkspaceChangeCategoryUpsert.schema_version" }
+        require(operation == "upsert") { "Invalid WorkspaceChangeCategoryUpsert.operation" }
+        require(entity_type == "category") { "Invalid WorkspaceChangeCategoryUpsert.entity_type" }
+    }
+    override fun toString() = "WorkspaceChangeCategoryUpsert([redacted])"
+}
+
+@Serializable
+data class WorkspaceChangeCategoryDelete(
+    override val schema_version: Int,
+    override val change_id: String,
+    override val action_id: String,
+    override val workspace_id: String,
+    override val sequence: String,
+    override val ordinal: Int,
+    override val group_size: Int,
+    override val created_at: String,
+    override val operation: String,
+    override val entity_type: String,
+    val data: Tombstone,
+    override val generation_id: String,
+) : WorkspaceChange {
+    init {
+        require(schema_version == 1) { "Invalid WorkspaceChangeCategoryDelete.schema_version" }
+        require(operation == "delete") { "Invalid WorkspaceChangeCategoryDelete.operation" }
+        require(entity_type == "category") { "Invalid WorkspaceChangeCategoryDelete.entity_type" }
+        require(data.entity_type == "category") { "Invalid WorkspaceChangeCategoryDelete.data.entity_type" }
+    }
+    override fun toString() = "WorkspaceChangeCategoryDelete([redacted])"
+}
+
+@Serializable
+data class WorkspaceChangeTagUpsert(
+    override val schema_version: Int,
+    override val change_id: String,
+    override val action_id: String,
+    override val workspace_id: String,
+    override val sequence: String,
+    override val ordinal: Int,
+    override val group_size: Int,
+    override val created_at: String,
+    override val operation: String,
+    override val entity_type: String,
+    val data: Tag,
+    override val generation_id: String,
+) : WorkspaceChange {
+    init {
+        require(schema_version == 1) { "Invalid WorkspaceChangeTagUpsert.schema_version" }
+        require(operation == "upsert") { "Invalid WorkspaceChangeTagUpsert.operation" }
+        require(entity_type == "tag") { "Invalid WorkspaceChangeTagUpsert.entity_type" }
+    }
+    override fun toString() = "WorkspaceChangeTagUpsert([redacted])"
+}
+
+@Serializable
+data class WorkspaceChangeTagDelete(
+    override val schema_version: Int,
+    override val change_id: String,
+    override val action_id: String,
+    override val workspace_id: String,
+    override val sequence: String,
+    override val ordinal: Int,
+    override val group_size: Int,
+    override val created_at: String,
+    override val operation: String,
+    override val entity_type: String,
+    val data: Tombstone,
+    override val generation_id: String,
+) : WorkspaceChange {
+    init {
+        require(schema_version == 1) { "Invalid WorkspaceChangeTagDelete.schema_version" }
+        require(operation == "delete") { "Invalid WorkspaceChangeTagDelete.operation" }
+        require(entity_type == "tag") { "Invalid WorkspaceChangeTagDelete.entity_type" }
+        require(data.entity_type == "tag") { "Invalid WorkspaceChangeTagDelete.data.entity_type" }
+    }
+    override fun toString() = "WorkspaceChangeTagDelete([redacted])"
+}
+
+@Serializable
+data class SyncGroup(
+    val sequence: String,
+    val action_id: String,
+    val workspace_id: String,
+    val changes: List<WorkspaceChange>,
+    val generation_id: String,
+) {
+    override fun toString() = "SyncGroup([redacted])"
+}
+
+@Serializable
+data class SyncChanges(
+    val workspace_id: String,
+    val groups: List<SyncGroup>,
+    val next_cursor: String,
+    val has_more: Boolean,
+    val head_sequence: String,
+    val min_available_sequence: String,
+    val generation_id: String,
+) {
+    override fun toString() = "SyncChanges([redacted])"
 }

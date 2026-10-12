@@ -28,7 +28,9 @@ class ApiClient(origin: String) {
     suspend fun request(path: String, method: String = "GET", body: String? = null, session: StoredSession? = null, commandId: String? = null, generationId: String? = null, maxResponseBytes: Int = 2 * 1024 * 1024): String {
         require(path.startsWith('/') && !path.startsWith("//") && !path.contains('\\'))
         require(maxResponseBytes in 1..65 * 1024 * 1024)
-        require(maxResponseBytes <= 2 * 1024 * 1024 || Regex("/workspaces/[0-9a-f-]{36}/sync/snapshots/[0-9a-f-]{36}/pages").matches(path.substringBefore('?')))
+        require(maxResponseBytes <= 2 * 1024 * 1024 ||
+            (maxResponseBytes <= 4 * 1024 * 1024 && Regex("/workspaces/[0-9a-f-]{36}/sync/changes").matches(path.substringBefore('?'))) ||
+            Regex("/workspaces/[0-9a-f-]{36}/sync/snapshots/[0-9a-f-]{36}/pages").matches(path.substringBefore('?')))
         require(session == null || session.origin == origin)
         require((commandId == null) == (generationId == null))
         if (commandId != null) {
