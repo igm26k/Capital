@@ -138,3 +138,8 @@ Split дохода/расхода и комиссии показывает ра�
 ### Шаг 44: ошибки полей фильтра истории
 
 Поиск, даты UTC и размер страницы показывают собственные ошибки и фокус первой ошибки. Период использует TransactionFilter contract и microsecond ordering; invalid apply сохраняет текущую историю/applied filter/raw inputs без API read. Reset и успешное применение очищают сообщения. Целевая приемка — **4/4 actual HistoryScreenTest, 40/40 unit**, debug/build/lint PASS. Проверены независимые ошибки/фокус/неизменный список, исправление и reset, прежние pagination/recreation/account shortcuts/full graph/bulk selection. Последний полный65/65 gate — шаг42; данного изменения полный gate не запускался. Далее оставшийся UX/spec audit, S3-05 и APP-03.
+
+
+### Шаг 45: идентификатор обращения при ошибке API/auth
+
+ApiFailure получает canonical UUID из X-Request-ID; понятные сообщения AuthViewModel показывают его для обращения в поддержку. Невалидный/отсутствующий ID не выводится, exception не содержит response body/credential. Целевая приемка — **2/2 actual ApiAuth/AuthScreen, 41/41 unit**, debug/build/lint PASS. Проверены реальные401 IDs, отображение ошибки входа, дальнейшие registration/logout/login/renew/recreation и отбрасывание небезопасного формата ID. Последний полный65/65 — шаг42; полный gate изменения не запускался. Durable financial rejection presentation и остальной UX audit, S3-05 и APP-03 остаются впереди.

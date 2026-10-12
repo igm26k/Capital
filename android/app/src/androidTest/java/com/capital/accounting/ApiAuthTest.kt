@@ -36,7 +36,7 @@ class ApiAuthTest {
         try {
             api.request("/auth/login", "POST", ApiClient.json.encodeToString(Login(email, password.trim(), "Wrong password", "bearer")))
             fail("Password whitespace must be preserved")
-        } catch (e: ApiFailure) { assertEquals(401, e.status) }
+        } catch (e: ApiFailure) { assertEquals(401, e.status); assertNotNull(e.requestId); assertEquals(e.requestId, UUID.fromString(e.requestId).toString()) }
         val login = decodeResponse<BearerAuth>(api.request("/auth/login", "POST", ApiClient.json.encodeToString(Login(email, password, "Second Android", "bearer"))))
         assertNotEquals(credential.sessionId, login.session.id)
         val foreign = decodeResponse<BearerAuth>(api.request("/auth/register", "POST", ApiClient.json.encodeToString(Register("foreign-${UUID.randomUUID()}@example.test", password, "Other", "bearer", "UTC"))))
@@ -52,7 +52,7 @@ class ApiAuthTest {
         val ack = decodeResponse<Acknowledgement>(api.request("/auth/logout", "POST", session = credential))
         assertTrue(ack.ok)
         try { api.request("/auth/session", session = credential); fail("Revoked credential") }
-        catch (e: ApiFailure) { assertEquals(401, e.status) }
+        catch (e: ApiFailure) { assertEquals(401, e.status); assertNotNull(e.requestId); assertEquals(e.requestId, UUID.fromString(e.requestId).toString()) }
         api.request("/auth/logout", "POST", session = login.credential(origin))
         api.request("/auth/logout", "POST", session = foreign.credential(origin))
     }

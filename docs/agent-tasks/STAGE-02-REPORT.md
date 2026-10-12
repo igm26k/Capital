@@ -2,7 +2,7 @@
 
 Дата: 2026-10-12. Статус: in_progress.
 
-Сервер/веб приняты в S3-07B. APP-01 завершена. В APP-02 приняты bearer/Keystore auth, devices/revoke, durable commands, ручные финансовые операции, scoped drafts/guards, отдельные редакторы, навигация и действия из деталей. Последний полный gate — 65/65 device и 35/35 unit PASS (шаг42); шаг43 принят на 8/8 целевых device; шаг44 — 4/4 целевых device и 40/40 unit. APP-02 остается in_progress: полный UX/spec audit и сквозная web сверка еще не приняты; массовая классификация принята в шаге36. S3-05 atomic outbox/mirror/staging и APP-03 Android→server→web остаются следующими пакетами. Банковские источники — финальный этап.
+Сервер/веб приняты в S3-07B. APP-01 завершена. В APP-02 приняты bearer/Keystore auth, devices/revoke, durable commands, ручные финансовые операции, scoped drafts/guards, отдельные редакторы, навигация и действия из деталей. Последний полный gate — 65/65 device и 35/35 unit PASS (шаг42); шаг43 принят на 8/8 целевых device; шаг44 — 4/4 целевых device; шаг45 — 2/2 целевых device и 41/41 unit. APP-02 остается in_progress: полный UX/spec audit и сквозная web сверка еще не приняты; массовая классификация принята в шаге36. S3-05 atomic outbox/mirror/staging и APP-03 Android→server→web остаются следующими пакетами. Банковские источники — финальный этап.
 
 ## APP-01 принята — 2026-10-06
 
@@ -324,3 +324,10 @@ UX audit подтвердил отсутствие требуемого спец
 History filters показывают ошибки search/from/to/page limit у соответствующих полей с фокусом первой ошибки. Период проверяется тем же TransactionFilter contract, включая реальные UTC dates и exact microseconds; равные/обратные границы дают связанные сообщения у обеих дат. Search≤200, integer page1..100. Invalid apply не вызывает model/API read и сохраняет текущий applied filter/history/raw inputs; reset/успешное применение убирают transient errors.
 
 Целевая приемка **4/4 HistoryScreenTest PASS** на actual TLS API/PostgreSQL без skips: дополненный scenario принимает ошибочный период/фокус from, long search/фокус search, invalid page/фокус limit и неизменный список из двух строк при каждой невалидной попытке, затем valid empty filter/reset. Прежние pagination/recreation/account shortcut/full graph/bulk selection проходят. **40/40 unit**, debug/build/lint PASS; три новых unit tests покрывают ordered independent errors, microsecond ordering/open bounds, impossible dates/nonUTC/excess precision и limit overflow. Artifact android-history-fields-focused.txt 0600. Полный gate данного изменения не запускался; последний полный65/65 — шаг42. Общий план in_progress; далее оставшийся UX/spec audit, S3-05 и APP-03.
+
+
+## Шаг 45: идентификатор обращения в API/auth ошибках — 2026-10-12
+
+ApiClient извлекает X-Request-ID из неуспешного HTTP response в ApiFailure. Пропускается только canonical lowercase UUID; arbitrary header/body/trace не выводится. AuthViewModel errorMessage добавляет идентификатор к прежнему понятному сообщению; IOException message остается HTTP status и не содержит body/credential. Отсутствующий/невалидный ID не меняет текст ошибки. Этот шаг принимает transport/auth presentation; durable financial rejection presentation и остальные UX требования остаются в audit.
+
+Целевая приемка **2/2 real TLS API/PostgreSQL native tests**: ApiAuthTest проверяет IDs реальных401, AuthScreenTest видит ID ошибочного входа, затем сохраняет прежние registration/logout/login/renew/recreation сценарии. **41/41 unit**, debug/build/lint PASS; новый unit отвергает arbitrary/oversized/multiline identifiers и принимает canonical UUID без изменения exception message. Artifact android-request-id-focused.txt0600. Полный gate изменения не запускался; последний полный65/65 — шаг42. Общий план in_progress; далее оставшийся UX/spec audit, S3-05 и APP-03.

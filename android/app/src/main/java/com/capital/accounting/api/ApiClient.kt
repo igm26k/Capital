@@ -18,7 +18,10 @@ import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
-class ApiFailure(val status: Int, val code: String) : IOException("HTTP $status")
+class ApiFailure(val status: Int, val code: String, requestId: String? = null) : IOException("HTTP $status") {
+    val requestId = requestId?.takeIf { it.matches(Regex("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")) }
+    val requestReference get() = requestId?.let { " Идентификатор обращения: $it" } ?: ""
+}
 
 class ApiClient(origin: String) {
     val origin = normalizedOrigin(origin)
@@ -56,7 +59,7 @@ class ApiClient(origin: String) {
                             } ?: throw IOException("Empty response")
                             if (!response.isSuccessful) {
                                 val code = try { JSONObject(content).optString("code", "http_error") } catch (_: Exception) { "http_error" }
-                                throw ApiFailure(response.code, code)
+                                throw ApiFailure(response.code, code, response.header("X-Request-ID"))
                             }
                             if (continuation.isActive) continuation.resume(content)
                         }

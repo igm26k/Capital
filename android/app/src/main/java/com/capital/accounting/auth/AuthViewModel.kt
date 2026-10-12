@@ -559,7 +559,7 @@ private fun errorMessage(error: Exception, authAttempt: Boolean = false): String
     error is ApiFailure && error.status in 400..499 -> "Сервер отклонил запрос. Проверьте введенные данные."
     authAttempt -> "Ответ не получен. Вход мог выполниться. Повторите вход после восстановления связи."
     else -> "Не удалось связаться с сервером. Повторите проверку сессии."
-}
+}.let { it + ((error as? ApiFailure)?.requestReference ?: "") }
 
 private fun savedMessage(path: String): String = when {
     path.endsWith("/transactions/classification") -> "Классификация выбранных операций сохранена"

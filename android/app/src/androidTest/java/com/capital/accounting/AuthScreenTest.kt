@@ -45,6 +45,13 @@ class AuthScreenTest {
         compose.onNodeWithText("Пароль").performTextInput("  android ui 🥨 password  ")
         compose.onNodeWithText("Название устройства").performTextClearance()
         compose.onNodeWithText("Название устройства").performTextInput("<svg onload=alert(1)>")
+        compose.onNodeWithText("Войти").performScrollTo().performClick()
+        compose.waitUntil(30000) { compose.onAllNodesWithText("Идентификатор обращения:", substring = true).fetchSemanticsNodes().isNotEmpty() }
+        val failure = compose.onNodeWithText("Идентификатор обращения:", substring = true).fetchSemanticsNode().config[SemanticsProperties.Text].joinToString { it.text }
+        assertTrue(failure.startsWith("Неверный email или пароль либо сессия завершена."))
+        val requestId = failure.substringAfter("Идентификатор обращения: ")
+        assertEquals(requestId, UUID.fromString(requestId).toString())
+        compose.onNodeWithText("Пароль").performScrollTo().performTextReplacement("  android ui 🥨 password  ")
         compose.onNodeWithText("Зарегистрироваться").performScrollTo().performClick()
         compose.waitUntil(30000) { compose.onAllNodesWithText("Вы вошли: $email").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Устройство: <svg onload=alert(1)>").assertExists()
