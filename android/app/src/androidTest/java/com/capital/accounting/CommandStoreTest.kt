@@ -14,7 +14,7 @@ import java.util.UUID
 class CommandStoreTest {
     private val context get() = ApplicationProvider.getApplicationContext<CapitalApplication>()
     private fun open(name: String) = Room.databaseBuilder(context, CapitalDatabase::class.java, name)
-        .addMigrations(CapitalDatabase.MIGRATION_1_2).build()
+        .addMigrations(CapitalDatabase.MIGRATION_1_2, CapitalDatabase.MIGRATION_2_3).build()
     @Test fun versionOneSettingsSurviveRealMigration() = runBlocking<Unit> {
         val name = "command-migration-test.db"
         context.deleteDatabase(name)
@@ -60,4 +60,32 @@ class CommandStoreTest {
             assertNull(db.commands().get(original.origin, owner, workspace))
         } finally { db.close(); context.deleteDatabase(name) }
     }
+    @Test fun versionTwoPendingCommandSurvivesMigrationAndRejectedReferenceReopen() = runBlocking<Unit> {
+        val name = "command-v2-migration.db"
+        context.deleteDatabase(name)
+        val id = UUID.randomUUID().toString(); val owner = UUID.randomUUID().toString(); val workspace = UUID.randomUUID().toString()
+        val session = UUID.randomUUID().toString(); val generation = UUID.randomUUID().toString()
+        context.openOrCreateDatabase(name, 0, null).use { old ->
+            old.execSQL("CREATE TABLE connection_settings (id INTEGER NOT NULL PRIMARY KEY, origin TEXT NOT NULL)")
+            old.execSQL("CREATE TABLE financial_commands (commandId TEXT NOT NULL PRIMARY KEY, origin TEXT NOT NULL, ownerId TEXT NOT NULL, workspaceId TEXT NOT NULL, sessionId TEXT NOT NULL, generationId TEXT NOT NULL, path TEXT NOT NULL, method TEXT NOT NULL, body TEXT NOT NULL, state TEXT NOT NULL, result TEXT, errorCode TEXT)")
+            old.execSQL("CREATE UNIQUE INDEX index_financial_commands_origin_ownerId_workspaceId ON financial_commands(origin,ownerId,workspaceId)")
+            old.execSQL("INSERT INTO connection_settings VALUES (1, 'https://accounting.example')")
+            old.execSQL("INSERT INTO financial_commands VALUES (?, 'https://accounting.example', ?, ?, ?, ?, ?, 'POST', '{}', 'pending', NULL, NULL)", arrayOf(id, owner, workspace, session, generation, "/workspaces/$workspace/accounts"))
+            old.execSQL("PRAGMA user_version=2")
+        }
+        var db = open(name)
+        try {
+            val original = db.commands().get("https://accounting.example", owner, workspace)!!
+            assertEquals(id, original.commandId); assertEquals("{}", original.body); assertNull(original.requestId)
+            assertEquals("https://accounting.example", db.settings().get()?.origin)
+            val reference = UUID.randomUUID().toString()
+            assertEquals(1, db.commands().reject(id, "rejected", "version_conflict", reference))
+            db.close(); db = open(name)
+            val rejected = db.commands().get(original.origin, owner, workspace)!!
+            assertEquals(original.copy(state = "rejected", errorCode = "version_conflict", requestId = reference), rejected)
+            assertEquals(0, db.commands().reject(id, "rejected", "invalid", UUID.randomUUID().toString()))
+            assertEquals(reference, db.commands().get(original.origin, owner, workspace)?.requestId)
+        } finally { db.close(); context.deleteDatabase(name) }
+    }
+
 }

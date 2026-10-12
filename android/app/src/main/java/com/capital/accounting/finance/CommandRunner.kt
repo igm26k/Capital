@@ -34,9 +34,9 @@ class CommandRunner(private val commands: CommandDao) {
             commands.confirm(command.commandId, response)
         } catch (e: ApiFailure) {
             if (e.code in setOf("action_result_expired", "idempotency_conflict")) {
-                commands.reject(command.commandId, "reconcile", e.code)
+                commands.reject(command.commandId, "reconcile", e.code, e.requestId)
             } else if (e.status in 400..499 && e.status !in setOf(401, 408, 425, 429)) {
-                commands.reject(command.commandId, "rejected", e.code)
+                commands.reject(command.commandId, "rejected", e.code, e.requestId)
             } else throw e
         }
         return requireNotNull(commands.get(command.origin, command.ownerId, command.workspaceId))

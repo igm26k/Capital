@@ -218,6 +218,9 @@ class AccountsScreenTest {
         val app = ApplicationProvider.getApplicationContext<CapitalApplication>()
         val rejected = runBlocking { app.database.commands().get(origin, auth.profile.id, auth.workspace.id)!! }
         assertEquals("rejected", rejected.state)
+        assertNotNull(rejected.requestId)
+        waitFor("Идентификатор обращения: ${rejected.requestId}")
+        compose.financialNode("Идентификатор обращения: ${rejected.requestId}").assertExists()
         assertEquals(archived.version, decodeResponse<AccountUpdate>(rejected.body).expected_version)
         click("Обновить данные для новой команды")
         waitFor("Данные обновлены. Проверьте поля перед новой командой.")

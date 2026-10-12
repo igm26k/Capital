@@ -23,7 +23,7 @@ run_suite() {
     "$adb" -s "$serial" shell am instrument -w -r -e class "$suite" -e api_origin https://localhost:8444 com.capital.accounting.test/androidx.test.runner.AndroidJUnitRunner > "$artifact"
     { rg -q "^OK \($expected tests?\)" "$artifact" && ! rg -q "INSTRUMENTATION_STATUS_CODE: -[1-4]" "$artifact"; } || { echo 'Android instrumentation failed; inspect restricted local artifact.' >&2; exit 1; }
 }
-run_suite 'com.capital.accounting.FoundationTest,com.capital.accounting.CommandStoreTest,com.capital.accounting.CredentialVaultTest,com.capital.accounting.SettingsScreenTest' 6 ops/.runtime/checks/android-foundation-instrumentation.txt
+run_suite 'com.capital.accounting.FoundationTest,com.capital.accounting.CommandStoreTest,com.capital.accounting.CredentialVaultTest,com.capital.accounting.SettingsScreenTest' 7 ops/.runtime/checks/android-foundation-instrumentation.txt
 run_suite com.capital.accounting.FinancialDraftStoreTest 2 ops/.runtime/checks/android-draft-store-instrumentation.txt
 run_suite com.capital.accounting.DraftGuardScreenTest 1 ops/.runtime/checks/android-draft-guard-instrumentation.txt
 run_suite com.capital.accounting.LinkedDraftGuardScreenTest 1 ops/.runtime/checks/android-linked-draft-guard-instrumentation.txt
@@ -53,4 +53,4 @@ run_suite com.capital.accounting.AuthScreenTest 1 ops/.runtime/checks/android-ui
 python3 scripts/check-android-auth-runtime.py "$adb" "$serial"
 python3 scripts/check-android-financial-runtime.py "$adb" "$serial"
 python3 scripts/check-android-release-trust.py "$sdk"
-echo 'PASS 65/65 real Android instrumentation executions and auth runtime acceptance'
+echo 'PASS 66/66 real Android instrumentation executions and auth runtime acceptance'

@@ -10,6 +10,7 @@ fun FinancialCommandStatus(model: AuthViewModel, accountDraft: String? = null) {
     state.financialCommand?.let { command ->
         Text("Сохраненная команда: ${command.commandId}")
         Text("Состояние: ${command.state}")
+        command.requestId?.let { Text("Идентификатор обращения: $it") }
         if (command.state == "pending" && command.sessionId != state.auth?.session?.id && command.generationId == state.auth?.workspace?.sync_generation_id) {
             Button(enabled = !state.busy, onClick = model::rebindAccountCommand) { Text("Продолжить сохраненную команду в этой сессии") }
         }

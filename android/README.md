@@ -30,7 +30,7 @@ CredentialVault выполняет IO/Keystore операции вне main thre
 JAVA_HOME=<JDK> ANDROID_HOME=<SDK> DOCKER_BUILD_NETWORK=host make android-auth-e2e
 ```
 
-Нужен отдельный запущенный test emulator (по умолчанию emulator-5556, можно задать ANDROID_TEST_SERIAL). Скрипт выбирает его явно, поднимает accounting-test, временно включает test registration, настраивает adb reverse8444 и выполняет 8 базовых + 53 реальных API/UI tests и отдельный native overview outage, затем два native этапа проверки неотправленных черновиков с force-stop между ними. Затем проверяет force-stop/start, реальную остановку API, persisted logout intent и SQL revoke/отсутствие лишних sessions. Останавливает test Compose без удаления volume; local окружение/.env не меняются. Артефакты 0600 в ops/.runtime/checks не содержат token/password.
+Нужен отдельный запущенный test emulator (по умолчанию emulator-5556, можно задать ANDROID_TEST_SERIAL). Скрипт выбирает его явно, поднимает accounting-test, временно включает test registration, настраивает adb reverse8444 и выполняет 9 базовых + 53 реальных API/UI tests и отдельный native overview outage, затем два native этапа проверки неотправленных черновиков с force-stop между ними. Затем проверяет force-stop/start, реальную остановку API, persisted logout intent и SQL revoke/отсутствие лишних sessions. Останавливает test Compose без удаления volume; local окружение/.env не меняются. Артефакты 0600 в ops/.runtime/checks не содержат token/password.
 
 Приемка: **65/65 instrumentation executions PASS без skips**, actual TLS/PostgreSQL, runtime restart/outage/logout PASS. Без api_origin пятьдесят три network tests явно skip, их нельзя считать принятыми обычным standalone android-device-check. Release unsigned APK собирается для проверки ресурсов через aapt2, без публикации; local CA не входит в release. Настройка TLS: [официальная Network Security Configuration](https://developer.android.com/privacy-and-security/security-config).
 
@@ -143,3 +143,8 @@ Split дохода/расхода и комиссии показывает ра�
 ### Шаг 45: идентификатор обращения при ошибке API/auth
 
 ApiFailure получает canonical UUID из X-Request-ID; понятные сообщения AuthViewModel показывают его для обращения в поддержку. Невалидный/отсутствующий ID не выводится, exception не содержит response body/credential. Целевая приемка — **2/2 actual ApiAuth/AuthScreen, 41/41 unit**, debug/build/lint PASS. Проверены реальные401 IDs, отображение ошибки входа, дальнейшие registration/logout/login/renew/recreation и отбрасывание небезопасного формата ID. Последний полный65/65 — шаг42; полный gate изменения не запускался. Durable financial rejection presentation и остальной UX audit, S3-05 и APP-03 остаются впереди.
+
+
+### Шаг 46: идентификатор финансового отказа после restart
+
+Room3 хранит nullable requestId для rejected/reconcile command; миграции1→2→3 сохраняют settings/key/body/scope. CommandRunner сохраняет reference вместе с terminal transition, UI показывает его после чтения сохраненной команды, terminal retry не заменяет ID. Целевая приемка — **8/8 actual CommandStore3/CommandApi1/AccountsScreen4, 41/41 unit**, debug/build/lint PASS. Проверены populated SQLite2→Room3, v1 migration, rejected reference reopen, guarded updates и UUID реального version conflict на экране. Скрипт полного gate теперь ожидает66 executions; последний принятый полный65/65 — шаг42. Далее оставшийся UX/spec audit, S3-05 и APP-03.

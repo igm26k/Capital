@@ -2,7 +2,7 @@
 
 Дата: 2026-10-12. Статус: in_progress.
 
-Сервер/веб приняты в S3-07B. APP-01 завершена. В APP-02 приняты bearer/Keystore auth, devices/revoke, durable commands, ручные финансовые операции, scoped drafts/guards, отдельные редакторы, навигация и действия из деталей. Последний полный gate — 65/65 device и 35/35 unit PASS (шаг42); шаг43 принят на 8/8 целевых device; шаг44 — 4/4 целевых device; шаг45 — 2/2 целевых device и 41/41 unit. APP-02 остается in_progress: полный UX/spec audit и сквозная web сверка еще не приняты; массовая классификация принята в шаге36. S3-05 atomic outbox/mirror/staging и APP-03 Android→server→web остаются следующими пакетами. Банковские источники — финальный этап.
+Сервер/веб приняты в S3-07B. APP-01 завершена. В APP-02 приняты bearer/Keystore auth, devices/revoke, durable commands, ручные финансовые операции, scoped drafts/guards, отдельные редакторы, навигация и действия из деталей. Последний полный gate — 65/65 device и 35/35 unit PASS (шаг42); шаг43 принят на 8/8 целевых device; шаг44 — 4/4 целевых device; шаг45 — 2/2 целевых device; шаг46 — 8/8 целевых device и 41/41 unit. APP-02 остается in_progress: полный UX/spec audit и сквозная web сверка еще не приняты; массовая классификация принята в шаге36. S3-05 atomic outbox/mirror/staging и APP-03 Android→server→web остаются следующими пакетами. Банковские источники — финальный этап.
 
 ## APP-01 принята — 2026-10-06
 
@@ -331,3 +331,10 @@ History filters показывают ошибки search/from/to/page limit у �
 ApiClient извлекает X-Request-ID из неуспешного HTTP response в ApiFailure. Пропускается только canonical lowercase UUID; arbitrary header/body/trace не выводится. AuthViewModel errorMessage добавляет идентификатор к прежнему понятному сообщению; IOException message остается HTTP status и не содержит body/credential. Отсутствующий/невалидный ID не меняет текст ошибки. Этот шаг принимает transport/auth presentation; durable financial rejection presentation и остальные UX требования остаются в audit.
 
 Целевая приемка **2/2 real TLS API/PostgreSQL native tests**: ApiAuthTest проверяет IDs реальных401, AuthScreenTest видит ID ошибочного входа, затем сохраняет прежние registration/logout/login/renew/recreation сценарии. **41/41 unit**, debug/build/lint PASS; новый unit отвергает arbitrary/oversized/multiline identifiers и принимает canonical UUID без изменения exception message. Artifact android-request-id-focused.txt0600. Полный gate изменения не запускался; последний полный65/65 — шаг42. Общий план in_progress; далее оставшийся UX/spec audit, S3-05 и APP-03.
+
+
+## Шаг 46: durable идентификатор финансового отказа — 2026-10-12
+
+Room v3 добавляет nullable requestId к financial_commands, миграция2→3 сохраняет scope/key/body/settings и цепочку1→2→3. CommandRunner сохраняет safe API request UUID вместе с terminal rejected/reconcile transition; terminal retry не перезаписывает reference. FinancialCommandStatus показывает идентификатор из сохраненной команды. Pending/confirmed не допускают requestId; confirm очищает reference. Bearer/password/response diagnostics не добавляются к Room.
+
+Целевая приемка **8/8 actual native**: CommandStore3 +CommandApi1 +AccountsScreen4 на TLS API/PostgreSQL. Новый migration test создает настоящую SQLite v2 с settings/pending command, открывает Room3, сверяет key/body/scope, сохраняет rejection UUID, reopen сохраняет exact command; повторный reject не заменяет reference. Прежняя v1 migration и confirmed reopen проходят. Реальный version conflict имеет UUID, terminal replay сохраняет его, экран счета показывает тот же ID. **41/41 unit**, debug/build/lint PASS. Экспортирована3.json; полный script обновлен до66 ожидаемых executions, полный gate шага не запускался. Последний полный65/65 — шаг42. Общий план in_progress; далее оставшийся UX/spec audit, S3-05 и APP-03.

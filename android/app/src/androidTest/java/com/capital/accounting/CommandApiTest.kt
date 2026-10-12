@@ -50,6 +50,8 @@ class CommandApiTest {
             val terminal = CommandRunner(db.commands()).send(credential)
             assertEquals("rejected", terminal.state)
             assertEquals("version_conflict", terminal.errorCode)
+            assertNotNull(terminal.requestId)
+            assertEquals(terminal.requestId, UUID.fromString(terminal.requestId).toString())
             assertEquals(stale, terminal.body)
             assertEquals(rejected.commandId, terminal.commandId)
             assertEquals(terminal, CommandRunner(db.commands()).send(credential))
