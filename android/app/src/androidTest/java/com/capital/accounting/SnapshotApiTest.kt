@@ -1,6 +1,9 @@
 package com.capital.accounting
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.room.Room
+import androidx.test.core.app.ApplicationProvider
+import com.capital.accounting.data.*
 import androidx.test.platform.app.InstrumentationRegistry
 import com.capital.accounting.api.*
 import kotlinx.coroutines.runBlocking
@@ -21,6 +24,11 @@ class SnapshotApiTest {
         val auth = decodeResponse<BearerAuth>(api.request("/auth/register", "POST", ApiClient.json.encodeToString(Register("snapshot-${UUID.randomUUID()}@example.test", "Synthetic snapshot password", "Snapshot API", "bearer", "UTC"))))
         val session = auth.credential(origin)
         val root = "/workspaces/${auth.workspace.id}"
+        val context = ApplicationProvider.getApplicationContext<CapitalApplication>()
+        val databaseName = "snapshot-api-${UUID.randomUUID()}.db"
+        val db = Room.databaseBuilder(context, CapitalDatabase::class.java, databaseName).build()
+        val store = SnapshotStore(db)
+        val scope = MirrorScope(origin, auth.profile.id, auth.workspace.id)
         suspend fun command(suffix: String, body: String): MutationResult = decodeResponse(api.request("$root/$suffix", "POST", body, session, UUID.randomUUID().toString(), session.generationId))
         try {
             val emptyId = UUID.randomUUID().toString()
@@ -40,6 +48,7 @@ class SnapshotApiTest {
             assertEquals("99000", changed.accounts.single().posted_balance_minor)
             assertEquals(snapshot, create())
             assertEquals(snapshot, decodeResponse<Snapshot>(api.request("$root/sync/snapshots/$id", session = session)))
+            store.begin(scope, snapshot)
             val items = mutableListOf<SnapshotItem>()
             var token: String? = snapshot.first_page_token
             val seen = mutableSetOf<String>(); var pages = 0
@@ -49,15 +58,21 @@ class SnapshotApiTest {
                 assertEquals(id, page.snapshot_id); assertEquals(snapshot.workspace_id, page.workspace_id)
                 assertEquals(snapshot.base_sequence, page.base_sequence); assertEquals(snapshot.generation_id, page.generation_id)
                 assertTrue(page.items.size <= 100)
+                store.append(scope, token, page)
                 items += page.items; token = page.next_page_token; pages++
             }
             assertEquals(2, pages); assertEquals(104, items.size)
+            store.install(scope)
+            val mirror = store.read(scope)!!
+            assertEquals(snapshot.generation_id, mirror.head.generation); assertEquals(snapshot.resume_cursor, mirror.head.cursor)
+            assertEquals("103", mirror.head.sequence); assertEquals(104, mirror.items.size)
+            assertEquals("100000", mirror.items.filterIsInstance<SnapshotItemAccount>().single().data.posted_balance_minor)
             assertEquals("100000", items.filterIsInstance<SnapshotItemAccount>().single().data.posted_balance_minor)
             assertEquals("opening", items.filterIsInstance<SnapshotItemTransaction>().single().data.kind)
             assertEquals(category.id, items.filterIsInstance<SnapshotItemCategory>().single().data.id)
             assertEquals(101, items.filterIsInstance<SnapshotItemTag>().size)
             assertEquals("99000", api.accounts(session).single().posted_balance_minor)
             assertEquals(2, api.transactions(session).size)
-        } finally { api.request("/auth/logout", "POST", session = session) }
+        } finally { db.close(); context.deleteDatabase(databaseName); api.request("/auth/logout", "POST", session = session) }
     }
 }

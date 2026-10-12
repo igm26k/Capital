@@ -20,12 +20,22 @@ interface SettingsDao {
     suspend fun save(settings: ConnectionSettings)
 }
 
-@Database(entities = [ConnectionSettings::class, FinancialCommand::class], version = 3, exportSchema = true)
+@Database(entities = [ConnectionSettings::class, FinancialCommand::class, SnapshotStage::class, SnapshotRecord::class, SnapshotToken::class, MirrorHead::class, MirrorRecord::class], version = 4, exportSchema = true)
 abstract class CapitalDatabase : RoomDatabase() {
     abstract fun settings(): SettingsDao
     abstract fun commands(): CommandDao
+    abstract fun snapshots(): SnapshotDao
 
     companion object {
+        val MIGRATION_3_4 = object : androidx.room.migration.Migration(3, 4) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE snapshot_stages (scope TEXT NOT NULL PRIMARY KEY, snapshot TEXT NOT NULL, descriptor TEXT NOT NULL, nextToken TEXT, received INTEGER NOT NULL, bytes INTEGER NOT NULL, lastKey TEXT, complete INTEGER NOT NULL)")
+                db.execSQL("CREATE TABLE snapshot_records (scope TEXT NOT NULL, entityType TEXT NOT NULL, entityId TEXT NOT NULL, payload TEXT NOT NULL, PRIMARY KEY(scope,entityType,entityId))")
+                db.execSQL("CREATE TABLE snapshot_tokens (scope TEXT NOT NULL, token TEXT NOT NULL, PRIMARY KEY(scope,token))")
+                db.execSQL("CREATE TABLE mirror_heads (scope TEXT NOT NULL PRIMARY KEY, generation TEXT NOT NULL, sequence TEXT NOT NULL, cursor TEXT NOT NULL)")
+                db.execSQL("CREATE TABLE mirror_records (scope TEXT NOT NULL, entityType TEXT NOT NULL, entityId TEXT NOT NULL, payload TEXT NOT NULL, PRIMARY KEY(scope,entityType,entityId))")
+            }
+        }
         val MIGRATION_2_3 = object : androidx.room.migration.Migration(2, 3) {
             override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE financial_commands ADD COLUMN requestId TEXT")
