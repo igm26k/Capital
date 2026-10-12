@@ -37,6 +37,9 @@ class OutboxSenderApiTest {
             val sending = OutboxLifecycle(db).claim(s)!!
             val original = api.request(sending.path, sending.method, sending.body, s, sending.actionId, sending.generation)
             // Commit reached the API, but the process did not save the reply.
+            val outcome = checkedActionOutcome(sending, api.request("/workspaces/${s.workspaceId}/actions/${sending.actionId}", session = s))
+            assertEquals("applied", outcome.state); assertEquals("1", outcome.group_sequence)
+            assertEquals(decodeResponse<MutationResult>(original), outcome.response_body)
             db.close(); db = open()
             val completed = OutboxSender(db).sendNext(s)!!
             assertEquals(first.copy(state = "applied"), completed); assertEquals(decodeResponse<MutationResult>(original), decodeResponse<MutationResult>(db.receipts().get(first.position)!!.payload))
@@ -51,6 +54,9 @@ class OutboxSenderApiTest {
             val confirmed = mirror.items.filterIsInstance<SnapshotItemTag>().first { it.data.id == local.id }.data
             val rejected = OutboxStore(db).enqueue(s, "tags/${local.id}", "PUT", ApiClient.json.encodeToString(TagUpdate("999", "Stale change", false)), listOf(OutboxBase("tag", local.id, confirmed.version)), emptyList(), listOf(OverlayEffect.upsert(SnapshotItemTag("tag", confirmed.copy(name = "Stale change")))))
             assertEquals(rejected.copy(state = "rejected"), OutboxSender(db).sendNext(s)); assertNull(OutboxSender(db).sendNext(s))
+            val rejectedOutcome = checkedActionOutcome(rejected, api.request("/workspaces/${s.workspaceId}/actions/${rejected.actionId}", session = s))
+            assertEquals("rejected", rejectedOutcome.state); assertEquals(409, rejectedOutcome.original_http_status)
+            assertTrue(rejectedOutcome.response_body is com.capital.accounting.api.Error)
             val failure = db.failures().get(rejected.position)!!
             assertEquals(409, failure.status); assertEquals("version_conflict", failure.code); assertNotNull(failure.requestId)
             db.close(); db = open(); assertEquals(failure, db.failures().get(rejected.position))

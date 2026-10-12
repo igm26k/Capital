@@ -4,6 +4,18 @@ package com.capital.accounting.api
 import kotlinx.serialization.*
 import kotlinx.serialization.json.*
 
+@Serializable(with = ActionResponseSerializer::class)
+sealed interface ActionResponse
+
+object ActionResponseSerializer : JsonContentPolymorphicSerializer<ActionResponse>(ActionResponse::class) {
+    override fun selectDeserializer(element: JsonElement): DeserializationStrategy<ActionResponse> =
+        when {
+            "action_id" in element.jsonObject -> MutationResult.serializer()
+            "code" in element.jsonObject -> Error.serializer()
+            else -> throw SerializationException("Invalid action response")
+        }
+}
+
 @Serializable(with = SnapshotItemSerializer::class)
 sealed interface SnapshotItem {
     val entity_type: String
@@ -218,7 +230,7 @@ data class MutationResult(
     val deleted: List<Tombstone>,
     val sync_group_sequence: String,
     val generation_id: String,
-) {
+) : ActionResponse {
     override fun toString() = "MutationResult([redacted])"
 }
 
@@ -924,4 +936,72 @@ data class SyncChanges(
     val generation_id: String,
 ) {
     override fun toString() = "SyncChanges([redacted])"
+}
+
+@Serializable
+data class ReceiptEntity(
+    val entity_type: String,
+    val id: String,
+    val version: String,
+) {
+    init {
+        require(entity_type in setOf("account", "transaction", "category", "tag")) { "Invalid ReceiptEntity.entity_type" }
+    }
+    override fun toString() = "ReceiptEntity([redacted])"
+}
+
+@Serializable
+data class FieldError(
+    val path: String,
+    val code: String,
+    val message: String,
+) {
+    override fun toString() = "FieldError([redacted])"
+}
+
+@Serializable
+data class ConflictVersion(
+    val entity_type: String,
+    val id: String,
+    val version: String,
+    val balance_version: String?,
+) {
+    init {
+        require(entity_type in setOf("account", "transaction", "category", "tag")) { "Invalid ConflictVersion.entity_type" }
+    }
+    override fun toString() = "ConflictVersion([redacted])"
+}
+
+@Serializable
+data class Error(
+    val request_id: String,
+    val code: String,
+    val message: String,
+    val field_errors: List<FieldError>,
+    val current_versions: List<ConflictVersion>,
+    val retry_after_seconds: Int?,
+) : ActionResponse {
+    init {
+        require(code in setOf("bad_request", "validation_error", "unauthenticated", "forbidden", "csrf_invalid", "not_found", "version_conflict", "idempotency_conflict", "dependent_transactions", "account_archived", "amount_out_of_range", "no_change", "rate_limited", "service_unavailable", "internal_error", "cursor_expired", "cursor_invalid", "snapshot_expired", "snapshot_too_large", "action_result_expired", "sync_group_too_large", "sync_generation_conflict", "registration_disabled")) { "Invalid Error.code" }
+    }
+    override fun toString() = "Error([redacted])"
+}
+
+@Serializable
+data class ActionOutcome(
+    val action_id: String,
+    val workspace_id: String,
+    val state: String,
+    val completed_at: String,
+    val response_expires_at: String,
+    val original_http_status: Int,
+    val group_sequence: String?,
+    val entity_refs: List<ReceiptEntity>,
+    val response_body: ActionResponse?,
+    val generation_id: String?,
+) {
+    init {
+        require(state in setOf("applied", "rejected")) { "Invalid ActionOutcome.state" }
+    }
+    override fun toString() = "ActionOutcome([redacted])"
 }
