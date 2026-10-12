@@ -7,6 +7,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.capital.accounting.api.*
 import com.capital.accounting.data.*
 import com.capital.accounting.sync.SnapshotBootstrap
+import java.net.URLEncoder
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.encodeToString
 import org.junit.Assert.*
@@ -44,4 +45,31 @@ class SnapshotBootstrapApiTest {
             assertEquals(original, decodeResponse<Snapshot>(api.request("$root/sync/snapshots/$id", session = session)))
         } finally { db.close(); context.deleteDatabase(name); api.request("/auth/logout", "POST", session = session) }
     }
+    @Test fun snapshotOvertakenByPullReturnsNewerMirrorWithoutThirdMaterialization() = runBlocking<Unit> {
+        val origin = InstrumentationRegistry.getArguments().getString("api_origin"); assumeTrue(origin != null)
+        val api = ApiClient(origin!!)
+        val auth = decodeResponse<BearerAuth>(api.request("/auth/register", "POST", ApiClient.json.encodeToString(Register("superseded-${UUID.randomUUID()}@example.test", "Synthetic superseded password", "Superseded API", "bearer", "UTC"))))
+        val saved = auth.credential(origin); val scope = MirrorScope(origin, saved.ownerId, saved.workspaceId); val root = "/workspaces/${scope.workspace}"
+        val context = ApplicationProvider.getApplicationContext<CapitalApplication>(); val name = "superseded-${UUID.randomUUID()}.db"
+        val db = Room.databaseBuilder(context, CapitalDatabase::class.java, name).build()
+        try {
+            val account = decodeResponse<MutationResult>(api.request("$root/accounts", "POST", ApiClient.json.encodeToString(AccountCreate(UUID.randomUUID().toString(), "Superseded cash", "cash", "KWD", "2026-10-01T12:00:00Z", "UTC", "100000")), saved, UUID.randomUUID().toString(), saved.generationId)).accounts.single()
+            val old = SnapshotBootstrap(db).load(saved)
+            val id = UUID.randomUUID().toString(); db.snapshots().start(SnapshotAttempt(scope.key, id))
+            val snapshot = decodeResponse<Snapshot>(api.request("$root/sync/snapshots", "POST", ApiClient.json.encodeToString(SnapshotCreate(id)), saved, id, saved.generationId))
+            SnapshotStore(db).begin(scope, snapshot)
+            val staged = decodeResponse<SnapshotPage>(api.request("$root/sync/snapshots/$id/pages?page_token=${URLEncoder.encode(snapshot.first_page_token, "UTF-8")}", session = saved))
+            SnapshotStore(db).append(scope, snapshot.first_page_token, staged)
+            api.request("$root/transactions", "POST", ApiClient.json.encodeToString(ExpenseCreate(UUID.randomUUID().toString(), "2026-10-06T12:00:00Z", "UTC", "Overtake snapshot", "", emptyList(), "expense", account.id, "1000", listOf(AllocationInput(UUID.randomUUID().toString(), null, "1000")))), saved, UUID.randomUUID().toString(), saved.generationId)
+            val page = decodeResponse<SyncChanges>(api.request("$root/sync/changes?cursor=${URLEncoder.encode(old.head.cursor, "UTF-8")}", session = saved))
+            PullStore(db).apply(scope, old.head, page)
+            val newer = SnapshotStore(db).read(scope)!!
+            assertEquals("2", newer.head.sequence)
+            val resumed = SnapshotBootstrap(db).load(saved)
+            assertEquals(newer, resumed); assertEquals("99000", resumed.items.filterIsInstance<SnapshotItemAccount>().single().data.posted_balance_minor)
+            assertNull(db.snapshots().stage(scope.key)); assertNull(db.snapshots().attempt(scope.key))
+            // Two snapshots remain live on the server: a third POST would have returned429.
+        } finally { db.close(); context.deleteDatabase(name); api.request("/auth/logout", "POST", session = saved) }
+    }
+
 }

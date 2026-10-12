@@ -69,6 +69,8 @@ data class ConfirmedMirror(val head: MirrorHead, val items: List<SnapshotItem>) 
     override fun toString() = "ConfirmedMirror([redacted])"
 }
 
+class SnapshotSuperseded(val newer: MirrorHead) : java.io.IOException("Snapshot superseded")
+
 class SnapshotStore(private val db: CapitalDatabase) {
     private val dao get() = db.snapshots()
     suspend fun begin(scope: MirrorScope, snapshot: Snapshot) = db.withTransaction {
@@ -91,7 +93,7 @@ class SnapshotStore(private val db: CapitalDatabase) {
         require(page.next_page_token == null || (page.next_page_token.isNotEmpty() && page.next_page_token != token && dao.tokenCount(scope.key, digest(page.next_page_token)) == 0))
         var previous = stage.lastKey
         val records = page.items.map { item ->
-            val (id, workspace, version, deleted) = identity(item)
+            val (id, workspace, version, deleted) = snapshotIdentity(item)
             uuid(id); sequence(version, positive = true)
             require(workspace == scope.workspace && deleted == null)
             val key = "${rank(item.entity_type)}:$id"
@@ -108,9 +110,11 @@ class SnapshotStore(private val db: CapitalDatabase) {
     suspend fun install(scope: MirrorScope) = db.withTransaction {
         val stage = requireNotNull(dao.stage(scope.key)); require(stage.complete)
         val snapshot = decodeResponse<Snapshot>(stage.descriptor)
+        dao.head(scope.key)?.let { current -> if (current.generation == snapshot.generation_id && BigInteger(snapshot.base_sequence) < BigInteger(current.sequence)) throw SnapshotSuperseded(current) }
         val records = dao.staged(scope.key); require(records.size == snapshot.item_count)
         val items = records.map { decodeResponse<SnapshotItem>(it.payload) }
-        validateGraph(items)
+        validateSnapshotGraph(items)
+        db.pull().clearTombstones(scope.key); db.pull().clearChanges(scope.key)
         dao.deleteConfirmed(scope.key)
         dao.confirmed(records.map { MirrorRecord(it.scope, it.entityType, it.entityId, it.payload) })
         dao.head(MirrorHead(scope.key, snapshot.generation_id, snapshot.base_sequence, snapshot.resume_cursor))
@@ -126,8 +130,8 @@ class SnapshotStore(private val db: CapitalDatabase) {
 }
 
 private fun rank(type: String) = listOf("category", "tag", "account", "transaction").indexOf(type).also { require(it >= 0) }
-private data class Identity(val id: String, val workspace: String, val version: String, val deleted: String?)
-private fun identity(item: SnapshotItem): Identity = when (item) {
+internal data class Identity(val id: String, val workspace: String, val version: String, val deleted: String?)
+internal fun snapshotIdentity(item: SnapshotItem): Identity = when (item) {
     is SnapshotItemAccount -> item.data.let { Identity(it.id, it.workspace_id, it.version, it.deleted_at) }
     is SnapshotItemTransaction -> item.data.let { Identity(it.id, it.workspace_id, it.version, it.deleted_at) }
     is SnapshotItemCategory -> item.data.let { Identity(it.id, it.workspace_id, it.version, it.deleted_at) }
@@ -135,7 +139,7 @@ private fun identity(item: SnapshotItem): Identity = when (item) {
 }
 
 /** References can cross page boundaries; validate only the complete staged graph. */
-private fun validateGraph(items: List<SnapshotItem>) {
+internal fun validateSnapshotGraph(items: List<SnapshotItem>) {
     val accounts = items.filterIsInstance<SnapshotItemAccount>().associate { it.data.id to it.data }
     val transactions = items.filterIsInstance<SnapshotItemTransaction>().associate { it.data.id to it.data }
     val categories = items.filterIsInstance<SnapshotItemCategory>().associate { it.data.id to it.data }

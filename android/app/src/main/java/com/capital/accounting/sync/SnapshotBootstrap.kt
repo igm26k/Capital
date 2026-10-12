@@ -53,6 +53,14 @@ class SnapshotBootstrap(private val db: CapitalDatabase) {
                         require(db.snapshots().finish(scope.key, attempt.snapshot) == 1)
                     }
                     return@withLock requireNotNull(SnapshotStore(db).read(scope))
+                } catch (e: SnapshotSuperseded) {
+                    return@withLock db.withTransaction {
+                        val newer = requireNotNull(SnapshotStore(db).read(scope))
+                        require(newer.head.generation == e.newer.generation && java.math.BigInteger(newer.head.sequence) >= java.math.BigInteger(e.newer.sequence))
+                        SnapshotStore(db).discard(scope, attempt.snapshot)
+                        require(db.snapshots().finish(scope.key, attempt.snapshot) == 1)
+                        newer
+                    }
                 } catch (e: ApiFailure) {
                     if (e.status != 410 || e.code != "snapshot_expired") throw e
                     db.withTransaction {
@@ -61,7 +69,7 @@ class SnapshotBootstrap(private val db: CapitalDatabase) {
                     }
                 }
             }
-            throw IOException("Snapshot expired during bootstrap")
+            throw IOException("Snapshot changed during bootstrap")
         }
     }
     companion object { private val gates = mutableMapOf<String, Mutex>() }

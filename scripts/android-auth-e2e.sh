@@ -26,6 +26,7 @@ run_suite() {
 run_suite 'com.capital.accounting.FoundationTest,com.capital.accounting.CommandStoreTest,com.capital.accounting.CredentialVaultTest,com.capital.accounting.SettingsScreenTest' 7 ops/.runtime/checks/android-foundation-instrumentation.txt
 run_suite com.capital.accounting.FinancialDraftStoreTest 2 ops/.runtime/checks/android-draft-store-instrumentation.txt
 run_suite com.capital.accounting.SnapshotStoreTest 4 ops/.runtime/checks/android-snapshot-store-instrumentation.txt
+run_suite com.capital.accounting.PullStoreTest 3 ops/.runtime/checks/android-pull-store-instrumentation.txt
 run_suite com.capital.accounting.DraftGuardScreenTest 1 ops/.runtime/checks/android-draft-guard-instrumentation.txt
 run_suite com.capital.accounting.LinkedDraftGuardScreenTest 1 ops/.runtime/checks/android-linked-draft-guard-instrumentation.txt
 run_suite com.capital.accounting.CatalogDraftGuardScreenTest 1 ops/.runtime/checks/android-catalog-draft-guard-instrumentation.txt
@@ -38,7 +39,7 @@ python3 scripts/check-android-draft-runtime.py "$adb" "$serial"
 run_suite com.capital.accounting.ApiAuthTest 1 ops/.runtime/checks/android-api-auth-instrumentation.txt
 run_suite com.capital.accounting.CommandApiTest 1 ops/.runtime/checks/android-command-api-instrumentation.txt
 run_suite com.capital.accounting.SnapshotApiTest 1 ops/.runtime/checks/android-snapshot-api-instrumentation.txt
-run_suite com.capital.accounting.SnapshotBootstrapApiTest 1 ops/.runtime/checks/android-snapshot-bootstrap-api-instrumentation.txt
+run_suite com.capital.accounting.SnapshotBootstrapApiTest 2 ops/.runtime/checks/android-snapshot-bootstrap-api-instrumentation.txt
 run_suite com.capital.accounting.PullApiTest 1 ops/.runtime/checks/android-pull-api-instrumentation.txt
 run_suite com.capital.accounting.AccountApiTest 1 ops/.runtime/checks/android-account-api-instrumentation.txt
 run_suite com.capital.accounting.DevicesScreenTest 1 ops/.runtime/checks/android-devices-instrumentation.txt
@@ -58,4 +59,4 @@ python3 scripts/check-android-auth-runtime.py "$adb" "$serial"
 python3 scripts/check-android-financial-runtime.py "$adb" "$serial"
 python3 scripts/check-android-snapshot-bootstrap.py "$adb" "$serial"
 python3 scripts/check-android-release-trust.py "$sdk"
-echo 'PASS 76/76 real Android instrumentation executions and auth runtime acceptance'
+echo 'PASS 80/80 real Android instrumentation executions and auth runtime acceptance'

@@ -50,11 +50,18 @@ class PullApiTest {
                     val changed = changes.filterIsInstance<WorkspaceChangeTransactionUpsert>().single()
                     assertEquals(if (sequence == "2") "1000" else "2000", changed.data.allocations.single().amount_minor)
                 }
-                captured = captured.copy(sequence = sequence, cursor = page.next_cursor)
+                PullStore(db).apply(scoped, captured, page)
+                captured = SnapshotStore(db).read(scoped)!!.head
+                assertEquals(sequence, captured.sequence)
             }
             val empty = pull(captured.cursor); assertTrue(empty.groups.isEmpty()); assertFalse(empty.has_more)
             assertEquals("4", validatedPullSequence(scoped, captured, empty))
-            assertEquals(baseline, SnapshotStore(db).read(scoped)) // This layer validates; Room application follows separately.
+            PullStore(db).apply(scoped, captured, empty)
+            val mirror = SnapshotStore(db).read(scoped)!!
+            assertEquals("4", mirror.head.sequence)
+            assertEquals("200000", mirror.items.filterIsInstance<SnapshotItemAccount>().single().data.posted_balance_minor)
+            assertEquals(1, mirror.items.filterIsInstance<SnapshotItemTransaction>().size)
+            assertEquals(expense.id, db.pull().tombstones(scoped.key).single().entityId)
             assertEquals("200000", api.accounts(saved).single().posted_balance_minor)
             assertEquals(1, api.transactions(saved).size)
         } finally { db.close(); context.deleteDatabase(name); api.request("/auth/logout", "POST", session = saved) }
