@@ -68,5 +68,6 @@ python3 scripts/check-android-financial-runtime.py "$adb" "$serial"
 python3 scripts/check-android-snapshot-bootstrap.py "$adb" "$serial"
 python3 scripts/check-android-cursor-runtime.py "$adb" "$serial"
 python3 scripts/check-android-offline-mirror.py "$adb" "$serial"
+python3 scripts/check-android-outbox-expiry.py "$adb" "$serial"
 python3 scripts/check-android-release-trust.py "$sdk"
-echo 'PASS 90/90 real Android instrumentation executions and auth runtime acceptance'
+echo 'PASS 108/108 real Android instrumentation executions and auth runtime acceptance'
