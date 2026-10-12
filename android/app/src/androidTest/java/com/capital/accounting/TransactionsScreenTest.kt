@@ -134,7 +134,7 @@ class TransactionsScreenTest {
         assertNull(runBlocking { app.database.commands().get(origin, auth.profile.id, auth.workspace.id) })
         field("Сумма операции", "0")
         click("Сохранить операцию")
-        waitFor("Проверьте положительную сумму, счет, дату, часовой пояс и длину текста.")
+        waitFor("Сумма должна быть больше нуля.")
         assertEquals(3, runBlocking { api.transactions(auth.credential(origin)).size })
         val pending = runBlocking {
             com.capital.accounting.finance.CommandRunner(app.database.commands()).prepare(auth.credential(origin), "transactions", "POST",

@@ -90,4 +90,47 @@ class FieldValidationScreenTest {
         assertEquals(1, runBlocking { api.tags(session) }.size)
         assertNull(runBlocking { app.database.commands().get(origin, auth.profile.id, auth.workspace.id) })
     }
+    @Test fun incomeAndExpenseValidateRawFieldsAndSplitBeforeAnyCommand() {
+        waitFor("Создайте первый счет")
+        click("Добавить счет"); field("Название счета", "Operations account")
+        field("Дата открытия (YYYY-MM-DDTHH:MM:SS)", "2026-10-01T12:00:00")
+        field("Часовой пояс открытия", "UTC"); click("Создать счет")
+        waitFor("Изменить счет Operations account")
+        val session = auth.credential(origin)
+        val baseline = runBlocking { api.accounts(session) }
+        fun unchanged() = runBlocking {
+            assertEquals(baseline, api.accounts(session))
+            assertEquals(1, api.transactions(session).size)
+            assertNull(app.database.commands().get(origin, auth.profile.id, auth.workspace.id))
+        }
+        click("Расход")
+        field("Сумма операции", "invalid")
+        field("Дата операции (YYYY-MM-DDTHH:MM:SS)", "2026-02-30T12:00:00")
+        field("Часовой пояс операции", "Unknown/Zone")
+        field("Получатель операции", "x".repeat(201))
+        field("Примечание операции", "x".repeat(2001))
+        click("Сохранить операцию"); focus("Сумма операции"); unchanged()
+        compose.onNodeWithText("Сумма операции").assertTextContains("invalid")
+        field("Сумма операции", "3,00"); click("Сохранить операцию"); focus("Дата операции (YYYY-MM-DDTHH:MM:SS)"); unchanged()
+        field("Дата операции (YYYY-MM-DDTHH:MM:SS)", "2026-10-06T12:00:00"); click("Сохранить операцию"); focus("Часовой пояс операции"); unchanged()
+        field("Часовой пояс операции", "UTC"); click("Сохранить операцию"); focus("Получатель операции"); unchanged()
+        field("Получатель операции", "Vendor"); click("Сохранить операцию"); focus("Примечание операции"); unchanged()
+        field("Примечание операции", "Validated expense")
+        click("Добавить часть операции")
+        field("Сумма части 1", "1,00"); field("Сумма части 2", "1,00")
+        click("Сохранить операцию"); focus("Сумма части 1"); unchanged()
+        field("Сумма части 2", "2,00"); click("Сохранить операцию")
+        waitFor("Детали операции Validated expense")
+        click("Доход"); field("Сумма операции", "0"); click("Сохранить операцию"); focus("Сумма операции")
+        assertEquals(2, runBlocking { api.transactions(session) }.size)
+        assertNull(runBlocking { app.database.commands().get(origin, auth.profile.id, auth.workspace.id) })
+        field("Сумма операции", "4,00"); field("Примечание операции", "Validated income"); click("Сохранить операцию")
+        waitFor("Детали операции Validated income")
+        val records = runBlocking { api.transactions(session) }
+        assertEquals(3, records.size)
+        assertEquals(listOf("100", "200"), records.single { it.note == "Validated expense" }.allocations.map { it.amount_minor }.sorted())
+        assertEquals("100", runBlocking { api.accounts(session) }.single().posted_balance_minor)
+        assertNull(runBlocking { app.database.commands().get(origin, auth.profile.id, auth.workspace.id) })
+    }
+
 }

@@ -47,13 +47,14 @@ fun TransactionPanel(model: AuthViewModel) {
     var occurred by rememberFinancialDraft("transaction.occurred") { SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.ROOT).format(Date()) }
     var zone by rememberFinancialDraft("transaction.zone") { TimeZone.getDefault().id }
     var error by remember { mutableStateOf("") }
+    val validation = remember(scope, scope.epoch) { FieldValidation() }
     var parts by rememberFinancialDraft("transaction.parts") { listOf(AllocationDraft()) }
     var selectedTags by rememberFinancialDraft<List<String>>("transaction.selectedTags") { emptyList() }
     val account = eligible.find { it.id == accountId } ?: if (accountId == null) eligible.firstOrNull() else null
     fun reset(targetKind: String = "expense") {
         editingId = null; editingVersion = ""; original = null; kind = targetKind; accountId = null; amount = ""; note = ""; payee = ""
         occurred = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.ROOT).format(Date()); zone = TimeZone.getDefault().id
-        parts = listOf(AllocationDraft()); selectedTags = emptyList(); error = ""
+        parts = listOf(AllocationDraft()); selectedTags = emptyList(); error = ""; validation.reset()
     }
     fun close() {
         if (enabled && !scope.saving) guard.request { reset(); navigation.value = null }
@@ -61,6 +62,7 @@ fun TransactionPanel(model: AuthViewModel) {
     fun createOperation(targetKind: String) { if (state.accountsLoaded && !createRouter.routeToFirstAccount(state)) guard.request { reset(targetKind); navigation.value = "transaction" } }
     HandleFinancialCreate("transaction", enabled) { createOperation(if (it.kind == FinancialCreation.INCOME) "income" else "expense") }
     fun editOperation(transaction: Transaction) { guard.request {
+        validation.reset()
         original = transaction; editingId = transaction.id; editingVersion = transaction.version; kind = transaction.kind
         accountId = transaction.entries.first().account_id
         amount = Money.display(transaction.allocations.fold(BigInteger.ZERO) { sum, item -> sum + BigInteger(item.amount_minor) }.toString(), transaction.entries.first().currency).removeSuffix(" ${transaction.entries.first().currency}")
@@ -161,11 +163,11 @@ fun TransactionPanel(model: AuthViewModel) {
                     TextButton(enabled = enabled, onClick = { accountId = item.id }) { Text("Для операции: ${item.name} · ${item.currency}") }
                 }
                 Text(if (account == null) "Обновите счета и выберите активный счет." else "Выбран счет: ${account.name} · ${account.currency}")
-                OutlinedTextField(amount, { amount = it }, label = { Text("Сумма операции") }, enabled = enabled, singleLine = true)
-                OutlinedTextField(occurred, { occurred = it }, label = { Text("Дата операции (YYYY-MM-DDTHH:MM:SS)") }, enabled = enabled, singleLine = true)
-                OutlinedTextField(zone, { zone = it }, label = { Text("Часовой пояс операции") }, enabled = enabled, singleLine = true)
-                OutlinedTextField(payee, { payee = it }, label = { Text("Получатель операции") }, enabled = enabled, singleLine = true)
-                OutlinedTextField(note, { note = it }, label = { Text("Примечание операции") }, enabled = enabled)
+                ValidatedTextField(amount, { amount = it }, "Сумма операции", "amount", validation, enabled)
+                ValidatedTextField(occurred, { occurred = it }, "Дата операции (YYYY-MM-DDTHH:MM:SS)", "occurred", validation, enabled)
+                ValidatedTextField(zone, { zone = it }, "Часовой пояс операции", "zone", validation, enabled)
+                ValidatedTextField(payee, { payee = it }, "Получатель операции", "payee", validation, enabled)
+                ValidatedTextField(note, { note = it }, "Примечание операции", "note", validation, enabled, singleLine = false)
                 parts.forEachIndexed { index, part ->
                     Text("Часть ${index + 1}: ${categoryPath(part.categoryId, state.categories)}")
                     TextButton(enabled = enabled, onClick = { parts = parts.map { if (it.id == part.id) it.copy(categoryId = null) else it } }) { Text("Без категории для части ${index + 1}") }
@@ -173,7 +175,7 @@ fun TransactionPanel(model: AuthViewModel) {
                         TextButton(enabled = enabled, onClick = { parts = parts.map { if (it.id == part.id) it.copy(categoryId = category.id) else it } }) { Text("Категория части ${index + 1}: ${categoryPath(category.id, state.categories)}") }
                     }
                     if (parts.size > 1) {
-                        OutlinedTextField(part.amount, { value -> parts = parts.map { if (it.id == part.id) it.copy(amount = value) else it } }, label = { Text("Сумма части ${index + 1}") }, enabled = enabled, singleLine = true)
+                        key(part.id) { ValidatedTextField(part.amount, { value -> parts = parts.map { if (it.id == part.id) it.copy(amount = value) else it } }, "Сумма части ${index + 1}", "part.${part.id}", validation, enabled) }
                         TextButton(enabled = enabled, onClick = { parts = parts.filterNot { it.id == part.id } }) { Text("Убрать часть ${index + 1}") }
                     }
                 }
@@ -185,7 +187,10 @@ fun TransactionPanel(model: AuthViewModel) {
                     }
                 }
                 if (error.isNotEmpty()) Text(error)
-                Button(enabled = enabled && account != null && (editingId == null || state.transactions.any { it.id == editingId }), onClick = {
+                Button(enabled = enabled && account != null && (editingId == null || state.transactions.any { it.id == editingId }), onClick = save@{
+                    error = ""
+                    val currency = account?.currency ?: return@save
+                    if (!validation.submit(transactionFieldErrors(amount, occurred, zone, payee, note, currency, parts))) return@save
                     try {
                         val selected = requireNotNull(account)
                         val minor = Money.minor(amount, selected.currency)
