@@ -154,6 +154,64 @@ class HistoryScreenTest {
         assertNull(runBlocking { app.database.commands().get(origin, auth.profile.id, auth.workspace.id) })
     }
 
+    @Test fun historySummariesAndActionsFollowFiltersWithoutLosingBulkSelectionOrEditorGraph() {
+        fun directClick(text: String) {
+            compose.waitUntil(30000) { compose.onAllNodes(hasText(text) and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithText(text).performScrollTo().performClick()
+        }
+        val session = auth.credential(origin)
+        runBlocking {
+            create("transactions", ApiClient.json.encodeToString(TransferCreate(UUID.randomUUID().toString(), "2026-10-06T08:13:00Z", "UTC", "History transfer", "History peer", emptyList(), "transfer", cash.id, other.id, "1000", "100", null, null)))
+            create("transactions", ApiClient.json.encodeToString(RefundCreate(UUID.randomUUID().toString(), "2026-10-06T08:14:00Z", "UTC", "History refund", "History refund recipient", emptyList(), "refund", cash.id, "100", first.id, first.version, null, listOf(RefundAllocationInput(UUID.randomUUID().toString(), first.allocations.single().id, "100")))))
+            val current = api.accounts(session).single { it.id == cash.id }
+            create("accounts/${cash.id}/adjustments", ApiClient.json.encodeToString(AdjustmentCreate(UUID.randomUUID().toString(), current.balance_version, "96000", "History reconciliation", "History adjustment", "UTC")))
+        }
+        val before = runBlocking { api.transactions(session) }
+        val balances = runBlocking { api.accounts(session) }
+        waitFor("Вы вошли: ${auth.profile.email}")
+        directClick("Обновить счета")
+        directClick("Обновить категории и теги")
+        directClick("Обновить историю")
+        waitFor("Изменить перевод History transfer")
+        compose.onNodeWithText("Изменить возврат History refund").assertExists()
+        compose.onNodeWithText("Изменить корректировку History adjustment").assertExists()
+        directClick("Фильтры истории")
+        directClick("Тип истории: Расход")
+        directClick("Применить фильтры истории")
+        waitFor("Показано операций: 3")
+        compose.onAllNodesWithText("Счета истории: History cash · KWD").assertCountEquals(2)
+        compose.onAllNodesWithText("Счета истории: History USD · USD").assertCountEquals(1)
+        compose.onAllNodesWithText("Категории истории: History meals").assertCountEquals(3)
+        compose.onAllNodesWithText("Контрагент истории: History recipient").assertCountEquals(3)
+        listOf("перевод History transfer", "возврат History refund", "корректировку History adjustment").forEach { label ->
+            compose.onNodeWithText("Изменить $label").assertDoesNotExist()
+            compose.onNodeWithText("Удалить $label").assertDoesNotExist()
+        }
+        directClick("Выбрать доступные операции на странице")
+        waitFor("Выбрано для классификации: 2")
+        compose.onNodeWithContentDescription("Массовый тег History trip").performScrollTo().performClick()
+        directClick("Тип истории: Перевод")
+        directClick("Применить фильтры истории")
+        waitFor("Показано операций: 1")
+        compose.onNodeWithText("Счета истории: History cash · KWD, History USD · USD").assertExists()
+        compose.onNodeWithText("Контрагент истории: History peer").assertExists()
+        directClick("Изменить перевод History transfer")
+        waitFor("Вернуться к истории переводов")
+        compose.onNodeWithText("Примечание перевода").assertTextContains("History transfer")
+        compose.onNodeWithContentDescription("Массовый тег History trip").assertDoesNotExist()
+        directClick("Вернуться к истории переводов")
+        if (compose.onAllNodesWithText("Сохранить измененный черновик?").fetchSemanticsNodes().isNotEmpty()) directClick("Отбросить черновик и продолжить")
+        waitFor("Выбрано для классификации: 2")
+        compose.onNodeWithContentDescription("Массовый тег History trip").assertIsOn()
+        directClick("Сбросить фильтры истории")
+        waitFor("Изменить возврат History refund")
+        compose.onNodeWithText("Изменить корректировку History adjustment").assertExists()
+        assertEquals(before, runBlocking { api.transactions(session) })
+        assertEquals(balances, runBlocking { api.accounts(session) })
+        val app = ApplicationProvider.getApplicationContext<CapitalApplication>()
+        assertNull(runBlocking { app.database.commands().get(origin, auth.profile.id, auth.workspace.id) })
+    }
+
     @Test fun realUiFiltersPagingRecreationAndResetKeepFullEditorGraph() {
         waitFor("Вы вошли: ${auth.profile.email}")
         click("Обновить счета"); waitFor("Для операции: History cash · KWD")

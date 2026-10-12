@@ -139,7 +139,7 @@ fun AdjustmentPanel(model: AuthViewModel) {
             Button(enabled = enabled && state.transactions.any { it.id == item.id }, onClick = { model.submitTransaction(ApiClient.json.encodeToString(TransactionDelete(item.version, emptyList())), item.id, delete = true); deleting = null }) { Text("Подтвердить удаление корректировки") }
             TextButton(enabled = enabled, onClick = { deleting = null }) { Text("Отменить удаление корректировки") }
         }
-        state.transactions.filter { it.kind == "adjustment" }.forEach { item ->
+        (state.historyItems ?: state.transactions).filter { it.kind == "adjustment" }.forEach { item ->
             val active = state.accounts.any { it.id == item.entries.single().account_id && it.archived_at == null && it.deleted_at == null }
             TextButton(enabled = enabled && active, onClick = { editAdjustment(item) }) { Text("Изменить корректировку ${item.note}") }
             TextButton(enabled = enabled && active, onClick = { deleteAdjustment(item) }) { Text("Удалить корректировку ${item.note}") }

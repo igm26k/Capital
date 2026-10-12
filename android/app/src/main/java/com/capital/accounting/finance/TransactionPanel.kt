@@ -123,7 +123,7 @@ fun TransactionPanel(model: AuthViewModel) {
     }
     if (navigation.value == null) Button(enabled = !state.busy, onClick = model::loadTransactions) { Text("Обновить историю") }
     if (!editorOpen && LocalFinancialSection.current.value == "operations") {
-        BulkClassificationControls(bulk)
+        if (navigation.value == null) BulkClassificationControls(bulk)
         Text("Новая операция", style = MaterialTheme.typography.titleLarge)
         Row {
             TextButton(enabled = enabled && !scope.saving, onClick = { createOperation("expense") }) { Text("Расход") }
@@ -242,6 +242,12 @@ fun TransactionPanel(model: AuthViewModel) {
                 else -> "Корректировка"
             }
             Text("$label · ${transaction.entries.joinToString { Money.display(it.amount_minor, it.currency) }} · ${transaction.note}")
+            Text("Счета истории: ${transaction.entries.map { entry ->
+                val account = state.accounts.find { it.id == entry.account_id }
+                "${account?.name ?: "Недоступный счет"} · ${entry.currency}${if (account?.archived_at != null) " · В архиве" else ""}"
+            }.distinct().sortedBy { it.lowercase(Locale.ROOT) }.joinToString(", ")}")
+            if (transaction.allocations.isNotEmpty()) Text("Категории истории: ${transaction.allocations.map { categoryPath(it.category_id, state.categories) }.distinct().joinToString("; ")}")
+            Text("Контрагент истории: ${transaction.payee.ifEmpty { "Не указан" }}")
             TextButton(enabled = !state.busy && state.persisted, onClick = { model.openTransactionDetails(transaction.id) }) { Text("Детали операции ${transaction.note.ifEmpty { label }}") }
             if (transaction.kind in listOf("income", "expense") && transaction.parent_transaction_id == null) {
                 TextButton(enabled = enabled, onClick = {

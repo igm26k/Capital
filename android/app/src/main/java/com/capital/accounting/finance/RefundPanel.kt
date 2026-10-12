@@ -184,7 +184,7 @@ fun RefundPanel(model: AuthViewModel) {
             }) { Text("Подтвердить удаление возврата") }
             TextButton(enabled = enabled, onClick = { deleting = null; deletingParent = null; deletingTransfer = null }) { Text("Отменить удаление возврата") }
         }
-        state.transactions.filter { it.kind == "refund" }.forEach { refund ->
+        (state.historyItems ?: state.transactions).filter { it.kind == "refund" }.forEach { refund ->
             val original = state.transactions.find { it.id == refund.parent_transaction_id }
             val linked = state.transactions.find { it.id == original?.parent_transaction_id }
             val available = original != null && (original.parent_transaction_id == null || linked != null)

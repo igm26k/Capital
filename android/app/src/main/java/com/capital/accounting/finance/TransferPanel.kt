@@ -261,7 +261,7 @@ fun TransferPanel(model: AuthViewModel) {
             }) { Text("Подтвердить удаление перевода") }
             TextButton(enabled = enabled, onClick = { deleting = null; deletingFee = null }) { Text("Отменить удаление перевода") }
         }
-        state.transactions.filter { it.kind == "transfer" }.forEach { transfer ->
+        (state.historyItems ?: state.transactions).filter { it.kind == "transfer" }.forEach { transfer ->
             TextButton(enabled = enabled && (transfer.fee_transaction_id == null || state.transactions.any { it.id == transfer.fee_transaction_id }), onClick = { editTransfer(transfer, state.transactions.find { it.id == transfer.fee_transaction_id }) }) { Text("Изменить перевод ${transfer.note}") }
             TextButton(enabled = enabled, onClick = { deleteTransfer(transfer, state.transactions.find { it.id == transfer.fee_transaction_id }) }) { Text("Удалить перевод ${transfer.note}") }
         }

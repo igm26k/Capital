@@ -113,6 +113,7 @@ class AccountsScreenTest {
         field("Начальный остаток", "invalid")
         click("KWD")
         fun systemBack() {
+            compose.waitUntil(10000) { compose.onAllNodes(hasText("Вернуться к счетам") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
             val descriptor = InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand("input keyevent KEYCODE_BACK")
             android.os.ParcelFileDescriptor.AutoCloseInputStream(descriptor).use { it.readBytes() }
         }
