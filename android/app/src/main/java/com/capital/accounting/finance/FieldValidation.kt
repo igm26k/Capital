@@ -149,3 +149,22 @@ fun adjustmentFieldErrors(target: String, current: String, currency: String, rea
     if (note.length > 2000) errors["note"] = "Примечание должно содержать не более 2000 символов."
     return errors
 }
+
+
+fun historyFieldErrors(search: String, from: String, to: String, limit: String): Map<String, String> {
+    val errors = linkedMapOf<String, String>()
+    if (search.length > 200) errors["search"] = "Поиск должен содержать не более 200 символов."
+    for ((key, value) in listOf("from" to from, "to" to to)) {
+        if (value.isNotEmpty()) try {
+            com.capital.accounting.api.TransactionFilter(from = value)
+        } catch (_: Exception) { errors[key] = "Введите существующую дату UTC, например 2026-10-06T08:00:00Z." }
+    }
+    if ("from" !in errors && "to" !in errors && from.isNotEmpty() && to.isNotEmpty()) try {
+        com.capital.accounting.api.TransactionFilter(from = from, to = to)
+    } catch (_: IllegalArgumentException) {
+        errors["from"] = "Начало периода должно быть раньше окончания."
+        errors["to"] = "Окончание периода должно быть позже начала."
+    }
+    if (limit.toIntOrNull() !in 1..100) errors["limit"] = "Введите целое число от 1 до 100."
+    return errors
+}

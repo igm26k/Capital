@@ -133,3 +133,8 @@ Transfer+fee — отдельный editor с системным Back/закры
 ### Шаг 43: распределенная сумма и остаток
 
 Split дохода/расхода и комиссии показывает распределенную сумму и остаток с валютой, включая отрицательный остаток при превышении. Расчет точный BigInteger/Money, invalid values дают пояснение; raw drafts/versions/commands не меняются. Целевая приемка — **8/8 actual native (FieldValidation4+Transfers4), 37/37 unit**, debug/build/lint PASS. Проверены under/exact/over allocation, fee remainder, KWD precision и суммы preview сверх предела одной операции. Полный gate данного изменения не запускался; последний полный 65/65 — шаг42. Далее оставшийся UX/spec audit, S3-05 и APP-03.
+
+
+### Шаг 44: ошибки полей фильтра истории
+
+Поиск, даты UTC и размер страницы показывают собственные ошибки и фокус первой ошибки. Период использует TransactionFilter contract и microsecond ordering; invalid apply сохраняет текущую историю/applied filter/raw inputs без API read. Reset и успешное применение очищают сообщения. Целевая приемка — **4/4 actual HistoryScreenTest, 40/40 unit**, debug/build/lint PASS. Проверены независимые ошибки/фокус/неизменный список, исправление и reset, прежние pagination/recreation/account shortcuts/full graph/bulk selection. Последний полный65/65 gate — шаг42; данного изменения полный gate не запускался. Далее оставшийся UX/spec audit, S3-05 и APP-03.

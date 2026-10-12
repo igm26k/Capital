@@ -19,12 +19,13 @@ fun HistoryFilters(model: AuthViewModel) {
     var to by remember { mutableStateOf(state.historyFilter?.to ?: "") }
     var limit by remember { mutableStateOf(state.historyLimit.toString()) }
     var error by remember { mutableStateOf("") }
+    val validation = remember(state.origin, state.auth?.profile?.id, state.auth?.workspace?.id) { FieldValidation() }
     LaunchedEffect(state.historyFilter, state.historyLimit) {
         val filter = state.historyFilter
         account = filter?.accountId; category = filter?.categoryId; tag = filter?.tagId
         kind = filter?.kind; status = filter?.status
         search = filter?.search ?: ""; from = filter?.from ?: ""; to = filter?.to ?: ""
-        limit = state.historyLimit.toString(); error = ""
+        limit = state.historyLimit.toString(); error = ""; validation.reset()
     }
     val enabled = !state.busy && state.persisted
     state.historyFilter?.accountId?.let { id ->
@@ -33,10 +34,10 @@ fun HistoryFilters(model: AuthViewModel) {
     TextButton(onClick = { expanded = !expanded }) { Text(if (expanded) "Скрыть фильтры истории" else "Фильтры истории") }
     if (expanded) {
         Text("Период: от включительно, до не включительно. Время UTC, например 2026-10-06T08:00:00Z.")
-        OutlinedTextField(search, { search = it }, label = { Text("Поиск по примечанию и получателю") }, enabled = enabled, singleLine = true)
-        OutlinedTextField(from, { from = it }, label = { Text("История от (UTC)") }, enabled = enabled, singleLine = true)
-        OutlinedTextField(to, { to = it }, label = { Text("История до (UTC)") }, enabled = enabled, singleLine = true)
-        OutlinedTextField(limit, { limit = it }, label = { Text("Операций на странице (1–100)") }, enabled = enabled, singleLine = true)
+        ValidatedTextField(search, { search = it }, "Поиск по примечанию и получателю", "search", validation, enabled)
+        ValidatedTextField(from, { from = it }, "История от (UTC)", "from", validation, enabled)
+        ValidatedTextField(to, { to = it }, "История до (UTC)", "to", validation, enabled)
+        ValidatedTextField(limit, { limit = it }, "Операций на странице (1–100)", "limit", validation, enabled)
         Text("Счет: ${state.accounts.find { it.id == account }?.name ?: "Все счета"}")
         TextButton(enabled = enabled, onClick = { account = null }) { Text("История: все счета") }
         state.accounts.forEach { item -> TextButton(enabled = enabled, onClick = { account = item.id }) { Text("История: счет ${item.name}") } }
@@ -53,7 +54,9 @@ fun HistoryFilters(model: AuthViewModel) {
         TextButton(enabled = enabled, onClick = { status = null }) { Text("История: все статусы") }
         TransactionFilter.statuses.forEach { (value, label) -> TextButton(enabled = enabled, onClick = { status = value }) { Text("Статус истории: $label") } }
         if (error.isNotEmpty()) Text(error)
-        Button(enabled = enabled, onClick = {
+        Button(enabled = enabled, onClick = apply@{
+            error = ""
+            if (!validation.submit(historyFieldErrors(search, from, to, limit))) return@apply
             try {
                 val pageSize = limit.toInt(); require(pageSize in 1..100)
                 val filter = TransactionFilter(account, category, tag, from.takeIf { it.isNotEmpty() }, to.takeIf { it.isNotEmpty() }, kind, status, search)
@@ -62,7 +65,7 @@ fun HistoryFilters(model: AuthViewModel) {
         }) { Text("Применить фильтры истории") }
     }
     if (expanded || state.historyFilter != null) TextButton(enabled = enabled, onClick = {
-        account = null; category = null; tag = null; kind = null; status = null; search = ""; from = ""; to = ""; error = ""
+        account = null; category = null; tag = null; kind = null; status = null; search = ""; from = ""; to = ""; error = ""; validation.reset()
         model.clearHistoryFilters()
     }) { Text("Сбросить фильтры истории") }
     if (state.historyFilter != null) Text(if (state.historyFilter.active) "Фильтры истории применены" else "Все операции по страницам")
