@@ -13,6 +13,7 @@ import com.capital.accounting.api.*
 import com.capital.accounting.data.ConnectionSettings
 import com.capital.accounting.data.FinancialCommand
 import com.capital.accounting.data.IdentityStore
+import com.capital.accounting.data.OfflineRefundStore
 import com.capital.accounting.data.OfflineTransferStore
 import com.capital.accounting.data.OfflineBasicStore
 import com.capital.accounting.data.OfflineAccountStore
@@ -62,6 +63,7 @@ data class AuthState(
     val financeBlocked: Boolean = true, val accountConflict: Account? = null, val transactionConflict: Transaction? = null, val categoryConflict: Category? = null, val tagConflict: Tag? = null,
 
 ) {
+    val canQueueRefunds get() = canQueueCatalog
     val canQueueTransfers get() = canQueueCatalog
     val canQueueBasicCreates get() = canQueueCatalog
     val canQueueAccounts get() = canQueueCatalog
@@ -484,7 +486,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val store = OfflineBasicStore(app.database)
                 val kind = ApiClient.json.parseToJsonElement(body).jsonObject["kind"]?.jsonPrimitive?.content ?: state.transactions.find { it.id == id }?.kind
-                val queued = if (kind == "transfer") OfflineTransferStore(app.database).let { if (id == null) it.create(saved, body) else if (delete) it.delete(saved, body, id) else it.replace(saved, body, id) } else if (id == null) store.create(saved, body) else if (delete) store.delete(saved, body, id) else store.replace(saved, body, id)
+                val queued = if (kind == "refund") OfflineRefundStore(app.database).let { if (id == null) it.create(saved, body) else if (delete) it.delete(saved, body, id) else it.replace(saved, body, id) } else if (kind == "transfer") OfflineTransferStore(app.database).let { if (id == null) it.create(saved, body) else if (delete) it.delete(saved, body, id) else it.replace(saved, body, id) } else if (id == null) store.create(saved, body) else if (delete) store.delete(saved, body, id) else store.replace(saved, body, id)
                 val projection = requireNotNull(LocalProjectionStore(app.database).read(MirrorScope(saved.origin, saved.ownerId, saved.workspaceId)))
                 val recordId = id ?: requireNotNull(ApiClient.json.parseToJsonElement(body).jsonObject["id"]).jsonPrimitive.content
                 state = state.withProjection(projection).copy(busy = false, localCollectionReceipt = LocalCollectionReceipt(queued.actionId, "transactions", recordId, id == null, delete, kind),

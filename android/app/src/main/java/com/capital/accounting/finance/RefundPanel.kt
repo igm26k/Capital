@@ -17,11 +17,12 @@ import java.util.*
 @Composable
 fun RefundPanel(model: AuthViewModel) {
     val state = model.state
-    val enabled = !state.busy && !state.financeBlocked && state.persisted
+    val enabled = !state.busy && state.persisted && !state.financeBlocked || state.canQueueRefunds
     val guard = rememberDraftGuard("refund", enabled, render = false)
     val scope = LocalFinancialDraftScope.current
     val navigation = LocalFinancialEditor.current
     val editorOpen = navigation.value == "refund"
+    var handledLocalReceipt by remember { mutableStateOf(state.localCollectionReceipt?.actionId) }
     var handledReceipt by remember { mutableStateOf(state.transactionReceipt?.commandId) }
     var editingId by rememberFinancialDraft<String?>("refund.editingId") { null }
     var editingVersion by rememberFinancialDraft("refund.editingVersion") { "" }
@@ -74,7 +75,20 @@ fun RefundPanel(model: AuthViewModel) {
     } }
     fun deleteRefund(refund: Transaction, original: Transaction?, linked: Transaction?) { deleting = refund; deletingParent = original; deletingTransfer = linked }
     HandleFinancialTransaction("refund", enabled) { if (it.action == FinancialTransactionAction.EDIT) editRefund(it.transaction, requireNotNull(it.parent), it.transfer) else deleteRefund(it.transaction, it.parent, it.transfer) }
-    LaunchedEffect(state.financialCommand?.commandId, state.transactionReceipt?.commandId, state.accounts, state.transactions) {
+    LaunchedEffect(state.financialCommand?.commandId, state.transactionReceipt?.commandId, state.localCollectionReceipt?.actionId, state.accounts, state.transactions) {
+        val local = state.localCollectionReceipt
+        if (local != null && local.actionId != handledLocalReceipt) {
+            handledLocalReceipt = local.actionId
+            if (local.collection == "transactions" && local.kind == "refund" && (local.created && editingId == null || local.recordId == editingId)) {
+                if (local.deleted) reset()
+                else {
+                    editingVersion = state.transactions.find { it.id == local.recordId }?.version ?: editingVersion
+                    parentVersion = state.transactions.find { it.id == parentId }?.version ?: parentVersion
+                    transferVersion = state.transactions.find { it.id == transfer?.id }?.version ?: transferVersion
+                }
+                guard.markClean(); if (navigation.value == "refund") navigation.value = null
+            }
+        }
         val command = state.financialCommand
         if (command == null) {
             val receipt = state.transactionReceipt
@@ -151,8 +165,8 @@ fun RefundPanel(model: AuthViewModel) {
                 }
             }
             if (parent != null && (parent.version != parentVersion || transfer?.version != transferVersion)) {
-                Text("Версия расхода на сервере: ${parent.version}; черновика: $parentVersion")
-                Text("Версия связанного перевода: ${transfer?.version ?: "нет"}; черновика: ${transferVersion ?: "нет"}")
+                Text(if (("transaction" to parent.id) in state.localAffected) "Ожидаемая версия расхода: ${parent.version}; черновика: $parentVersion" else "Версия расхода на сервере: ${parent.version}; черновика: $parentVersion")
+                Text(if (transfer != null && ("transaction" to transfer.id) in state.localAffected) "Ожидаемая версия связанного перевода: ${transfer.version}; черновика: ${transferVersion ?: "нет"}" else "Версия связанного перевода: ${transfer?.version ?: "нет"}; черновика: ${transferVersion ?: "нет"}")
                 Button(enabled = enabled && (parent.parent_transaction_id == null || transfer != null), onClick = { parentVersion = parent.version; transferVersion = transfer?.version }) { Text("Использовать обновленные версии расхода и перевода") }
             }
             if (error.isNotEmpty()) Text(error)
@@ -172,7 +186,7 @@ fun RefundPanel(model: AuthViewModel) {
                 } catch (_: Exception) { error = "Проверьте положительные суммы частей, доступный возврат, счет, дату и длину текста." }
             }) { Text(if (editingId == null) "Сохранить возврат" else "Сохранить изменения возврата") }
             if (edited != null && edited.version != editingVersion) {
-                Text("Версия возврата на сервере: ${edited.version}; черновика: $editingVersion")
+                Text(if (("transaction" to edited.id) in state.localAffected) "Ожидаемая версия возврата: ${edited.version}; черновика: $editingVersion" else "Версия возврата на сервере: ${edited.version}; черновика: $editingVersion")
                 Button(enabled = enabled, onClick = { editingVersion = edited.version }) { Text("Использовать обновленную версию возврата") }
             }
             state.transactionConflict?.takeIf { it.kind == "refund" }?.let { Text("Возврат на сервере: ${it.note}; версия ${it.version}") }

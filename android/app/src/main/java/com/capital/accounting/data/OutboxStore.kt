@@ -73,6 +73,31 @@ class OutboxStore(private val db: CapitalDatabase) {
                     require(data.entity_type == base.entityType)
                     val collection = when (base.entityType) { "tag" -> "tags"; "category" -> "categories"; "transaction" -> "transactions"; else -> "accounts" }
                     val expected = when {
+                        base.entityType == "transaction" && parent.method in setOf("POST", "PUT") &&
+                            ApiClient.json.parseToJsonElement(parent.body).jsonObject["kind"]?.jsonPrimitive?.content == "refund" -> {
+                            val input = if (parent.method == "POST") decodeResponse<RefundCreate>(parent.body) else decodeResponse<RefundReplace>(parent.body).let {
+                                RefundCreate(parent.path.substringAfterLast('/'), it.occurred_at, it.occurred_timezone, it.note, it.payee, it.tag_ids, it.kind, it.account_id,
+                                    it.amount_minor, it.parent_transaction_id, it.expected_parent_version, it.expected_transfer_version, it.allocations)
+                            }
+                            require(parent.path == if (parent.method == "POST") "/workspaces/${saved.workspaceId}/transactions" else "/workspaces/${saved.workspaceId}/transactions/${input.id}")
+                            if (base.entityId == input.id) {
+                                if (parent.method == "POST") "1" else (BigInteger(decodeResponse<RefundReplace>(parent.body).expected_version) + BigInteger.ONE).toString()
+                            } else if (base.entityId == input.parent_transaction_id) (BigInteger(input.expected_parent_version) + BigInteger.ONE).toString()
+                            else {
+                                val effect = requireNotNull(db.outbox().overlays(parent.position).find { it.entityType == "transaction" && it.entityId == input.parent_transaction_id && it.operation == "upsert" })
+                                val expense = decodeResponse<SnapshotItemTransaction>(requireNotNull(effect.payload)).data
+                                require(expense.kind == "expense" && expense.parent_transaction_id == base.entityId)
+                                (BigInteger(requireNotNull(input.expected_transfer_version)) + BigInteger.ONE).toString()
+                            }
+                        }
+                        base.entityType == "transaction" && parent.method == "DELETE" && parent.path.startsWith("/workspaces/${saved.workspaceId}/transactions/") -> {
+                            uuid(parent.path.substringAfterLast('/'))
+                            val related = decodeResponse<TransactionDelete>(parent.body).related_versions.single { it.id == base.entityId }
+                            val observed = ApiClient.json.decodeFromString<List<OutboxBase>>(parent.baseVersions).single { it.entityType == "transaction" && it.entityId == base.entityId && it.field == "version" }
+                            require(related.version == observed.version)
+                            (BigInteger(related.version) + BigInteger.ONE).toString()
+                        }
+
                         parent.method == "POST" && parent.path == "/workspaces/${saved.workspaceId}/$collection" -> {
                             require((when (base.entityType) { "tag" -> decodeResponse<TagCreate>(parent.body).id; "category" -> decodeResponse<CategoryCreate>(parent.body).id; "account" -> decodeResponse<AccountCreate>(parent.body).id; else -> { val parsed = ApiClient.json.parseToJsonElement(parent.body).jsonObject; if (parsed["kind"]?.jsonPrimitive?.content == "transfer") { val input = decodeResponse<TransferCreate>(parent.body); require(base.entityId in listOfNotNull(input.id, input.fee?.id)); base.entityId } else { require(parsed["kind"]?.jsonPrimitive?.content in setOf("income", "expense")); requireNotNull(parsed["id"]).jsonPrimitive.content } } }) == base.entityId); "1"
                         }
@@ -89,7 +114,7 @@ class OutboxStore(private val db: CapitalDatabase) {
                             parent.method in setOf("PUT", "DELETE") && parent.path.startsWith("/workspaces/${saved.workspaceId}/transactions/") && parent.path.substringAfterLast('/').matches(Regex("[a-f0-9-]{36}"))) -> {
                             val parsed = ApiClient.json.parseToJsonElement(parent.body).jsonObject
                             val accountId = parsed["account_id"]?.jsonPrimitive?.content
-                            require(parent.method == "DELETE" || parsed["kind"]?.jsonPrimitive?.content in setOf("income", "expense") || parsed["kind"]?.jsonPrimitive?.content == "transfer")
+                            require(parent.method == "DELETE" || parsed["kind"]?.jsonPrimitive?.content in setOf("income", "expense", "refund", "transfer"))
                             if (parent.method == "POST") {
                                 if (parsed["kind"]?.jsonPrimitive?.content == "transfer") {
                                     val input = decodeResponse<TransferCreate>(parent.body)

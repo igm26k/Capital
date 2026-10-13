@@ -25,7 +25,7 @@ import java.io.File
 import java.security.MessageDigest
 import java.util.UUID
 
-private const val offlineTagBanner = "Нет соединения. Показаны сохраненные данные; они могут быть устаревшими. Новые переводы, доходы и расходы, изменения счетов, категорий и тегов сохраняются на устройстве."
+private const val offlineTagBanner = "Нет соединения. Показаны сохраненные данные; они могут быть устаревшими. Доходы, расходы, переводы и возвраты, изменения счетов, категорий и тегов сохраняются на устройстве."
 private fun commandHash(body: String) = MessageDigest.getInstance("SHA-256").digest(body.toByteArray()).joinToString("") { "%02x".format(it) }
 @RunWith(AndroidJUnit4::class)
 class OfflineTagPrepareTest {
@@ -57,6 +57,26 @@ class OfflineTagRuntimeTest {
     private fun click(text: String) {
         compose.waitUntil(30000) { compose.onAllNodes(hasText(text) and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText(text).performScrollTo().performClick()
+    }
+    private fun refundCreate(label: String, note: String, amount: String) {
+        click(label); wait("Сумма части возврата 1")
+        compose.onNodeWithText("Сумма части возврата 1").performTextInput(amount)
+        compose.onNodeWithText("Дата возврата (YYYY-MM-DDTHH:MM:SS)").performTextClearance(); compose.onNodeWithText("Дата возврата (YYYY-MM-DDTHH:MM:SS)").performTextInput("2026-10-13T12:15:00")
+        compose.onNodeWithText("Часовой пояс возврата").performTextClearance(); compose.onNodeWithText("Часовой пояс возврата").performTextInput("UTC")
+        compose.onNodeWithText("Примечание возврата").performTextInput(note)
+        click("Сохранить возврат")
+        compose.waitUntil(60000) { compose.onAllNodesWithText("Сумма части возврата 1").fetchSemanticsNodes().isEmpty() }
+    }
+    private fun refundEdit(note: String, amount: String? = null, newNote: String? = null) {
+        click("Изменить возврат $note"); wait("Сумма части возврата 1")
+        amount?.let { compose.onNodeWithText("Сумма части возврата 1").performTextClearance(); compose.onNodeWithText("Сумма части возврата 1").performTextInput(it) }
+        newNote?.let { compose.onNodeWithText("Примечание возврата").performTextClearance(); compose.onNodeWithText("Примечание возврата").performTextInput(it) }
+        click("Сохранить изменения возврата")
+        compose.waitUntil(60000) { compose.onAllNodesWithText("Сумма части возврата 1").fetchSemanticsNodes().isEmpty() }
+    }
+    private fun refundDelete(note: String) {
+        click("Удалить возврат $note"); click("Подтвердить удаление возврата")
+        compose.waitUntil(60000) { compose.onAllNodesWithText("Удалить возврат $note").fetchSemanticsNodes().isEmpty() }
     }
     @Test fun offlineCreateEditArchive() {
         wait(offlineTagBanner); compose.onNodeWithContentDescription("Раздел Еще").performClick(); wait("Тег: Existing offline tag")
@@ -128,6 +148,10 @@ class OfflineTagRuntimeTest {
             val projected = LocalProjectionStore(app.database).read(MirrorScope(saved.origin, saved.ownerId, saved.workspaceId))!!.visible
             assertEquals("112900", projected.accounts.single().posted_balance_minor)
         }
+        refundCreate("Создать возврат расхода Edited offline expense", "Offline refund", "1,000")
+        refundEdit("Offline refund", newNote = "Offline refund metadata")
+        refundEdit("Offline refund metadata", amount = "1,500")
+        refundDelete("Offline refund metadata")
         for (note in listOf("Edited offline expense", "Edited offline income")) {
             click("Удалить операцию $note"); click("Подтвердить удаление операции")
             compose.waitUntil(60000) { compose.onAllNodesWithText("Удалить операцию $note").fetchSemanticsNodes().isEmpty() }
@@ -146,10 +170,14 @@ class OfflineTagRuntimeTest {
         compose.onNodeWithText("Примечание перевода").performTextInput("Offline transfer")
         click("Добавить комиссию перевода"); click("Счет комиссии: Renamed offline cash · KWD")
         compose.onNodeWithText("Сумма комиссии перевода").performTextInput("0,111")
+        compose.onNodeWithText("Примечание комиссии перевода").performTextInput("Offline transfer fee")
         click("Категория комиссии 1: Offline parent")
         compose.onNodeWithContentDescription("Тег комиссии Offline second tag").performScrollTo().performClick()
         click("Сохранить перевод")
         compose.waitUntil(60000) { compose.onAllNodesWithText("Сумма списания перевода").fetchSemanticsNodes().isEmpty() }
+        refundCreate("Создать возврат комиссии Offline transfer fee", "Offline fee refund", "0,100")
+        refundEdit("Offline fee refund", amount = "0,050")
+        refundDelete("Offline fee refund")
         click("Изменить перевод Offline transfer"); wait("Сумма списания перевода")
         compose.onNodeWithText("Сумма списания перевода").performTextClearance(); compose.onNodeWithText("Сумма списания перевода").performTextInput("20,000")
         compose.onNodeWithText("Сумма комиссии перевода").performTextClearance(); compose.onNodeWithText("Сумма комиссии перевода").performTextInput("0,222")
@@ -163,10 +191,10 @@ class OfflineTagRuntimeTest {
         compose.waitUntil(60000) { compose.onAllNodesWithText("Сумма списания перевода").fetchSemanticsNodes().isEmpty() }
         click("Удалить перевод Offline transfer"); click("Подтвердить удаление перевода")
         compose.waitUntil(60000) { compose.onAllNodesWithText("Удалить перевод Offline transfer").fetchSemanticsNodes().isEmpty() }
-        wait("Локальные изменения ожидают синхронизации: 24.")
+        wait("Локальные изменения ожидают синхронизации: 31.")
         runBlocking {
             val data = JSONObject(proof.readText()); val scope = MirrorScope("https://localhost:8444", data.getString("owner"), data.getString("workspace"))
-            val commands = app.database.outbox().commands(scope.key); assertEquals(24, commands.size); assertTrue(commands.all { it.state == "queued" })
+            val commands = app.database.outbox().commands(scope.key); assertEquals(31, commands.size); assertTrue(commands.all { it.state == "queued" })
             val visible = LocalProjectionStore(app.database).read(scope)!!
             assertEquals(mapOf("Renamed offline cash" to "123456", "Offline target" to "10000"), visible.visible.accounts.associate { it.name to it.posted_balance_minor })
             assertTrue(visible.visible.transactions.all { it.kind == "opening" })
@@ -184,23 +212,23 @@ class OfflineTagRuntimeTest {
         compose.waitUntil(480000) {
             runBlocking { app.database.withTransaction {
                 val commands = app.database.outbox().commands(queuedScope.key)
-                commands.size == 24 && commands.all { it.state == "applied" && app.database.outbox().overlays(it.position).isEmpty() } &&
-                    app.database.snapshots().head(queuedScope.key)?.sequence == "25"
+                commands.size == 31 && commands.all { it.state == "applied" && app.database.outbox().overlays(it.position).isEmpty() } &&
+                    app.database.snapshots().head(queuedScope.key)?.sequence == "32"
             } }
         }
-        compose.waitUntil(60000) { compose.onAllNodesWithText("Локальные изменения ожидают синхронизации: 24.").fetchSemanticsNodes().isEmpty() }
+        compose.waitUntil(60000) { compose.onAllNodesWithText("Локальные изменения ожидают синхронизации: 31.").fetchSemanticsNodes().isEmpty() }
         compose.onNodeWithContentDescription("Раздел Еще").performClick(); wait("Тег: Edited offline first · В архиве"); wait("Тег: Offline second tag"); wait("Тег: Archived offline tag · В архиве"); wait("Категория: Offline parent / Archived child · В архиве")
         runBlocking {
             val scope = MirrorScope("https://localhost:8444", before.getString("owner"), before.getString("workspace")); val commands = app.database.outbox().commands(scope.key)
-            assertEquals(24, commands.size)
+            assertEquals(31, commands.size)
             for ((index, command) in commands.withIndex()) {
                 assertEquals(before.getJSONArray("actions").getString(index), command.actionId); assertEquals(before.getJSONArray("hashes").getString(index), commandHash(command.body))
                 assertEquals("applied", command.state); assertTrue(app.database.outbox().overlays(command.position).isEmpty())
             }
-            val mirror = SnapshotStore(app.database).read(scope)!!; assertEquals("25", mirror.head.sequence)
+            val mirror = SnapshotStore(app.database).read(scope)!!; assertEquals("32", mirror.head.sequence)
             assertEquals("2", mirror.items.filterIsInstance<SnapshotItemTag>().first { it.data.id == before.getString("tag") }.data.version)
             val account = mirror.items.filterIsInstance<SnapshotItemAccount>().single { it.data.name == "Renamed offline cash" }.data
-            assertEquals("123456", account.posted_balance_minor); assertEquals("15", account.version); assertEquals("12", account.balance_version); assertNull(account.archived_at)
+            assertEquals("123456", account.posted_balance_minor); assertEquals("21", account.version); assertEquals("18", account.balance_version); assertNull(account.archived_at)
             assertEquals("10000", mirror.finance().accounts.single { it.name == "Offline target" }.posted_balance_minor)
             assertTrue(mirror.finance().transactions.all { it.kind == "opening" })
             val creation = commands.single { it.path.endsWith("/transactions") && JSONObject(it.body).getString("kind") == "transfer" }
