@@ -39,7 +39,7 @@ data class TransactionReceipt(val commandId: String, val transactionId: String, 
     val transaction get() = records.find { it.id == transactionId }
 }
 
-data class LocalCollectionReceipt(val actionId: String, val collection: String, val recordId: String, val created: Boolean)
+data class LocalCollectionReceipt(val actionId: String, val collection: String, val recordId: String, val created: Boolean, val deleted: Boolean = false)
 
 data class CollectionReceipt(val commandId: String, val collection: String, val recordId: String, val created: Boolean, val result: MutationResult)
 data class ClassificationReceipt(val commandId: String, val ids: Set<String>)
@@ -476,14 +476,15 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     fun submitTransaction(body: String, id: String? = null, delete: Boolean = false) {
         if (!state.offline) { submitFinancial(body, if (id == null) "transactions" else "transactions/$id", if (delete) "DELETE" else if (id == null) "POST" else "PUT"); return }
         val saved = candidate ?: return
-        if (!state.canQueueBasicCreates || id != null || delete) return
+        if (!state.canQueueBasicCreates || delete && id == null) return
         state = state.copy(busy = true, message = "")
         viewModelScope.launch {
             try {
-                val queued = OfflineBasicStore(app.database).create(saved, body)
+                val store = OfflineBasicStore(app.database)
+                val queued = if (id == null) store.create(saved, body) else if (delete) store.delete(saved, body, id) else store.replace(saved, body, id)
                 val projection = requireNotNull(LocalProjectionStore(app.database).read(MirrorScope(saved.origin, saved.ownerId, saved.workspaceId)))
-                val recordId = requireNotNull(ApiClient.json.parseToJsonElement(body).jsonObject["id"]).jsonPrimitive.content
-                state = state.withProjection(projection).copy(busy = false, localCollectionReceipt = LocalCollectionReceipt(queued.actionId, "transactions", recordId, true),
+                val recordId = id ?: requireNotNull(ApiClient.json.parseToJsonElement(body).jsonObject["id"]).jsonPrimitive.content
+                state = state.withProjection(projection).copy(busy = false, localCollectionReceipt = LocalCollectionReceipt(queued.actionId, "transactions", recordId, id == null, delete),
                     message = "Операция сохранена на устройстве и ожидает синхронизации.")
                 synchronizeQueue()
             } catch (e: CancellationException) { throw e }

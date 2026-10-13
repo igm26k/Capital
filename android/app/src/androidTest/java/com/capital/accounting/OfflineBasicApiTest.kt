@@ -64,4 +64,69 @@ class OfflineBasicApiTest {
             assertEquals(incomeCommand.body, db.outbox().commands(scope.key).last().body)
         } finally { db.close(); context.deleteDatabase(name); api.request("/auth/logout", "POST", session = saved) }
     }
+    @Test fun replaceMoveMetadataDeleteForecastsSurviveRollbackRestartAndExactServerCoverage() = runBlocking<Unit> {
+        val origin = InstrumentationRegistry.getArguments().getString("api_origin"); assumeTrue(origin != null)
+        val api = ApiClient(origin!!)
+        val auth = decodeResponse<BearerAuth>(api.request("/auth/register", "POST", ApiClient.json.encodeToString(Register("offline-edit-${id()}@example.test", "synthetic edit password", "Offline edit", "bearer", "UTC"))))
+        val saved = auth.credential(origin); val scope = MirrorScope(origin, saved.ownerId, saved.workspaceId)
+        val context = ApplicationProvider.getApplicationContext<CapitalApplication>(); val name = "offline-edit-api.db"
+        context.deleteDatabase(name); fun open() = Room.databaseBuilder(context, CapitalDatabase::class.java, name).build()
+        var db = open()
+        try {
+            IdentityStore(db).save(auth, origin); SnapshotBootstrap(db).load(saved)
+            val first = id(); val second = id()
+            for (accountId in listOf(first, second)) OfflineAccountStore(db).create(saved, ApiClient.json.encodeToString(AccountCreate(accountId, accountId, "cash", "KWD", "2026-10-13T12:00:00Z", "UTC", "100000")))
+            val expense = ExpenseCreate(id(), "2026-10-13T12:05:00Z", "UTC", "Expense", "", emptyList(), "expense", first, "12345", listOf(AllocationInput(id(), null, "12345")))
+            val store = OfflineBasicStore(db); store.create(saved, ApiClient.json.encodeToString(expense))
+            val edit = ExpenseReplace(expense.occurred_at, "UTC", "Edited expense", "", emptyList(), "expense", first, "12345", expense.allocations, "1", null)
+            try { store.replace(saved, ApiClient.json.encodeToString(edit.copy(expected_version = "2")), expense.id); fail("Stale version accepted") } catch (_: IllegalArgumentException) { }
+            try { db.withTransaction { store.replace(saved, ApiClient.json.encodeToString(edit), expense.id); throw IOException("Synthetic interruption") }; fail("Missing fault") } catch (_: IOException) { }
+            assertEquals(3, db.outbox().commands(scope.key).size)
+            store.replace(saved, ApiClient.json.encodeToString(edit), expense.id)
+            var projected = LocalProjectionStore(db).read(scope)!!.visible
+            assertEquals("2", projected.accounts.single { it.id == first }.version)
+            assertEquals("2", projected.transactions.single { it.id == expense.id }.version)
+            val moved = edit.copy(account_id = second, amount_minor = "20000", allocations = listOf(AllocationInput(expense.allocations.single().id, null, "20000")), expected_version = "2")
+            store.replace(saved, ApiClient.json.encodeToString(moved), expense.id)
+            projected = LocalProjectionStore(db).read(scope)!!.visible
+            assertEquals("100000", projected.accounts.single { it.id == first }.posted_balance_minor)
+            assertEquals("80000", projected.accounts.single { it.id == second }.posted_balance_minor)
+            store.delete(saved, ApiClient.json.encodeToString(TransactionDelete("3", emptyList())), expense.id)
+            val income = IncomeCreate(id(), expense.occurred_at, "UTC", "Income", "", emptyList(), "income", second, "3333", listOf(AllocationInput(id(), null, "3333")))
+            store.create(saved, ApiClient.json.encodeToString(income))
+            store.replace(saved, ApiClient.json.encodeToString(IncomeReplace(income.occurred_at, "UTC", "Changed income", "", emptyList(), "income", second, "4444", listOf(AllocationInput(income.allocations.single().id, null, "4444")), "1")), income.id)
+            store.delete(saved, ApiClient.json.encodeToString(TransactionDelete("2", emptyList())), income.id)
+            val pending = db.outbox().commands(scope.key); assertEquals(9, pending.size)
+            projected = LocalProjectionStore(db).read(scope)!!.visible
+            assertTrue(projected.transactions.all { it.kind == "opening" }); assertTrue(projected.accounts.all { it.posted_balance_minor == "100000" })
+            assertEquals("3", projected.accounts.single { it.id == first }.version); assertEquals("6", projected.accounts.single { it.id == second }.version)
+            db.close(); db = open(); assertEquals(pending, db.outbox().commands(scope.key))
+            assertEquals(QueueDrainResult(9, QueueDrainStatus.IDLE), QueueCoordinator(db).drain(saved))
+            val mirror = SnapshotStore(db).read(scope)!!; assertEquals("9", mirror.head.sequence)
+            val finance = mirror.finance(); assertTrue(finance.transactions.all { it.kind == "opening" })
+            assertTrue(finance.accounts.all { it.posted_balance_minor == "100000" }); assertEquals("6", finance.accounts.single { it.id == second }.balance_version)
+            assertEquals(pending.map { it.copy(state = "applied") }, db.outbox().commands(scope.key))
+            assertTrue(db.outbox().commands(scope.key).all { db.outbox().overlays(it.position).isEmpty() })
+            assertEquals(QueueDrainResult(0, QueueDrainStatus.IDLE), QueueCoordinator(db).drain(saved))
+            val refundedExpense = expense.copy(id = id(), account_id = second, allocations = listOf(AllocationInput(id(), null, "12345")))
+            api.request("/workspaces/${saved.workspaceId}/transactions", "POST", ApiClient.json.encodeToString(refundedExpense), saved, id(), saved.generationId)
+            api.request("/workspaces/${saved.workspaceId}/transactions", "POST", ApiClient.json.encodeToString(RefundCreate(id(), "2026-10-13T12:10:00Z", "UTC", "Refund", "", emptyList(), "refund", second, "1000", refundedExpense.id, "1", null, listOf(RefundAllocationInput(id(), refundedExpense.allocations.single().id, "1000")))), saved, id(), saved.generationId)
+            MirrorSynchronizer(db).refresh(saved)
+            val guarded = edit.copy(account_id = second, allocations = refundedExpense.allocations, expected_version = "2", note = "Local metadata")
+            try { OfflineBasicStore(db).delete(saved, ApiClient.json.encodeToString(TransactionDelete("2", emptyList())), refundedExpense.id); fail("Refunded delete accepted") } catch (_: IllegalArgumentException) { }
+            try { OfflineBasicStore(db).replace(saved, ApiClient.json.encodeToString(guarded.copy(amount_minor = "12000", allocations = listOf(AllocationInput(refundedExpense.allocations.single().id, null, "12000")))), refundedExpense.id); fail("Refunded movement accepted") } catch (_: IllegalArgumentException) { }
+            val local = OfflineBasicStore(db).replace(saved, ApiClient.json.encodeToString(guarded), refundedExpense.id)
+            OfflineBasicStore(db).replace(saved, ApiClient.json.encodeToString(guarded.copy(expected_version = "3", note = "Dependent metadata")), refundedExpense.id)
+            assertEquals("11345", LocalProjectionStore(db).read(scope)!!.visible.transactions.single { it.id == refundedExpense.id }.allocations.single().remaining_refundable_minor)
+            api.request("/workspaces/${saved.workspaceId}/transactions/${refundedExpense.id}", "PUT", ApiClient.json.encodeToString(guarded.copy(note = "Other client")), saved, id(), saved.generationId)
+            assertEquals(QueueDrainResult(0, QueueDrainStatus.BLOCKED), QueueCoordinator(db).drain(saved))
+            val rejected = db.outbox().commands(scope.key).single { it.actionId == local.actionId }
+            assertEquals("rejected", rejected.state); assertEquals(local.body, rejected.body)
+            val conflict = LocalProjectionStore(db).read(scope)!!
+            assertEquals(2, conflict.blocked.size); assertEquals("Other client", conflict.visible.transactions.single { it.id == refundedExpense.id }.note)
+            assertEquals("88655", conflict.visible.accounts.single { it.id == second }.posted_balance_minor)
+
+        } finally { db.close(); context.deleteDatabase(name); api.request("/auth/logout", "POST", session = saved) }
+    }
+
 }

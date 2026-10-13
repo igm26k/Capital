@@ -63,7 +63,8 @@ class AuthScreenTest {
         assertEquals(email, identity.profile.email); assertEquals(registered.sessionId, identity.session.id)
         val cached = runBlocking { app.database.identities().get(MirrorScope(origin, registered.ownerId, registered.workspaceId).key)!! }
         assertFalse(cached.payload.contains(registered.token)); assertFalse(cached.payload.contains("access_token"))
-        compose.onNodeWithText("Выйти").performScrollTo().performClick()
+        compose.waitUntil(30000) { compose.onAllNodes(hasText("Выйти") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Выйти").assertIsEnabled().performScrollTo().performClick()
         compose.waitUntil(30000) { compose.onAllNodesWithText("Вы вышли из аккаунта").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Email").assertTextContains(email)
         assertTrue("Password must be cleared after logout", compose.onNodeWithText("Пароль").fetchSemanticsNode().config[SemanticsProperties.EditableText].text.isEmpty())
