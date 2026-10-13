@@ -6,6 +6,7 @@ import com.capital.accounting.auth.StoredSession
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import java.math.BigInteger
 import java.util.UUID
 
@@ -77,6 +78,13 @@ class OutboxStore(private val db: CapitalDatabase) {
                         }
                         parent.method == "PUT" && parent.path == "/workspaces/${saved.workspaceId}/$collection/${base.entityId}" ->
                             (BigInteger(when (base.entityType) { "tag" -> decodeResponse<TagUpdate>(parent.body).expected_version; "category" -> decodeResponse<CategoryUpdate>(parent.body).expected_version; else -> decodeResponse<AccountUpdate>(parent.body).expected_version }) + BigInteger.ONE).toString()
+                        parent.method == "POST" && base.entityType == "account" && parent.path == "/workspaces/${saved.workspaceId}/transactions" -> {
+                            val parsed = ApiClient.json.parseToJsonElement(parent.body).jsonObject
+                            val accountId = requireNotNull(parsed["account_id"]).jsonPrimitive.content
+                            require(accountId == base.entityId && parsed["kind"]?.jsonPrimitive?.content in setOf("income", "expense"))
+                            val observed = ApiClient.json.decodeFromString<List<OutboxBase>>(parent.baseVersions).single { it.entityType == "account" && it.entityId == base.entityId && it.field == "version" }
+                            (BigInteger(observed.version) + BigInteger.ONE).toString()
+                        }
                         else -> error("Invalid catalog dependency")
                     }
                     require(identity.id == base.entityId && identity.workspace == saved.workspaceId && identity.version == expected)
