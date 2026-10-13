@@ -13,6 +13,7 @@ import com.capital.accounting.api.*
 import com.capital.accounting.data.ConnectionSettings
 import com.capital.accounting.data.FinancialCommand
 import com.capital.accounting.data.IdentityStore
+import com.capital.accounting.data.OfflineTagStore
 import com.capital.accounting.data.LocalProjection
 import com.capital.accounting.data.LocalProjectionStore
 import com.capital.accounting.data.MirrorFinance
@@ -35,6 +36,8 @@ data class TransactionReceipt(val commandId: String, val transactionId: String, 
     val transaction get() = records.find { it.id == transactionId }
 }
 
+data class LocalCollectionReceipt(val actionId: String, val collection: String, val recordId: String, val created: Boolean)
+
 data class CollectionReceipt(val commandId: String, val collection: String, val recordId: String, val created: Boolean, val result: MutationResult)
 data class ClassificationReceipt(val commandId: String, val ids: Set<String>)
 
@@ -45,7 +48,8 @@ data class AuthState(
     val sessions: List<Session> = emptyList(), val revokePendingId: String? = null,
     val accounts: List<Account> = emptyList(), val transactions: List<Transaction> = emptyList(), val categories: List<Category> = emptyList(), val tags: List<Tag> = emptyList(), val financialCommand: FinancialCommand? = null,
     val detailStack: List<String> = emptyList(), val detailTransaction: Transaction? = null, val detailMissing: Boolean = false, val detailError: String = "",
-    val collectionReceipt: CollectionReceipt? = null,
+    val collectionReceipt: CollectionReceipt? = null, val localCollectionReceipt: LocalCollectionReceipt? = null,
+    val localAffected: Set<Pair<String, String>> = emptySet(),
     val classificationReceipt: ClassificationReceipt? = null,
     val accountsLoaded: Boolean = false, val overviewLoaded: Boolean = false, val overviewError: String = "", val overviewCached: Boolean = false, val offline: Boolean = false, val localPending: Int = 0, val localBlocked: Int = 0, val queueRunning: Boolean = false, val queueMessage: String = "",
     val transactionsLoaded: Boolean = false, val transactionReceipt: TransactionReceipt? = null,
@@ -53,7 +57,9 @@ data class AuthState(
     val historyLimit: Int = 50, val historyNextCursor: String? = null, val historyCursors: List<String> = emptyList(), val historyError: String = "",
     val financeBlocked: Boolean = true, val accountConflict: Account? = null, val transactionConflict: Transaction? = null, val categoryConflict: Category? = null, val tagConflict: Tag? = null,
 
-)
+) {
+    val canQueueTags get() = offline && auth != null && persisted && !busy && !logoutPending && revokePendingId == null && financialCommand == null && localBlocked == 0
+}
 
 class AuthViewModel(application: Application) : AndroidViewModel(application) {
     private val app = application as CapitalApplication
@@ -219,7 +225,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         transactions = finance.transactions, transactionsLoaded = true, categories = finance.categories, tags = finance.tags, overviewLoaded = true)
 
     private fun AuthState.withProjection(projection: LocalProjection): AuthState = withFinance(projection.visible).copy(
-        localPending = projection.pending.size, localBlocked = projection.blocked.size,
+        localPending = projection.pending.size, localBlocked = projection.blocked.size, localAffected = projection.affected,
         financeBlocked = offline || financialCommand != null || projection.pending.isNotEmpty() || projection.blocked.isNotEmpty())
 
     private suspend fun readFinance(saved: StoredSession): MirrorFinance {
@@ -232,7 +238,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         }
         val projection = requireNotNull(LocalProjectionStore(app.database).read(MirrorScope(saved.origin, saved.ownerId, saved.workspaceId)))
         require(projection.confirmed.head.generation == mirror.head.generation)
-        state = state.copy(localPending = projection.pending.size, localBlocked = projection.blocked.size)
+        state = state.copy(localPending = projection.pending.size, localBlocked = projection.blocked.size, localAffected = projection.affected)
         return projection.visible
     }
 
@@ -450,6 +456,23 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
 
     fun submitCatalog(body: String, collection: String, id: String? = null) {
         require(collection in setOf("categories", "tags"))
+        if (state.offline && collection == "tags") {
+            val saved = candidate ?: return
+            if (!state.canQueueTags) return
+            state = state.copy(busy = true, message = "")
+            viewModelScope.launch {
+                try {
+                    val queued = OfflineTagStore(app.database).enqueue(saved, body, id)
+                    val projection = requireNotNull(LocalProjectionStore(app.database).read(MirrorScope(saved.origin, saved.ownerId, saved.workspaceId)))
+                    val recordId = id ?: decodeResponse<TagCreate>(body).id
+                    state = state.withProjection(projection).copy(busy = false, localCollectionReceipt = LocalCollectionReceipt(queued.actionId, "tags", recordId, id == null),
+                        message = "Изменение тега сохранено на устройстве и ожидает синхронизации.")
+                    synchronizeQueue()
+                } catch (e: CancellationException) { throw e }
+                catch (_: Exception) { state = state.copy(busy = false, message = "Не удалось сохранить локальное изменение. Проверьте сессию и версию тега; черновик сохранен.") }
+            }
+            return
+        }
         submitFinancial(body, if (id == null) collection else "$collection/$id", if (id == null) "POST" else "PUT")
     }
 
