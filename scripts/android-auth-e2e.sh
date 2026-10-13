@@ -46,6 +46,7 @@ python3 scripts/check-android-overview-runtime.py "$adb" "$serial"
 run_suite com.capital.accounting.FinancialAddScreenTest 1 ops/.runtime/checks/android-add-ui-instrumentation.txt
 python3 scripts/check-android-draft-runtime.py "$adb" "$serial"
 run_suite com.capital.accounting.ApiAuthTest 1 ops/.runtime/checks/android-api-auth-instrumentation.txt
+run_suite com.capital.accounting.OfflineAccountApiTest 1 ops/.runtime/checks/android-offline-account-api-instrumentation.txt
 run_suite com.capital.accounting.CategoryDependencyApiTest 1 ops/.runtime/checks/android-category-dependency-api-instrumentation.txt
 run_suite com.capital.accounting.TagDependencyApiTest 1 ops/.runtime/checks/android-tag-dependency-api-instrumentation.txt
 run_suite com.capital.accounting.QueueWorkerApiTest 1 ops/.runtime/checks/android-queue-worker-api-instrumentation.txt
@@ -80,4 +81,4 @@ python3 scripts/check-android-queue-worker.py "$adb" "$serial"
 python3 scripts/check-android-queue-startup.py "$adb" "$serial"
 python3 scripts/check-android-offline-tags.py "$adb" "$serial"
 python3 scripts/check-android-release-trust.py "$sdk"
-echo 'PASS 129/129 real Android instrumentation executions and auth runtime acceptance'
+echo 'PASS 130/130 real Android instrumentation executions and auth runtime acceptance'

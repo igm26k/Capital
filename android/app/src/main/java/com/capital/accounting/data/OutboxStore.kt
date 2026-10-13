@@ -91,13 +91,15 @@ class OutboxStore(private val db: CapitalDatabase) {
         }
         var bytes = 0L
         for (effect in effects) {
-            type(effect.entityType); uuid(effect.entityId); require(effect.operation in setOf("upsert", "delete"))
-            if (effect.operation == "upsert") {
+            type(effect.entityType); uuid(effect.entityId); require(effect.operation in setOf("upsert", "delete", "opening"))
+            if (effect.operation in setOf("upsert", "opening")) {
+                if (effect.operation == "opening") validateLocalOpening(path, method, body, saved.workspaceId, effect)
                 val item = decodeResponse<SnapshotItem>(requireNotNull(effect.payload)); val identity = snapshotIdentity(item)
                 require(item.entity_type == effect.entityType && identity.id == effect.entityId && identity.workspace == saved.workspaceId && identity.deleted == null)
                 bytes += effect.payload.toByteArray(Charsets.UTF_8).size
             } else require(effect.payload == null)
         }
+        require(effects.count { it.operation == "opening" } <= 1)
         require(bytes <= 1024 * 1024)
         val command = OutboxCommand(scope = scope.key, actionId = action, origin = saved.origin, owner = saved.ownerId, workspace = saved.workspaceId,
             issuerSession = saved.sessionId, generation = saved.generationId, path = path, method = method, body = body,

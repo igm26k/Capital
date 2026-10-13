@@ -32,7 +32,9 @@ class OutboxOutcomeStore(private val db: CapitalDatabase) {
         if (outcome.state == "applied") {
             require(command.state != "rejected")
             val keys = outcome.entity_refs.map { it.entity_type to it.id }.toSet()
-            require(db.outbox().overlays(command.position).all { (it.entityType to it.entityId) in keys })
+            val effects = db.outbox().overlays(command.position)
+            if (effects.any { it.operation == "opening" } && outcome.response_body is MutationResult) validateAccountOpeningReceipt(command, outcome.response_body)
+            require(effects.filter { it.operation != "opening" }.all { (it.entityType to it.entityId) in keys })
             val receipt = db.receipts().get(command.position)
             if (receipt != null) {
                 require(receipt.generation == record.generation && receipt.sequence == record.sequence && command.state == "applied")

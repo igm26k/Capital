@@ -47,7 +47,9 @@ class OutboxReceiptStore(private val db: CapitalDatabase) {
             return@withTransaction existing
         }
         require(stored == command && command.state in setOf("sending", "uncertain"))
-        require(db.outbox().overlays(command.position).all { (it.entityType to it.entityId) in keys })
+        val effects = db.outbox().overlays(command.position)
+        if (effects.any { it.operation == "opening" }) validateAccountOpeningReceipt(command, result)
+        require(effects.filter { it.operation != "opening" }.all { (it.entityType to it.entityId) in keys })
         db.receipts().insert(receipt)
         db.failures().clear(command.position)
         require(db.outbox().transition(command.scope, command.actionId, command.state, "applied") == 1)

@@ -30,6 +30,11 @@ class LocalProjectionStore(private val db: CapitalDatabase) {
                 val key = effect.entityType to effect.entityId
                 when (effect.operation) {
                     "delete" -> { require(effect.payload == null); items.remove(key) }
+                    "opening" -> {
+                        validateLocalOpening(command.path, command.method, command.body, command.workspace,
+                            OverlayEffect(effect.entityType, effect.entityId, effect.operation, effect.payload))
+                        items[key] = decodeResponse<SnapshotItem>(requireNotNull(effect.payload))
+                    }
                     "upsert" -> {
                         val item = decodeResponse<SnapshotItem>(requireNotNull(effect.payload)); val identity = snapshotIdentity(item)
                         require(item.entity_type == effect.entityType && identity.id == effect.entityId && identity.workspace == scope.workspace && identity.deleted == null)
