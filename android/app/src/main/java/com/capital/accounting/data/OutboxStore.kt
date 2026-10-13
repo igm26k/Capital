@@ -76,13 +76,20 @@ class OutboxStore(private val db: CapitalDatabase) {
                         parent.method == "POST" && parent.path == "/workspaces/${saved.workspaceId}/$collection" -> {
                             require((when (base.entityType) { "tag" -> decodeResponse<TagCreate>(parent.body).id; "category" -> decodeResponse<CategoryCreate>(parent.body).id; "account" -> decodeResponse<AccountCreate>(parent.body).id; else -> { val parsed = ApiClient.json.parseToJsonElement(parent.body).jsonObject; if (parsed["kind"]?.jsonPrimitive?.content == "transfer") { val input = decodeResponse<TransferCreate>(parent.body); require(base.entityId in listOfNotNull(input.id, input.fee?.id)); base.entityId } else { require(parsed["kind"]?.jsonPrimitive?.content in setOf("income", "expense")); requireNotNull(parsed["id"]).jsonPrimitive.content } } }) == base.entityId); "1"
                         }
+                        parent.method == "PUT" && base.entityType == "transaction" && parent.path.startsWith("/workspaces/${saved.workspaceId}/transactions/") &&
+                            ApiClient.json.parseToJsonElement(parent.body).jsonObject["kind"]?.jsonPrimitive?.content == "transfer" -> {
+                            val input = decodeResponse<TransferReplace>(parent.body)
+                            val rootId = parent.path.substringAfterLast('/'); uuid(rootId)
+                            if (base.entityId == rootId) (BigInteger(input.expected_version) + BigInteger.ONE).toString()
+                            else { require(input.fee?.id == base.entityId); input.expected_fee_version?.let { (BigInteger(it) + BigInteger.ONE).toString() } ?: "1" }
+                        }
                         parent.method == "PUT" && parent.path == "/workspaces/${saved.workspaceId}/$collection/${base.entityId}" ->
                             (BigInteger(when (base.entityType) { "tag" -> decodeResponse<TagUpdate>(parent.body).expected_version; "category" -> decodeResponse<CategoryUpdate>(parent.body).expected_version; "account" -> decodeResponse<AccountUpdate>(parent.body).expected_version; else -> { val parsed = ApiClient.json.parseToJsonElement(parent.body).jsonObject; require(parsed["kind"]?.jsonPrimitive?.content in setOf("income", "expense")); requireNotNull(parsed["expected_version"]).jsonPrimitive.content } }) + BigInteger.ONE).toString()
                         base.entityType == "account" && (parent.method == "POST" && parent.path == "/workspaces/${saved.workspaceId}/transactions" ||
                             parent.method in setOf("PUT", "DELETE") && parent.path.startsWith("/workspaces/${saved.workspaceId}/transactions/") && parent.path.substringAfterLast('/').matches(Regex("[a-f0-9-]{36}"))) -> {
                             val parsed = ApiClient.json.parseToJsonElement(parent.body).jsonObject
                             val accountId = parsed["account_id"]?.jsonPrimitive?.content
-                            require(parent.method == "DELETE" || parsed["kind"]?.jsonPrimitive?.content in setOf("income", "expense") || parent.method == "POST" && parsed["kind"]?.jsonPrimitive?.content == "transfer")
+                            require(parent.method == "DELETE" || parsed["kind"]?.jsonPrimitive?.content in setOf("income", "expense") || parsed["kind"]?.jsonPrimitive?.content == "transfer")
                             if (parent.method == "POST") {
                                 if (parsed["kind"]?.jsonPrimitive?.content == "transfer") {
                                     val input = decodeResponse<TransferCreate>(parent.body)

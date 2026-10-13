@@ -1,6 +1,7 @@
 package com.capital.accounting
 
 import android.os.Process
+import androidx.room.withTransaction
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.core.app.ApplicationProvider
@@ -49,8 +50,8 @@ class OfflineTagRuntimeTest {
         override fun before() { assumeTrue("Host tag driver required", InstrumentationRegistry.getArguments().getString("offline_tag_host") == "true") }
     }
     @get:Rule(order = 1) val compose = createAndroidComposeRule<MainActivity>()
-    private fun wait(text: String) {
-        try { compose.waitUntil(60000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() } }
+    private fun wait(text: String, timeout: Long = 60000) {
+        try { compose.waitUntil(timeout) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() } }
         catch (e: ComposeTimeoutException) { throw AssertionError("Expected UI label: $text", e) }
     }
     private fun click(text: String) {
@@ -149,15 +150,26 @@ class OfflineTagRuntimeTest {
         compose.onNodeWithContentDescription("Тег комиссии Offline second tag").performScrollTo().performClick()
         click("Сохранить перевод")
         compose.waitUntil(60000) { compose.onAllNodesWithText("Сумма списания перевода").fetchSemanticsNodes().isEmpty() }
-        wait("Локальные изменения ожидают синхронизации: 20.")
+        click("Изменить перевод Offline transfer"); wait("Сумма списания перевода")
+        compose.onNodeWithText("Сумма списания перевода").performTextClearance(); compose.onNodeWithText("Сумма списания перевода").performTextInput("20,000")
+        compose.onNodeWithText("Сумма комиссии перевода").performTextClearance(); compose.onNodeWithText("Сумма комиссии перевода").performTextInput("0,222")
+        click("Сохранить изменения перевода")
+        compose.waitUntil(60000) { compose.onAllNodesWithText("Сумма списания перевода").fetchSemanticsNodes().isEmpty() }
+        click("Изменить перевод Offline transfer"); wait("Сумма списания перевода"); click("Убрать комиссию перевода"); click("Сохранить изменения перевода")
+        compose.waitUntil(60000) { compose.onAllNodesWithText("Сумма списания перевода").fetchSemanticsNodes().isEmpty() }
+        click("Изменить перевод Offline transfer"); wait("Сумма списания перевода"); click("Добавить комиссию перевода")
+        click("Счет комиссии: Renamed offline cash · KWD"); compose.onNodeWithText("Сумма комиссии перевода").performTextInput("0,111")
+        click("Сохранить изменения перевода")
+        compose.waitUntil(60000) { compose.onAllNodesWithText("Сумма списания перевода").fetchSemanticsNodes().isEmpty() }
+        click("Удалить перевод Offline transfer"); click("Подтвердить удаление перевода")
+        compose.waitUntil(60000) { compose.onAllNodesWithText("Удалить перевод Offline transfer").fetchSemanticsNodes().isEmpty() }
+        wait("Локальные изменения ожидают синхронизации: 24.")
         runBlocking {
             val data = JSONObject(proof.readText()); val scope = MirrorScope("https://localhost:8444", data.getString("owner"), data.getString("workspace"))
-            val commands = app.database.outbox().commands(scope.key); assertEquals(20, commands.size); assertTrue(commands.all { it.state == "queued" })
+            val commands = app.database.outbox().commands(scope.key); assertEquals(24, commands.size); assertTrue(commands.all { it.state == "queued" })
             val visible = LocalProjectionStore(app.database).read(scope)!!
-            assertEquals(mapOf("Renamed offline cash" to "111000", "Offline target" to "22345"), visible.visible.accounts.associate { it.name to it.posted_balance_minor })
-            val localTransfer = visible.visible.transactions.single { it.kind == "transfer" }
-            assertEquals(Rate("1", "1"), localTransfer.rate)
-            assertEquals("-111", visible.visible.transactions.single { it.id == localTransfer.fee_transaction_id }.entries.single().amount_minor)
+            assertEquals(mapOf("Renamed offline cash" to "123456", "Offline target" to "10000"), visible.visible.accounts.associate { it.name to it.posted_balance_minor })
+            assertTrue(visible.visible.transactions.all { it.kind == "opening" })
             val original = SnapshotStore(app.database).read(scope)!!; assertEquals("1", original.head.sequence)
             assertEquals("Existing offline tag", original.items.filterIsInstance<SnapshotItemTag>().single().data.name)
             val changed = commands.first { it.path.endsWith("/tags/${data.getString("tag")}") }; assertEquals("1", decodeResponse<TagUpdate>(changed.body).expected_version)
@@ -168,26 +180,36 @@ class OfflineTagRuntimeTest {
     }
     @Test fun onlineColdRecover() {
         val before = JSONObject(proof.readText()); assertNotEquals(before.getInt("pid"), Process.myPid())
-        wait("Синхронизация завершена.")
-        compose.waitUntil(60000) { compose.onAllNodesWithText("Локальные изменения ожидают синхронизации: 20.").fetchSemanticsNodes().isEmpty() }
+        val queuedScope = MirrorScope("https://localhost:8444", before.getString("owner"), before.getString("workspace"))
+        compose.waitUntil(480000) {
+            runBlocking { app.database.withTransaction {
+                val commands = app.database.outbox().commands(queuedScope.key)
+                commands.size == 24 && commands.all { it.state == "applied" && app.database.outbox().overlays(it.position).isEmpty() } &&
+                    app.database.snapshots().head(queuedScope.key)?.sequence == "25"
+            } }
+        }
+        compose.waitUntil(60000) { compose.onAllNodesWithText("Локальные изменения ожидают синхронизации: 24.").fetchSemanticsNodes().isEmpty() }
         compose.onNodeWithContentDescription("Раздел Еще").performClick(); wait("Тег: Edited offline first · В архиве"); wait("Тег: Offline second tag"); wait("Тег: Archived offline tag · В архиве"); wait("Категория: Offline parent / Archived child · В архиве")
         runBlocking {
             val scope = MirrorScope("https://localhost:8444", before.getString("owner"), before.getString("workspace")); val commands = app.database.outbox().commands(scope.key)
-            assertEquals(20, commands.size)
+            assertEquals(24, commands.size)
             for ((index, command) in commands.withIndex()) {
                 assertEquals(before.getJSONArray("actions").getString(index), command.actionId); assertEquals(before.getJSONArray("hashes").getString(index), commandHash(command.body))
                 assertEquals("applied", command.state); assertTrue(app.database.outbox().overlays(command.position).isEmpty())
             }
-            val mirror = SnapshotStore(app.database).read(scope)!!; assertEquals("21", mirror.head.sequence)
+            val mirror = SnapshotStore(app.database).read(scope)!!; assertEquals("25", mirror.head.sequence)
             assertEquals("2", mirror.items.filterIsInstance<SnapshotItemTag>().first { it.data.id == before.getString("tag") }.data.version)
             val account = mirror.items.filterIsInstance<SnapshotItemAccount>().single { it.data.name == "Renamed offline cash" }.data
-            assertEquals("111000", account.posted_balance_minor); assertEquals("11", account.version); assertEquals("8", account.balance_version); assertNull(account.archived_at)
-            assertEquals("22345", mirror.finance().accounts.single { it.name == "Offline target" }.posted_balance_minor)
-            val transfer = mirror.finance().transactions.single { it.kind == "transfer" }
+            assertEquals("123456", account.posted_balance_minor); assertEquals("15", account.version); assertEquals("12", account.balance_version); assertNull(account.archived_at)
+            assertEquals("10000", mirror.finance().accounts.single { it.name == "Offline target" }.posted_balance_minor)
+            assertTrue(mirror.finance().transactions.all { it.kind == "opening" })
+            val creation = commands.single { it.path.endsWith("/transactions") && JSONObject(it.body).getString("kind") == "transfer" }
+            val result = decodeResponse<MutationResult>(app.database.receipts().get(creation.position)!!.payload)
+            val transfer = result.transactions.single { it.kind == "transfer" }
             val originalTransfer = decodeResponse<TransferCreate>(commands.single { it.path.endsWith("/transactions") && JSONObject(it.body).getString("kind") == "transfer" }.body)
             assertEquals(originalTransfer.id, transfer.id); assertEquals(originalTransfer.fee!!.id, transfer.fee_transaction_id)
             assertEquals(Rate("1", "1"), transfer.rate)
-            val fee = mirror.finance().transactions.single { it.id == transfer.fee_transaction_id }
+            val fee = result.transactions.single { it.id == transfer.fee_transaction_id }
             assertEquals(transfer.id, fee.parent_transaction_id); assertEquals("-111", fee.entries.single().amount_minor)
             assertEquals(2, mirror.items.filterIsInstance<SnapshotItemTransaction>().count { it.data.kind == "opening" })
             before.put("stage", "verified").put("pid", Process.myPid()).put("cold_recovered", true).put("command_preserved", true).put("pull_covered", true)

@@ -484,7 +484,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val store = OfflineBasicStore(app.database)
                 val kind = ApiClient.json.parseToJsonElement(body).jsonObject["kind"]?.jsonPrimitive?.content ?: state.transactions.find { it.id == id }?.kind
-                val queued = if (id == null && kind == "transfer") OfflineTransferStore(app.database).create(saved, body) else if (id == null) store.create(saved, body) else if (delete) store.delete(saved, body, id) else store.replace(saved, body, id)
+                val queued = if (kind == "transfer") OfflineTransferStore(app.database).let { if (id == null) it.create(saved, body) else if (delete) it.delete(saved, body, id) else it.replace(saved, body, id) } else if (id == null) store.create(saved, body) else if (delete) store.delete(saved, body, id) else store.replace(saved, body, id)
                 val projection = requireNotNull(LocalProjectionStore(app.database).read(MirrorScope(saved.origin, saved.ownerId, saved.workspaceId)))
                 val recordId = id ?: requireNotNull(ApiClient.json.parseToJsonElement(body).jsonObject["id"]).jsonPrimitive.content
                 state = state.withProjection(projection).copy(busy = false, localCollectionReceipt = LocalCollectionReceipt(queued.actionId, "transactions", recordId, id == null, delete, kind),

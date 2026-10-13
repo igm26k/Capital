@@ -45,10 +45,10 @@ class QueueWorkerApiTest {
                 val tag = Tag(id(), saved.workspaceId, "1", date, date, null, label, null)
                 return OutboxStore(app.database).enqueue(saved, "tags", "POST", ApiClient.json.encodeToString(TagCreate(tag.id, label)), emptyList(), emptyList(), listOf(OverlayEffect.upsert(SnapshotItemTag("tag", tag))))
             }
-            enqueue("Worker first"); enqueue("Worker second")
+            repeat(24) { enqueue("Worker $it") }
             val first = QueueScheduler(app).schedule(saved); val second = QueueScheduler(app).schedule(saved)
             for (work in listOf(first, second)) {
-                val result = finished(work); assertEquals(WorkInfo.State.SUCCEEDED, result.state); assertEquals("IDLE", result.outputData.getString("status"))
+                val result = finished(work); assertEquals(WorkInfo.State.SUCCEEDED, result.state); assertEquals("IDLE", result.outputData.getString("status")); assertTrue("Healthy queue must not enter retry backoff", result.runAttemptCount <= 1)
             }
             val workDb = File(app.noBackupFilesDir, "androidx.work.workdb").takeIf { it.exists() } ?: app.getDatabasePath("androidx.work.workdb")
             SQLiteDatabase.openDatabase(workDb.path, null, SQLiteDatabase.OPEN_READONLY).use { sqlite ->
@@ -58,8 +58,8 @@ class QueueWorkerApiTest {
                     assertFalse(data.values.any { it == saved.token })
                 }
             }
-            assertEquals("2", SnapshotStore(app.database).read(scope)!!.head.sequence)
-            assertEquals(2, SnapshotStore(app.database).read(scope)!!.items.size)
+            assertEquals("24", SnapshotStore(app.database).read(scope)!!.head.sequence)
+            assertEquals(24, SnapshotStore(app.database).read(scope)!!.items.size)
             assertTrue(app.database.outbox().commands(scope.key).all { it.state == "applied" && app.database.outbox().overlays(it.position).isEmpty() })
             val pending = enqueue("Must not send")
             // The captured worker identity differs from the live vault; no HTTP mutation is permitted.
@@ -67,7 +67,7 @@ class QueueWorkerApiTest {
             val blocked = finished(QueueScheduler(app).schedule(wrong))
             assertEquals("SCOPE_CHANGED", blocked.outputData.getString("status"))
             assertEquals(pending, app.database.outbox().commands(scope.key).last())
-            assertEquals("2", MirrorSynchronizer(app.database).refresh(saved).head.sequence)
+            assertEquals("24", MirrorSynchronizer(app.database).refresh(saved).head.sequence)
             app.credentialVault.clear()
             val missing = finished(QueueScheduler(app).schedule(saved)); assertEquals("AUTH_REQUIRED", missing.outputData.getString("status"))
             assertEquals(pending, app.database.outbox().commands(scope.key).last())

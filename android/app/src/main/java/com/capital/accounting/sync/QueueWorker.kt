@@ -24,7 +24,7 @@ class QueueWorker(context: Context, parameters: WorkerParameters) : CoroutineWor
             if (saved.ownerId != owner || saved.workspaceId != workspace || saved.sessionId != inputData.getString("session") || saved.generationId != inputData.getString("generation"))
                 return finished("SCOPE_CHANGED")
             if (saved.logoutPending || saved.revokeSessionId != null) return finished("AUTH_REQUIRED")
-            return when (QueueCoordinator(app.database).drain(saved).status) {
+            return when (QueueCoordinator(app.database).drain(saved, maximum = 100).status) {
                 QueueDrainStatus.IDLE -> finished("IDLE")
                 QueueDrainStatus.BLOCKED -> finished("BLOCKED")
                 QueueDrainStatus.MORE -> Result.retry()

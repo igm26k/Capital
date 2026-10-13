@@ -12,7 +12,7 @@ adb, serial = sys.argv[1:3]
 checks = root / 'ops/.runtime/checks'
 compose = ['docker', 'compose', '--project-name', 'accounting-test', '-f', 'compose.yaml', '-f', 'compose.test.yaml', '-f', 'compose.e2e.yaml']
 def run(args, body=None):
-    return subprocess.run(args, input=body, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=180, check=True, cwd=root).stdout
+    return subprocess.run(args, input=body, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=600, check=True, cwd=root).stdout
 
 def native(test, artifact):
     output = run([adb, '-s', serial, 'shell', 'am', 'instrument', '-w', '-r', '-e', 'class', test, '-e', 'offline_tag_host', 'true', '-e', 'api_origin', 'https://localhost:8444', 'com.capital.accounting.test/androidx.test.runner.AndroidJUnitRunner'])
@@ -47,7 +47,7 @@ for key in ['actions', 'hashes']:
 for key in ['local_ui', 'confirmed_preserved', 'cold_recovered', 'command_preserved', 'pull_covered']:
     assert after[key] is True
 counts = json.loads(sql(f"SELECT json_build_object('actions',(SELECT count(*) FROM actions WHERE workspace_id='{w}'),'groups',(SELECT count(*) FROM sync_groups WHERE workspace_id='{w}'),'tags',(SELECT count(*) FROM tags WHERE workspace_id='{w}'),'archived',(SELECT count(*) FROM tags WHERE workspace_id='{w}' AND archived_at IS NOT NULL),'categories',(SELECT count(*) FROM categories WHERE workspace_id='{w}'),'archived_categories',(SELECT count(*) FROM categories WHERE workspace_id='{w}' AND archived_at IS NOT NULL),'accounts',(SELECT count(*) FROM accounts WHERE workspace_id='{w}'),'opening',(SELECT count(*) FROM transactions WHERE workspace_id='{w}' AND kind='opening'),'deleted',(SELECT count(*) FROM transactions WHERE workspace_id='{w}' AND deleted_at IS NOT NULL),'balance',(SELECT coalesce(sum(e.amount_minor),0)::text FROM entries e JOIN transactions t ON t.workspace_id=e.workspace_id AND t.id=e.transaction_id WHERE e.workspace_id='{w}' AND t.deleted_at IS NULL),'head',(SELECT last_sequence FROM sync_heads WHERE workspace_id='{w}'));\n"))
-assert counts == {'actions': 21, 'groups': 21, 'tags': 3, 'archived': 2, 'categories': 2, 'archived_categories': 1, 'accounts': 2, 'opening': 2, 'deleted': 2, 'balance': '133345', 'head': 21}
+assert counts == {'actions': 25, 'groups': 25, 'tags': 3, 'archived': 2, 'categories': 2, 'archived_categories': 1, 'accounts': 2, 'opening': 2, 'deleted': 5, 'balance': '133456', 'head': 25}
 after['sql_no_duplicate'] = True
 (checks / 'android-offline-tags-runtime.json').write_text(json.dumps(after))
 print('PASS offline catalog, basic CRUD and transfer/fee UI, cold sync, original commands and SQL no duplicate')
