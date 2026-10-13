@@ -18,8 +18,8 @@ import java.util.UUID
 fun CatalogPanel(model: AuthViewModel) {
     val state = model.state
     val onlineEnabled = !state.busy && !state.financeBlocked && state.persisted
-    val enabled = onlineEnabled || state.canQueueTags
-    val tagEnabled = onlineEnabled || state.canQueueTags
+    val enabled = onlineEnabled || state.canQueueCatalog
+    val tagEnabled = onlineEnabled || state.canQueueCatalog
     val guard = rememberDraftGuard("catalog", enabled, render = false)
     val scope = LocalFinancialDraftScope.current
     val navigation = LocalFinancialEditor.current
@@ -89,13 +89,13 @@ fun CatalogPanel(model: AuthViewModel) {
     if (navigation.value == null) Button(enabled = !state.busy, onClick = model::loadCatalog) { Text("Обновить категории и теги") }
     if (!editorOpen && LocalFinancialSection.current.value == "more") {
         Text("Категории и теги", style = MaterialTheme.typography.titleLarge)
-        TextButton(enabled = onlineEnabled && !scope.saving, onClick = { createCatalog("categories") }) { Text("Новая категория") }
+        TextButton(enabled = enabled && !scope.saving, onClick = { createCatalog("categories") }) { Text("Новая категория") }
         TextButton(enabled = tagEnabled && !scope.saving, onClick = { createCatalog("tags") }) { Text("Новый тег") }
         TextButton(enabled = enabled && !scope.saving, onClick = { navigation.value = "catalog" }) { Text("Открыть черновик классификации") }
         DraftGuardControls(guard, "catalog", enabled) { navigation.value = "catalog" }
         state.categories.forEach { item ->
             Text("Категория: ${categoryPath(item.id, state.categories)}${if (item.archived_at != null) " · В архиве" else ""}")
-            TextButton(enabled = onlineEnabled, onClick = { guard.request { collection = "categories"; id = item.id; version = item.version; name = item.name; parentId = item.parent_id; archived = item.archived_at != null; error = ""; validation.reset(); navigation.value = "catalog"  } }) { Text("Изменить категорию ${categoryPath(item.id, state.categories)}") }
+            TextButton(enabled = enabled && (state.offline || ("category" to item.id) !in state.localAffected), onClick = { guard.request { collection = "categories"; id = item.id; version = item.version; name = item.name; parentId = item.parent_id; archived = item.archived_at != null; error = ""; validation.reset(); navigation.value = "catalog"  } }) { Text("Изменить категорию ${categoryPath(item.id, state.categories)}") }
         }
         state.tags.forEach { item ->
             Text("Тег: ${item.name}${if (item.archived_at != null) " · В архиве" else ""}")
@@ -115,7 +115,7 @@ fun CatalogPanel(model: AuthViewModel) {
                 }
                 FinancialCommandStatus(model)
                 DraftGuardControls(guard, "catalog", enabled)
-                TextButton(enabled = onlineEnabled && !scope.saving, onClick = { createCatalog("categories") }) { Text("Новая категория") }
+                TextButton(enabled = enabled && !scope.saving, onClick = { createCatalog("categories") }) { Text("Новая категория") }
                 TextButton(enabled = tagEnabled && !scope.saving, onClick = { createCatalog("tags") }) { Text("Новый тег") }
                 val category = collection == "categories"
                 Text(if (category) "Редактор категории" else "Редактор тега")
@@ -131,14 +131,14 @@ fun CatalogPanel(model: AuthViewModel) {
                 Text(if (archived) "Состояние классификации: В архиве" else "Состояние классификации: Активна")
                 val currentVersion = if (category) state.categories.find { it.id == id }?.version else state.tags.find { it.id == id }?.version
                 if (id != null && currentVersion != null && currentVersion != version) {
-                    Text(if (!category && ("tag" to id) in state.localAffected) "Ожидаемая версия тега: $currentVersion; версия черновика: $version" else "Версия классификации на сервере: $currentVersion; версия черновика: $version")
+                    Text(if (((if (category) "category" else "tag") to id) in state.localAffected) "Ожидаемая версия классификации: $currentVersion; версия черновика: $version" else "Версия классификации на сервере: $currentVersion; версия черновика: $version")
                     Button(enabled = enabled, onClick = { version = currentVersion }) { Text("Использовать обновленную версию классификации") }
                 }
                 state.categoryConflict?.let { Text("Категория на сервере: ${it.name}; версия ${it.version}") }
                 state.tagConflict?.let { Text("Тег на сервере: ${it.name}; версия ${it.version}") }
                 if (error.isNotEmpty()) Text(error)
-                if (state.offline) Text("Теги сохраняются локально; для отправки потребуется действующая сессия на сервере.")
-                Button(enabled = if (category) onlineEnabled else tagEnabled, onClick = save@{
+                if (state.offline) Text("Категории и теги сохраняются локально; для отправки потребуется действующая сессия на сервере.")
+                Button(enabled = enabled, onClick = save@{
                     error = ""
                     val issue = nameFieldError(name, if (category) 100 else 50)
                     if (!validation.submit(if (issue == null) emptyMap() else mapOf("name" to issue))) return@save

@@ -13,6 +13,7 @@ import com.capital.accounting.api.*
 import com.capital.accounting.data.ConnectionSettings
 import com.capital.accounting.data.FinancialCommand
 import com.capital.accounting.data.IdentityStore
+import com.capital.accounting.data.OfflineCategoryStore
 import com.capital.accounting.data.OfflineTagStore
 import com.capital.accounting.data.LocalProjection
 import com.capital.accounting.data.LocalProjectionStore
@@ -58,7 +59,7 @@ data class AuthState(
     val financeBlocked: Boolean = true, val accountConflict: Account? = null, val transactionConflict: Transaction? = null, val categoryConflict: Category? = null, val tagConflict: Tag? = null,
 
 ) {
-    val canQueueTags get() = offline && auth != null && persisted && !busy && !logoutPending && revokePendingId == null && financialCommand == null && localBlocked == 0
+    val canQueueCatalog get() = offline && auth != null && persisted && !busy && !logoutPending && revokePendingId == null && financialCommand == null && localBlocked == 0
 }
 
 class AuthViewModel(application: Application) : AndroidViewModel(application) {
@@ -456,20 +457,20 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
 
     fun submitCatalog(body: String, collection: String, id: String? = null) {
         require(collection in setOf("categories", "tags"))
-        if (state.offline && collection == "tags") {
+        if (state.offline) {
             val saved = candidate ?: return
-            if (!state.canQueueTags) return
+            if (!state.canQueueCatalog) return
             state = state.copy(busy = true, message = "")
             viewModelScope.launch {
                 try {
-                    val queued = OfflineTagStore(app.database).enqueue(saved, body, id)
+                    val queued = if (collection == "tags") OfflineTagStore(app.database).enqueue(saved, body, id) else OfflineCategoryStore(app.database).enqueue(saved, body, id)
                     val projection = requireNotNull(LocalProjectionStore(app.database).read(MirrorScope(saved.origin, saved.ownerId, saved.workspaceId)))
-                    val recordId = id ?: decodeResponse<TagCreate>(body).id
-                    state = state.withProjection(projection).copy(busy = false, localCollectionReceipt = LocalCollectionReceipt(queued.actionId, "tags", recordId, id == null),
-                        message = "Изменение тега сохранено на устройстве и ожидает синхронизации.")
+                    val recordId = id ?: if (collection == "tags") decodeResponse<TagCreate>(body).id else decodeResponse<CategoryCreate>(body).id
+                    state = state.withProjection(projection).copy(busy = false, localCollectionReceipt = LocalCollectionReceipt(queued.actionId, collection, recordId, id == null),
+                        message = "Изменение классификации сохранено на устройстве и ожидает синхронизации.")
                     synchronizeQueue()
                 } catch (e: CancellationException) { throw e }
-                catch (_: Exception) { state = state.copy(busy = false, message = "Не удалось сохранить локальное изменение. Проверьте сессию и версию тега; черновик сохранен.") }
+                catch (_: Exception) { state = state.copy(busy = false, message = "Не удалось сохранить локальное изменение. Проверьте сессию и версию и связи; черновик сохранен.") }
             }
             return
         }

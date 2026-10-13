@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Offline tag UI create/update/archive, cold sync and isolated SQL no-duplicate acceptance."""
+"""Offline catalog UI create/update/archive, cold sync and isolated SQL no-duplicate acceptance."""
 import json
 import os
 from pathlib import Path
@@ -18,7 +18,7 @@ def native(test, artifact):
     output = run([adb, '-s', serial, 'shell', 'am', 'instrument', '-w', '-r', '-e', 'class', test, '-e', 'offline_tag_host', 'true', '-e', 'api_origin', 'https://localhost:8444', 'com.capital.accounting.test/androidx.test.runner.AndroidJUnitRunner'])
     (checks / artifact).write_text(output)
     if not re.search(r'^OK \(1 test\)', output, re.M) or re.search(r'INSTRUMENTATION_STATUS_CODE: -[1-4]', output):
-        raise RuntimeError('Native offline tag failed; inspect restricted artifact')
+        raise RuntimeError('Native offline catalog failed; inspect restricted artifact')
 
 def proof():
     return json.loads(run([adb, '-s', serial, 'exec-out', 'run-as', 'com.capital.accounting', 'cat', 'files/offline-tag-runtime.json']))
@@ -46,8 +46,8 @@ for key in ['actions', 'hashes']:
     assert after[key] == queued[key]
 for key in ['local_ui', 'confirmed_preserved', 'cold_recovered', 'command_preserved', 'pull_covered']:
     assert after[key] is True
-counts = json.loads(sql(f"SELECT json_build_object('actions',(SELECT count(*) FROM actions WHERE workspace_id='{w}'),'groups',(SELECT count(*) FROM sync_groups WHERE workspace_id='{w}'),'tags',(SELECT count(*) FROM tags WHERE workspace_id='{w}'),'archived',(SELECT count(*) FROM tags WHERE workspace_id='{w}' AND archived_at IS NOT NULL),'head',(SELECT last_sequence FROM sync_heads WHERE workspace_id='{w}'));\n"))
-assert counts == {'actions': 6, 'groups': 6, 'tags': 3, 'archived': 2, 'head': 6}
+counts = json.loads(sql(f"SELECT json_build_object('actions',(SELECT count(*) FROM actions WHERE workspace_id='{w}'),'groups',(SELECT count(*) FROM sync_groups WHERE workspace_id='{w}'),'tags',(SELECT count(*) FROM tags WHERE workspace_id='{w}'),'archived',(SELECT count(*) FROM tags WHERE workspace_id='{w}' AND archived_at IS NOT NULL),'categories',(SELECT count(*) FROM categories WHERE workspace_id='{w}'),'archived_categories',(SELECT count(*) FROM categories WHERE workspace_id='{w}' AND archived_at IS NOT NULL),'head',(SELECT last_sequence FROM sync_heads WHERE workspace_id='{w}'));\n"))
+assert counts == {'actions': 9, 'groups': 9, 'tags': 3, 'archived': 2, 'categories': 2, 'archived_categories': 1, 'head': 9}
 after['sql_no_duplicate'] = True
 (checks / 'android-offline-tags-runtime.json').write_text(json.dumps(after))
-print('PASS offline tag UI create/update/archive, cold sync, original commands and SQL no duplicate')
+print('PASS offline catalog UI create/update/archive, cold sync, original commands and SQL no duplicate')
