@@ -62,7 +62,7 @@ class OutboxStore(private val db: CapitalDatabase) {
             type(base.entityType); uuid(base.entityId)
             require(base.version.matches(Regex("[1-9][0-9]*")) && BigInteger(base.version) <= BigInteger.valueOf(Long.MAX_VALUE))
             val confirmed = mirror[base.entityType to base.entityId]?.let { decodeResponse<SnapshotItem>(it.payload) }
-            val item = if (base.entityType in setOf("tag", "category") && base.field == "version" && (confirmed == null || snapshotIdentity(confirmed).version != base.version)) {
+            val item = if (base.entityType in setOf("tag", "category", "account") && base.field == "version" && (confirmed == null || snapshotIdentity(confirmed).version != base.version)) {
                 val candidates = queued.values.filter { it.actionId in dependencies && it.generation == saved.generationId }.sortedByDescending { it.position }
                 var predicted: SnapshotItem? = null
                 for (parent in candidates) {
@@ -70,13 +70,13 @@ class OutboxStore(private val db: CapitalDatabase) {
                     val data = decodeResponse<SnapshotItem>(requireNotNull(effect.payload))
                     val identity = snapshotIdentity(data)
                     require(data.entity_type == base.entityType)
-                    val collection = if (base.entityType == "tag") "tags" else "categories"
+                    val collection = when (base.entityType) { "tag" -> "tags"; "category" -> "categories"; else -> "accounts" }
                     val expected = when {
                         parent.method == "POST" && parent.path == "/workspaces/${saved.workspaceId}/$collection" -> {
-                            require((if (base.entityType == "tag") decodeResponse<TagCreate>(parent.body).id else decodeResponse<CategoryCreate>(parent.body).id) == base.entityId); "1"
+                            require((when (base.entityType) { "tag" -> decodeResponse<TagCreate>(parent.body).id; "category" -> decodeResponse<CategoryCreate>(parent.body).id; else -> decodeResponse<AccountCreate>(parent.body).id }) == base.entityId); "1"
                         }
                         parent.method == "PUT" && parent.path == "/workspaces/${saved.workspaceId}/$collection/${base.entityId}" ->
-                            (BigInteger(if (base.entityType == "tag") decodeResponse<TagUpdate>(parent.body).expected_version else decodeResponse<CategoryUpdate>(parent.body).expected_version) + BigInteger.ONE).toString()
+                            (BigInteger(when (base.entityType) { "tag" -> decodeResponse<TagUpdate>(parent.body).expected_version; "category" -> decodeResponse<CategoryUpdate>(parent.body).expected_version; else -> decodeResponse<AccountUpdate>(parent.body).expected_version }) + BigInteger.ONE).toString()
                         else -> error("Invalid catalog dependency")
                     }
                     require(identity.id == base.entityId && identity.workspace == saved.workspaceId && identity.version == expected)

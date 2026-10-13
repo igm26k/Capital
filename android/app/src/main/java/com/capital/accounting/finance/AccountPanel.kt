@@ -19,13 +19,14 @@ import java.util.*
 @Composable
 fun AccountPanel(model: AuthViewModel) {
     val state = model.state
-    val enabled = !state.busy && state.persisted && !state.financeBlocked
+    val enabled = !state.busy && state.persisted && (!state.financeBlocked || state.canQueueAccounts)
     val guard = rememberDraftGuard("account", enabled, render = false)
     val scope = LocalFinancialDraftScope.current
     val navigation = LocalFinancialEditor.current
     val section = LocalFinancialSection.current
     var accountFilter by rememberSaveable(state.origin, state.auth?.profile?.id, state.auth?.workspace?.id) { mutableStateOf("active") }
     val editorOpen = navigation.value == "account"
+    var handledLocalReceipt by remember { mutableStateOf(state.localCollectionReceipt?.actionId) }
     var handledReceipt by remember { mutableStateOf(state.collectionReceipt?.commandId) }
     var editingId by rememberFinancialDraft<String?>("account.editingId") { null }
     var editingVersion by rememberFinancialDraft("account.editingVersion") { "" }
@@ -48,7 +49,14 @@ fun AccountPanel(model: AuthViewModel) {
     }
     fun createAccount() { guard.request { reset(); navigation.value = "account" } }
     HandleFinancialCreate("account", enabled) { createAccount() }
-    LaunchedEffect(state.financialCommand?.commandId, state.collectionReceipt?.commandId) {
+    LaunchedEffect(state.financialCommand?.commandId, state.collectionReceipt?.commandId, state.localCollectionReceipt?.actionId) {
+        val local = state.localCollectionReceipt
+        if (local != null && local.actionId != handledLocalReceipt) {
+            handledLocalReceipt = local.actionId
+            if (local.collection == "accounts" && (local.recordId == editingId || local.created && editingId == null)) {
+                guard.markClean(); navigation.value = null
+            }
+        }
         val command = state.financialCommand
         if (command == null && state.collectionReceipt?.commandId != handledReceipt) {
             val receipt = state.collectionReceipt
@@ -139,7 +147,7 @@ fun AccountPanel(model: AuthViewModel) {
                 if (editingId != null) {
                     val current = state.accounts.find { it.id == editingId }
                     if (current != null && current.version != editingVersion) {
-                        Text("Текущая версия на сервере: ${current.version}; ваш черновик: $editingVersion")
+                        Text(if (("account" to editingId) in state.localAffected) "Ожидаемая версия счета: ${current.version}; ваш черновик: $editingVersion" else "Текущая версия на сервере: ${current.version}; ваш черновик: $editingVersion")
                         Button(enabled = enabled, onClick = { editingVersion = current.version; currency = current.currency; editingBalance = current.posted_balance_minor }) { Text("Использовать обновленную версию") }
                     }
                 }

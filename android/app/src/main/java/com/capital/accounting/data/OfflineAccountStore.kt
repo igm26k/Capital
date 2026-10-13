@@ -34,4 +34,26 @@ class OfflineAccountStore(private val db: CapitalDatabase) {
         LocalProjectionStore(db).read(scope)
         command
     }
+    suspend fun update(saved: StoredSession, body: String, id: String): OutboxCommand = db.withTransaction {
+        require(IdentityStore(db).read(saved) != null)
+        require(db.commands().get(saved.origin, saved.ownerId, saved.workspaceId) == null)
+        val scope = MirrorScope(saved.origin, saved.ownerId, saved.workspaceId)
+        val projection = requireNotNull(LocalProjectionStore(db).read(scope))
+        require(projection.confirmed.head.generation == saved.generationId && projection.blocked.isEmpty())
+        val input = decodeResponse<AccountUpdate>(body); require(input.name.isNotBlank() && input.name.length <= 100)
+        val visible = requireNotNull(projection.visible.accounts.find { it.id == id }); require(input.expected_version == visible.version)
+        val next = java.math.BigInteger(visible.version) + java.math.BigInteger.ONE; require(next <= java.math.BigInteger.valueOf(Long.MAX_VALUE))
+        val dependencies = mutableListOf<String>()
+        for (parent in projection.pending.asReversed()) {
+            if (db.outbox().overlays(parent.position).any { it.entityType == "account" && it.entityId == id }) { dependencies.add(parent.actionId); break }
+        }
+        val now = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.ROOT).apply { timeZone = TimeZone.getTimeZone("UTC") }.format(Date())
+        val account = visible.copy(version = next.toString(), name = input.name, type = input.type, updated_at = now,
+            archived_at = if (input.archived) visible.archived_at ?: now else null)
+        val command = OutboxStore(db).enqueue(saved, "accounts/$id", "PUT", body, listOf(OutboxBase("account", id, input.expected_version)), dependencies,
+            listOf(OverlayEffect.upsert(SnapshotItemAccount("account", account))))
+        LocalProjectionStore(db).read(scope)
+        command
+    }
+
 }

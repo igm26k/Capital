@@ -46,8 +46,8 @@ for key in ['actions', 'hashes']:
     assert after[key] == queued[key]
 for key in ['local_ui', 'confirmed_preserved', 'cold_recovered', 'command_preserved', 'pull_covered']:
     assert after[key] is True
-counts = json.loads(sql(f"SELECT json_build_object('actions',(SELECT count(*) FROM actions WHERE workspace_id='{w}'),'groups',(SELECT count(*) FROM sync_groups WHERE workspace_id='{w}'),'tags',(SELECT count(*) FROM tags WHERE workspace_id='{w}'),'archived',(SELECT count(*) FROM tags WHERE workspace_id='{w}' AND archived_at IS NOT NULL),'categories',(SELECT count(*) FROM categories WHERE workspace_id='{w}'),'archived_categories',(SELECT count(*) FROM categories WHERE workspace_id='{w}' AND archived_at IS NOT NULL),'head',(SELECT last_sequence FROM sync_heads WHERE workspace_id='{w}'));\n"))
-assert counts == {'actions': 9, 'groups': 9, 'tags': 3, 'archived': 2, 'categories': 2, 'archived_categories': 1, 'head': 9}
+counts = json.loads(sql(f"SELECT json_build_object('actions',(SELECT count(*) FROM actions WHERE workspace_id='{w}'),'groups',(SELECT count(*) FROM sync_groups WHERE workspace_id='{w}'),'tags',(SELECT count(*) FROM tags WHERE workspace_id='{w}'),'archived',(SELECT count(*) FROM tags WHERE workspace_id='{w}' AND archived_at IS NOT NULL),'categories',(SELECT count(*) FROM categories WHERE workspace_id='{w}'),'archived_categories',(SELECT count(*) FROM categories WHERE workspace_id='{w}' AND archived_at IS NOT NULL),'accounts',(SELECT count(*) FROM accounts WHERE workspace_id='{w}'),'opening',(SELECT count(*) FROM transactions WHERE workspace_id='{w}' AND kind='opening'),'balance',(SELECT coalesce(sum(amount_minor),0)::text FROM entries WHERE workspace_id='{w}'),'head',(SELECT last_sequence FROM sync_heads WHERE workspace_id='{w}'));\n"))
+assert counts == {'actions': 12, 'groups': 12, 'tags': 3, 'archived': 2, 'categories': 2, 'archived_categories': 1, 'accounts': 1, 'opening': 1, 'balance': '123456', 'head': 12}
 after['sql_no_duplicate'] = True
 (checks / 'android-offline-tags-runtime.json').write_text(json.dumps(after))
 print('PASS offline catalog UI create/update/archive, cold sync, original commands and SQL no duplicate')
