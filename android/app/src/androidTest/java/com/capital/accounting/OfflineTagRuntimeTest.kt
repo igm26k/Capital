@@ -24,7 +24,7 @@ import java.io.File
 import java.security.MessageDigest
 import java.util.UUID
 
-private const val offlineTagBanner = "Нет соединения. Показаны сохраненные данные; они могут быть устаревшими. Изменения счетов, категорий и тегов сохраняются на устройстве."
+private const val offlineTagBanner = "Нет соединения. Показаны сохраненные данные; они могут быть устаревшими. Новые доходы и расходы, изменения счетов, категорий и тегов сохраняются на устройстве."
 private fun commandHash(body: String) = MessageDigest.getInstance("SHA-256").digest(body.toByteArray()).joinToString("") { "%02x".format(it) }
 @RunWith(AndroidJUnit4::class)
 class OfflineTagPrepareTest {
@@ -87,10 +87,35 @@ class OfflineTagRuntimeTest {
         click("Карта"); click("Сохранить счет"); wait("Renamed offline cash")
         click("Изменить счет Renamed offline cash"); wait("Счет в архиве")
         compose.onNode(isToggleable()).performClick(); click("Сохранить счет"); click("Все счета"); wait("Renamed offline cash · В архиве")
-        wait("Локальные изменения ожидают синхронизации: 11.")
+        click("Изменить счет Renamed offline cash"); wait("Счет в архиве")
+        compose.onNode(isToggleable()).performClick(); click("Сохранить счет"); wait("Renamed offline cash")
+        compose.onNodeWithContentDescription("Раздел Операции").performClick()
+        for ((kind, amount) in listOf("Расход" to "12,345", "Доход" to "3,333")) {
+            click(kind); wait("Сумма операции")
+            compose.onNodeWithText("Сумма операции").performTextInput(amount)
+            compose.onNodeWithText("Дата операции (YYYY-MM-DDTHH:MM:SS)").performTextClearance()
+            compose.onNodeWithText("Дата операции (YYYY-MM-DDTHH:MM:SS)").performTextInput("2026-10-13T12:05:00")
+            compose.onNodeWithText("Часовой пояс операции").performTextClearance()
+            compose.onNodeWithText("Часовой пояс операции").performTextInput("UTC")
+            click("Категория части 1: Offline parent")
+            compose.onNodeWithContentDescription("Выбрать тег Offline second tag").performScrollTo().performClick()
+            if (kind == "Расход") {
+                click("Добавить часть операции")
+                compose.onNodeWithText("Сумма части 1").performTextInput("2,000")
+                compose.onNodeWithText("Сумма части 2").performTextInput("10,345")
+            }
+            click("Сохранить операцию")
+            compose.waitUntil(60000) { compose.onAllNodesWithText("Сумма операции").fetchSemanticsNodes().isEmpty() }
+        }
+        wait("Локальные изменения ожидают синхронизации: 14.")
         runBlocking {
             val data = JSONObject(proof.readText()); val scope = MirrorScope("https://localhost:8444", data.getString("owner"), data.getString("workspace"))
-            val commands = app.database.outbox().commands(scope.key); assertEquals(11, commands.size); assertTrue(commands.all { it.state == "queued" })
+            val commands = app.database.outbox().commands(scope.key); assertEquals(14, commands.size); assertTrue(commands.all { it.state == "queued" })
+            val visible = LocalProjectionStore(app.database).read(scope)!!
+            assertEquals("114444", visible.visible.accounts.single().posted_balance_minor)
+            val localExpense = visible.visible.transactions.single { it.kind == "expense" }
+            assertEquals("-12345", localExpense.entries.single().amount_minor)
+            assertEquals(listOf("2000", "10345"), localExpense.allocations.map { it.amount_minor })
             val original = SnapshotStore(app.database).read(scope)!!; assertEquals("1", original.head.sequence)
             assertEquals("Existing offline tag", original.items.filterIsInstance<SnapshotItemTag>().single().data.name)
             val changed = commands.first { it.path.endsWith("/tags/${data.getString("tag")}") }; assertEquals("1", decodeResponse<TagUpdate>(changed.body).expected_version)
@@ -102,19 +127,24 @@ class OfflineTagRuntimeTest {
     @Test fun onlineColdRecover() {
         val before = JSONObject(proof.readText()); assertNotEquals(before.getInt("pid"), Process.myPid())
         wait("Синхронизация завершена.")
-        compose.waitUntil(60000) { compose.onAllNodesWithText("Локальные изменения ожидают синхронизации: 11.").fetchSemanticsNodes().isEmpty() }
+        compose.waitUntil(60000) { compose.onAllNodesWithText("Локальные изменения ожидают синхронизации: 14.").fetchSemanticsNodes().isEmpty() }
         compose.onNodeWithContentDescription("Раздел Еще").performClick(); wait("Тег: Edited offline first · В архиве"); wait("Тег: Offline second tag"); wait("Тег: Archived offline tag · В архиве"); wait("Категория: Offline parent / Archived child · В архиве")
         runBlocking {
             val scope = MirrorScope("https://localhost:8444", before.getString("owner"), before.getString("workspace")); val commands = app.database.outbox().commands(scope.key)
-            assertEquals(11, commands.size)
+            assertEquals(14, commands.size)
             for ((index, command) in commands.withIndex()) {
                 assertEquals(before.getJSONArray("actions").getString(index), command.actionId); assertEquals(before.getJSONArray("hashes").getString(index), commandHash(command.body))
                 assertEquals("applied", command.state); assertTrue(app.database.outbox().overlays(command.position).isEmpty())
             }
-            val mirror = SnapshotStore(app.database).read(scope)!!; assertEquals("12", mirror.head.sequence)
+            val mirror = SnapshotStore(app.database).read(scope)!!; assertEquals("15", mirror.head.sequence)
             assertEquals("2", mirror.items.filterIsInstance<SnapshotItemTag>().first { it.data.id == before.getString("tag") }.data.version)
             val account = mirror.items.filterIsInstance<SnapshotItemAccount>().single().data
-            assertEquals("123456", account.posted_balance_minor); assertEquals("3", account.version); assertEquals("1", account.balance_version); assertNotNull(account.archived_at)
+            assertEquals("114444", account.posted_balance_minor); assertEquals("6", account.version); assertEquals("3", account.balance_version); assertNull(account.archived_at)
+            val expense = mirror.items.filterIsInstance<SnapshotItemTransaction>().single { it.data.kind == "expense" }.data
+            val originalExpense = decodeResponse<ExpenseCreate>(commands.single { it.path.endsWith("/transactions") && JSONObject(it.body).getString("kind") == "expense" }.body)
+            assertEquals(originalExpense.allocations.associate { it.id to (it.amount_minor to it.category_id) }, expense.allocations.associate { it.id to (it.amount_minor to it.category_id) })
+            assertEquals("-12345", expense.entries.single().amount_minor)
+            assertEquals("3333", mirror.items.filterIsInstance<SnapshotItemTransaction>().single { it.data.kind == "income" }.data.entries.single().amount_minor)
             assertEquals(1, mirror.items.filterIsInstance<SnapshotItemTransaction>().count { it.data.kind == "opening" })
             before.put("stage", "verified").put("pid", Process.myPid()).put("cold_recovered", true).put("command_preserved", true).put("pull_covered", true)
             proof.writeText(before.toString())

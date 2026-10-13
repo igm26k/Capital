@@ -13,6 +13,7 @@ import com.capital.accounting.api.*
 import com.capital.accounting.data.ConnectionSettings
 import com.capital.accounting.data.FinancialCommand
 import com.capital.accounting.data.IdentityStore
+import com.capital.accounting.data.OfflineBasicStore
 import com.capital.accounting.data.OfflineAccountStore
 import com.capital.accounting.data.OfflineCategoryStore
 import com.capital.accounting.data.OfflineTagStore
@@ -60,6 +61,7 @@ data class AuthState(
     val financeBlocked: Boolean = true, val accountConflict: Account? = null, val transactionConflict: Transaction? = null, val categoryConflict: Category? = null, val tagConflict: Tag? = null,
 
 ) {
+    val canQueueBasicCreates get() = canQueueCatalog
     val canQueueAccounts get() = canQueueCatalog
     val canQueueCatalog get() = offline && auth != null && persisted && !busy && !logoutPending && revokePendingId == null && financialCommand == null && localBlocked == 0
 }
@@ -471,7 +473,23 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
     fun submitAdjustment(body: String, accountId: String) = submitFinancial(body, "accounts/$accountId/adjustments", "POST")
-    fun submitTransaction(body: String, id: String? = null, delete: Boolean = false) = submitFinancial(body, if (id == null) "transactions" else "transactions/$id", if (delete) "DELETE" else if (id == null) "POST" else "PUT")
+    fun submitTransaction(body: String, id: String? = null, delete: Boolean = false) {
+        if (!state.offline) { submitFinancial(body, if (id == null) "transactions" else "transactions/$id", if (delete) "DELETE" else if (id == null) "POST" else "PUT"); return }
+        val saved = candidate ?: return
+        if (!state.canQueueBasicCreates || id != null || delete) return
+        state = state.copy(busy = true, message = "")
+        viewModelScope.launch {
+            try {
+                val queued = OfflineBasicStore(app.database).create(saved, body)
+                val projection = requireNotNull(LocalProjectionStore(app.database).read(MirrorScope(saved.origin, saved.ownerId, saved.workspaceId)))
+                val recordId = requireNotNull(ApiClient.json.parseToJsonElement(body).jsonObject["id"]).jsonPrimitive.content
+                state = state.withProjection(projection).copy(busy = false, localCollectionReceipt = LocalCollectionReceipt(queued.actionId, "transactions", recordId, true),
+                    message = "Операция сохранена на устройстве и ожидает синхронизации.")
+                synchronizeQueue()
+            } catch (e: CancellationException) { throw e }
+            catch (_: Exception) { state = state.copy(busy = false, message = "Не удалось сохранить локальную операцию. Проверьте сумму, дату и ссылки; черновик сохранен.") }
+        }
+    }
     fun submitClassification(body: String) = submitFinancial(body, "transactions/classification", "POST")
 
     fun submitCatalog(body: String, collection: String, id: String? = null) {

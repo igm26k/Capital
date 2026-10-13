@@ -23,13 +23,15 @@ import java.util.*
 @Composable
 fun TransactionPanel(model: AuthViewModel) {
     val state = model.state
-    val enabled = !state.busy && !state.financeBlocked && state.persisted
+    val onlineEnabled = !state.busy && !state.financeBlocked && state.persisted
+    val enabled = onlineEnabled || state.canQueueBasicCreates
     val guard = rememberDraftGuard("transaction", enabled, render = false)
     val scope = LocalFinancialDraftScope.current
     val bulk = rememberBulkClassification(model)
     val navigation = LocalFinancialEditor.current
     val createRouter = LocalFinancialCreateRouter.current
     val editorOpen = navigation.value == "transaction"
+    var handledLocalReceipt by remember { mutableStateOf(state.localCollectionReceipt?.actionId) }
     var handledReceipt by remember { mutableStateOf(state.transactionReceipt?.commandId) }
     var editingId by rememberFinancialDraft<String?>("transaction.editingId") { null }
     var editingVersion by rememberFinancialDraft("transaction.editingVersion") { "" }
@@ -71,8 +73,15 @@ fun TransactionPanel(model: AuthViewModel) {
         note = transaction.note; payee = transaction.payee; zone = transaction.occurred_timezone; occurred = openingLocal(transaction.occurred_at, zone); error = ""; navigation.value = "transaction"
     } }
     fun deleteOperation(transaction: Transaction) { deleting = transaction }
-    HandleFinancialTransaction("transaction", enabled) { if (it.action == FinancialTransactionAction.EDIT) editOperation(it.transaction) else deleteOperation(it.transaction) }
-    LaunchedEffect(state.financialCommand?.commandId, state.transactionReceipt?.commandId, state.accounts, state.transactions) {
+    HandleFinancialTransaction("transaction", onlineEnabled) { if (it.action == FinancialTransactionAction.EDIT) editOperation(it.transaction) else deleteOperation(it.transaction) }
+    LaunchedEffect(state.financialCommand?.commandId, state.transactionReceipt?.commandId, state.localCollectionReceipt?.actionId, state.accounts, state.transactions) {
+        val local = state.localCollectionReceipt
+        if (local != null && local.actionId != handledLocalReceipt) {
+            handledLocalReceipt = local.actionId
+            if (local.collection == "transactions" && local.created && editingId == null) {
+                parts = parts.map { it.copy(id = UUID.randomUUID().toString()) }; guard.markClean(); navigation.value = null
+            }
+        }
         val command = state.financialCommand
         if (command == null && state.transactionReceipt?.commandId != handledReceipt) {
             val receipt = state.transactionReceipt
@@ -188,7 +197,7 @@ fun TransactionPanel(model: AuthViewModel) {
                     }
                 }
                 if (error.isNotEmpty()) Text(error)
-                Button(enabled = enabled && account != null && (editingId == null || state.transactions.any { it.id == editingId }), onClick = save@{
+                Button(enabled = enabled && (!state.offline || editingId == null) && account != null && (editingId == null || state.transactions.any { it.id == editingId }), onClick = save@{
                     error = ""
                     val currency = account?.currency ?: return@save
                     if (!validation.submit(transactionFieldErrors(amount, occurred, zone, payee, note, currency, parts))) return@save
@@ -233,7 +242,7 @@ fun TransactionPanel(model: AuthViewModel) {
         deleting?.let { target ->
             Text("Удаление: ${target.note}; ${target.entries.joinToString { Money.display(it.amount_minor, it.currency) }}")
             Text("Движение будет исключено из остатка. Историю зависимых операций проверит сервер.")
-            Button(enabled = enabled && state.transactions.any { it.id == target.id }, onClick = { model.submitTransaction(ApiClient.json.encodeToString(TransactionDelete(target.version, emptyList())), target.id, delete = true); deleting = null }) { Text("Подтвердить удаление операции") }
+            Button(enabled = onlineEnabled && state.transactions.any { it.id == target.id }, onClick = { model.submitTransaction(ApiClient.json.encodeToString(TransactionDelete(target.version, emptyList())), target.id, delete = true); deleting = null }) { Text("Подтвердить удаление операции") }
             TextButton(enabled = enabled, onClick = { deleting = null }) { Text("Отменить удаление") }
         }
         Text("История операций", style = MaterialTheme.typography.titleLarge)
@@ -257,10 +266,10 @@ fun TransactionPanel(model: AuthViewModel) {
             Text("Контрагент истории: ${transaction.payee.ifEmpty { "Не указан" }}")
             TextButton(enabled = !state.busy && state.persisted, onClick = { model.openTransactionDetails(transaction.id) }) { Text("Детали операции ${transaction.note.ifEmpty { label }}") }
             if (transaction.kind in listOf("income", "expense") && transaction.parent_transaction_id == null) {
-                TextButton(enabled = enabled, onClick = {
+                TextButton(enabled = onlineEnabled, onClick = {
                     editOperation(transaction)
                 }) { Text("Изменить операцию ${transaction.note}") }
-                TextButton(enabled = enabled, onClick = { deleteOperation(transaction) }) { Text("Удалить операцию ${transaction.note}") }
+                TextButton(enabled = onlineEnabled, onClick = { deleteOperation(transaction) }) { Text("Удалить операцию ${transaction.note}") }
             }
             Text("${transaction.occurred_at} · ${transaction.occurred_timezone} · ${if (transaction.status == "posted") "Проведена" else "Ожидает проведения"}")
         }
