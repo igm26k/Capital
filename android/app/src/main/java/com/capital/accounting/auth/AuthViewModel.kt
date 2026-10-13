@@ -11,10 +11,10 @@ import com.capital.accounting.api.*
 import com.capital.accounting.data.ConnectionSettings
 import com.capital.accounting.data.FinancialCommand
 import com.capital.accounting.data.IdentityStore
+import com.capital.accounting.data.LocalProjection
+import com.capital.accounting.data.LocalProjectionStore
 import com.capital.accounting.data.MirrorFinance
 import com.capital.accounting.data.MirrorScope
-import com.capital.accounting.data.SnapshotStore
-import com.capital.accounting.data.finance
 import com.capital.accounting.sync.MirrorSynchronizer
 import com.capital.accounting.finance.CommandRunner
 import com.capital.accounting.normalizedOrigin
@@ -42,7 +42,7 @@ data class AuthState(
     val detailStack: List<String> = emptyList(), val detailTransaction: Transaction? = null, val detailMissing: Boolean = false, val detailError: String = "",
     val collectionReceipt: CollectionReceipt? = null,
     val classificationReceipt: ClassificationReceipt? = null,
-    val accountsLoaded: Boolean = false, val overviewLoaded: Boolean = false, val overviewError: String = "", val overviewCached: Boolean = false, val offline: Boolean = false,
+    val accountsLoaded: Boolean = false, val overviewLoaded: Boolean = false, val overviewError: String = "", val overviewCached: Boolean = false, val offline: Boolean = false, val localPending: Int = 0, val localBlocked: Int = 0,
     val transactionsLoaded: Boolean = false, val transactionReceipt: TransactionReceipt? = null,
     val historyFilter: TransactionFilter? = null, val historyItems: List<Transaction>? = null,
     val historyLimit: Int = 50, val historyNextCursor: String? = null, val historyCursors: List<String> = emptyList(), val historyError: String = "",
@@ -132,12 +132,12 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
 
     private suspend fun restoreOffline(saved: StoredSession, holdBusy: Boolean): Boolean {
         val identity = IdentityStore(app.database).read(saved) ?: return false
-        val mirror = SnapshotStore(app.database).read(MirrorScope(saved.origin, saved.ownerId, saved.workspaceId)) ?: return false
-        if (mirror.head.generation != saved.generationId) return false
+        val projection = LocalProjectionStore(app.database).read(MirrorScope(saved.origin, saved.ownerId, saved.workspaceId)) ?: return false
+        if (projection.confirmed.head.generation != saved.generationId) return false
         val command = app.database.commands().get(saved.origin, saved.ownerId, saved.workspaceId)
         candidate = saved
         state = AuthState(saved.origin, busy = holdBusy, auth = BearerAuth(identity.profile, identity.workspace, identity.session, "bearer", saved.token, "Bearer"),
-            offline = true, overviewCached = true, financeBlocked = true, financialCommand = command).withFinance(mirror.finance())
+            offline = true, overviewCached = true, financeBlocked = true, financialCommand = command).withProjection(projection)
         return true
     }
 
@@ -168,6 +168,10 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     private fun AuthState.withFinance(finance: MirrorFinance): AuthState = copy(accounts = finance.accounts, accountsLoaded = true,
         transactions = finance.transactions, transactionsLoaded = true, categories = finance.categories, tags = finance.tags, overviewLoaded = true)
 
+    private fun AuthState.withProjection(projection: LocalProjection): AuthState = withFinance(projection.visible).copy(
+        localPending = projection.pending.size, localBlocked = projection.blocked.size,
+        financeBlocked = offline || financialCommand != null || projection.pending.isNotEmpty() || projection.blocked.isNotEmpty())
+
     private suspend fun readFinance(saved: StoredSession): MirrorFinance {
         val mirror = MirrorSynchronizer(app.database).refresh(saved)
         if (state.auth?.workspace?.sync_generation_id != mirror.head.generation) {
@@ -176,18 +180,21 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             val updated = auth.credential(saved.origin)
             app.credentialVault.save(updated); IdentityStore(app.database).save(auth, saved.origin); candidate = updated; state = state.copy(auth = auth)
         }
-        return mirror.finance()
+        val projection = requireNotNull(LocalProjectionStore(app.database).read(MirrorScope(saved.origin, saved.ownerId, saved.workspaceId)))
+        require(projection.confirmed.head.generation == mirror.head.generation)
+        state = state.copy(localPending = projection.pending.size, localBlocked = projection.blocked.size)
+        return projection.visible
     }
 
     private suspend fun fetchOverview(saved: StoredSession, holdBusy: Boolean = false) {
         try {
             if (!state.overviewLoaded) {
-                SnapshotStore(app.database).read(MirrorScope(saved.origin, saved.ownerId, saved.workspaceId))?.takeIf { it.head.generation == state.auth?.workspace?.sync_generation_id }?.let { state = state.withFinance(it.finance()).copy(overviewCached = true) }
+                LocalProjectionStore(app.database).read(MirrorScope(saved.origin, saved.ownerId, saved.workspaceId))?.takeIf { it.confirmed.head.generation == state.auth?.workspace?.sync_generation_id }?.let { state = state.withProjection(it).copy(overviewCached = true) }
             }
             val finance = readFinance(saved)
             val command = app.database.commands().get(saved.origin, saved.ownerId, saved.workspaceId)
             val page = state.historyFilter?.let { ApiClient(saved.origin).transactionPage(saved, it, state.historyLimit) }
-            state = state.withFinance(finance).copy(busy = holdBusy, overviewError = "", overviewCached = false, financialCommand = command, financeBlocked = command != null,
+            state = state.withFinance(finance).copy(busy = holdBusy, overviewError = "", overviewCached = false, financialCommand = command, financeBlocked = command != null || state.localPending > 0 || state.localBlocked > 0,
                 historyItems = page?.items, historyNextCursor = page?.next_cursor, historyCursors = listOfNotNull(page?.next_cursor), historyError = "")
         } catch (e: CancellationException) { throw e }
         catch (e: Exception) {
@@ -410,7 +417,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                 if (financialFailure(saved, e)) return@launch
                 val pending = try { app.database.commands().get(saved.origin, saved.ownerId, saved.workspaceId) }
                 catch (_: Exception) { state = state.copy(busy = false, financeBlocked = true, message = "Не удалось прочитать сохраненную команду. Повторите обновление."); return@launch }
-                state = state.copy(busy = false, financialCommand = pending, financeBlocked = pending != null,
+                state = state.copy(busy = false, financialCommand = pending, financeBlocked = pending != null || state.localPending > 0 || state.localBlocked > 0,
                     message = if (pending == null) "Не удалось сохранить команду. Запрос не отправлен." else "Результат не подтвержден. Повторите ту же команду.")
             }
         }
@@ -439,7 +446,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             val receipt = transactionReceipt(result) ?: state.transactionReceipt
             val classification = classificationReceipt(result) ?: state.classificationReceipt
             require(app.database.commands().remove(result.commandId, "confirmed") == 1)
-            state = state.copy(busy = false, accounts = accounts, accountsLoaded = true, overviewLoaded = true, overviewError = "", transactions = history, transactionsLoaded = true, categories = categories, tags = tags, financialCommand = null, financeBlocked = false, historyItems = page?.items, historyNextCursor = page?.next_cursor,
+            state = state.copy(busy = false, accounts = accounts, accountsLoaded = true, overviewLoaded = true, overviewError = "", transactions = history, transactionsLoaded = true, categories = categories, tags = tags, financialCommand = null, financeBlocked = state.localPending > 0 || state.localBlocked > 0, historyItems = page?.items, historyNextCursor = page?.next_cursor,
                 historyCursors = listOfNotNull(page?.next_cursor), historyError = "", transactionReceipt = receipt, collectionReceipt = collection, classificationReceipt = classification, message = savedMessage(result.path))
         } else {
             var current: Account? = null
@@ -489,7 +496,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                 val receipt = if (command.state == "confirmed") transactionReceipt(command) ?: state.transactionReceipt else state.transactionReceipt
                 val classification = if (command.state == "confirmed") classificationReceipt(command) ?: state.classificationReceipt else state.classificationReceipt
                 require(app.database.commands().remove(command.commandId, command.state) == 1)
-                state = state.copy(busy = false, accounts = accounts, accountsLoaded = true, overviewLoaded = true, overviewError = "", transactions = history, transactionsLoaded = true, categories = categories, tags = tags, financialCommand = null, financeBlocked = false,
+                state = state.copy(busy = false, accounts = accounts, accountsLoaded = true, overviewLoaded = true, overviewError = "", transactions = history, transactionsLoaded = true, categories = categories, tags = tags, financialCommand = null, financeBlocked = state.localPending > 0 || state.localBlocked > 0,
                     historyItems = page?.items, historyNextCursor = page?.next_cursor, historyCursors = listOfNotNull(page?.next_cursor), historyError = "",
                     transactionReceipt = receipt, collectionReceipt = collection, classificationReceipt = classification,
                     accountConflict = null, transactionConflict = null, categoryConflict = null, tagConflict = null, message = if (command.state == "confirmed") savedMessage(command.path) else "Данные обновлены. Проверьте поля перед новой командой.")
@@ -522,7 +529,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
 
     fun logout() {
         val saved = candidate ?: return
-        if (state.busy || (state.financeBlocked && !state.logoutPending && !(state.offline && state.financialCommand == null)) || state.revokePendingId != null) return
+        if (state.busy || (state.financeBlocked && !state.logoutPending && !(state.offline && state.financialCommand == null && state.localPending == 0 && state.localBlocked == 0)) || state.revokePendingId != null) return
         state = AuthState(saved.origin, auth = state.auth, logoutPending = true)
         viewModelScope.launch {
             try {

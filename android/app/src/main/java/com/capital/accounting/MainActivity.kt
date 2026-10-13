@@ -71,6 +71,8 @@ class MainActivity : ComponentActivity() {
                                         Text("Нет соединения. Показаны сохраненные данные только для чтения; они могут быть устаревшими.")
                                         Button(enabled = !state.busy, onClick = model::loadOverview) { Text("Проверить соединение") }
                                     }
+                                    if (state.localPending > 0) Text("Локальные изменения ожидают синхронизации: ${state.localPending}.")
+                                    if (state.localBlocked > 0) Text("Сохраненные изменения требуют проверки: ${state.localBlocked}.")
                                     Button(enabled = !state.busy && state.persisted, onClick = model::loadOverview) { Text("Обновить финансовые данные") }
                                     if (state.busy && !state.overviewLoaded) Text("Загрузка финансовых данных…")
                                     if (state.busy && state.overviewCached) Text("Показаны сохраненные финансовые данные. Выполняется синхронизация.")
@@ -80,7 +82,7 @@ class MainActivity : ComponentActivity() {
                                     }
                                     if (!state.persisted) Button(enabled = !state.busy, onClick = model::persist) { Text("Повторить сохранение сессии") }
                                     Button(enabled = !state.busy && !state.financeBlocked, onClick = model::renew) { Text("Продлить сессию") }
-                                    Button(enabled = !state.busy && (!state.financeBlocked || (state.offline && state.financialCommand == null)), onClick = model::logout) { Text("Выйти") }
+                                    Button(enabled = !state.busy && (!state.financeBlocked || (state.offline && state.financialCommand == null && state.localPending == 0 && state.localBlocked == 0)), onClick = model::logout) { Text("Выйти") }
                                     if (section.value == "more") {
                                         Text("Профиль: ${state.auth.profile.email}")
                                         Text("Часовой пояс профиля: ${state.auth.profile.timezone}")
