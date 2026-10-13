@@ -50,7 +50,7 @@ class OfflineAccountStore(private val db: CapitalDatabase) {
         val now = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.ROOT).apply { timeZone = TimeZone.getTimeZone("UTC") }.format(Date())
         val account = visible.copy(version = next.toString(), name = input.name, type = input.type, updated_at = now,
             archived_at = if (input.archived) visible.archived_at ?: now else null)
-        val command = OutboxStore(db).enqueue(saved, "accounts/$id", "PUT", body, listOf(OutboxBase("account", id, input.expected_version)), dependencies,
+        val command = OutboxStore(db).enqueue(saved, "accounts/$id", "PUT", body, ledgerAccountBases(listOf(visible)), dependencies,
             listOf(OverlayEffect.upsert(SnapshotItemAccount("account", account))))
         LocalProjectionStore(db).read(scope)
         command

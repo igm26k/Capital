@@ -28,3 +28,7 @@ internal fun ledgerAccountDelta(account: Account, delta: BigInteger, now: String
     return account.copy(version = ledgerBump(account.version), balance_version = ledgerBump(account.balance_version), updated_at = now,
         posted_balance_minor = posted, projected_balance_minor = projected)
 }
+
+internal fun ledgerAccountBases(accounts: List<Account>): List<OutboxBase> = accounts.distinctBy { it.id }.flatMap {
+    listOf(OutboxBase("account", it.id, it.version), OutboxBase("account", it.id, it.balance_version, "balance_version"))
+}

@@ -63,7 +63,8 @@ class OutboxStore(private val db: CapitalDatabase) {
             type(base.entityType); uuid(base.entityId)
             require(base.version.matches(Regex("[1-9][0-9]*")) && BigInteger(base.version) <= BigInteger.valueOf(Long.MAX_VALUE))
             val confirmed = mirror[base.entityType to base.entityId]?.let { decodeResponse<SnapshotItem>(it.payload) }
-            val item = if (base.entityType in setOf("tag", "category", "account", "transaction") && base.field == "version" && (confirmed == null || snapshotIdentity(confirmed).version != base.version)) {
+            val confirmedVersion = if (base.field == "balance_version" && confirmed is SnapshotItemAccount) confirmed.data.balance_version else confirmed?.let { snapshotIdentity(it).version }
+            val item = if (base.entityType in setOf("tag", "category", "account", "transaction") && (base.field == "version" || base.entityType == "account" && base.field == "balance_version") && confirmedVersion != base.version) {
                 val candidates = queued.values.filter { it.actionId in dependencies && it.generation == saved.generationId }.sortedByDescending { it.position }
                 var predicted: SnapshotItem? = null
                 for (parent in candidates) {
@@ -73,6 +74,50 @@ class OutboxStore(private val db: CapitalDatabase) {
                     require(data.entity_type == base.entityType)
                     val collection = when (base.entityType) { "tag" -> "tags"; "category" -> "categories"; "transaction" -> "transactions"; else -> "accounts" }
                     val expected = when {
+                        base.entityType == "account" && base.field == "balance_version" -> {
+                            require(data is SnapshotItemAccount)
+                            if (parent.method == "POST" && parent.path == "/workspaces/${saved.workspaceId}/accounts") {
+                                require(decodeResponse<AccountCreate>(parent.body).id == base.entityId); "1"
+                            } else {
+                                val observed = ApiClient.json.decodeFromString<List<OutboxBase>>(parent.baseVersions).single { it.entityType == "account" && it.entityId == base.entityId && it.field == "balance_version" }
+                                if (parent.method == "PUT" && parent.path == "/workspaces/${saved.workspaceId}/accounts/${base.entityId}") observed.version
+                                else {
+                                    require(parent.path == "/workspaces/${saved.workspaceId}/accounts/${base.entityId}/adjustments" && parent.method == "POST" ||
+                                        parent.method == "POST" && parent.path == "/workspaces/${saved.workspaceId}/transactions" ||
+                                        parent.method in setOf("PUT", "DELETE") && parent.path.startsWith("/workspaces/${saved.workspaceId}/transactions/"))
+                                    if (parent.path.endsWith("/adjustments")) require(decodeResponse<AdjustmentCreate>(parent.body).expected_balance_version == observed.version)
+                                    else if (parent.method == "POST") {
+                                        val parsed = ApiClient.json.parseToJsonElement(parent.body).jsonObject
+                                        require(parsed["kind"]?.jsonPrimitive?.content in setOf("income", "expense", "refund", "transfer"))
+                                        if (parsed["kind"]?.jsonPrimitive?.content == "transfer") {
+                                            val input = decodeResponse<TransferCreate>(parent.body)
+                                            require(base.entityId in listOfNotNull(input.source_account_id, input.target_account_id, input.fee?.account_id))
+                                        } else require(parsed["account_id"]?.jsonPrimitive?.content == base.entityId)
+                                    } else {
+                                        val rootId = parent.path.substringAfterLast('/'); uuid(rootId)
+                                        val root = ApiClient.json.decodeFromString<List<OutboxBase>>(parent.baseVersions).single { it.entityType == "transaction" && it.entityId == rootId && it.field == "version" }
+                                        val expected = if (parent.method == "DELETE") decodeResponse<TransactionDelete>(parent.body).expected_version else {
+                                            val parsed = ApiClient.json.parseToJsonElement(parent.body).jsonObject
+                                            require(parsed["kind"]?.jsonPrimitive?.content in setOf("income", "expense", "refund", "transfer"))
+                                            requireNotNull(parsed["expected_version"]).jsonPrimitive.content
+                                        }
+                                        require(expected == root.version)
+                                    }
+                                    (BigInteger(observed.version) + BigInteger.ONE).toString()
+                                }
+                            }
+                        }
+                        base.entityType == "account" && parent.method == "POST" && parent.path == "/workspaces/${saved.workspaceId}/accounts/${base.entityId}/adjustments" -> {
+                            val input = decodeResponse<AdjustmentCreate>(parent.body)
+                            val observed = ApiClient.json.decodeFromString<List<OutboxBase>>(parent.baseVersions)
+                            require(input.expected_balance_version == observed.single { it.entityType == "account" && it.entityId == base.entityId && it.field == "balance_version" }.version)
+                            (BigInteger(observed.single { it.entityType == "account" && it.entityId == base.entityId && it.field == "version" }.version) + BigInteger.ONE).toString()
+                        }
+                        base.entityType == "transaction" && parent.method == "POST" && parent.path.startsWith("/workspaces/${saved.workspaceId}/accounts/") && parent.path.endsWith("/adjustments") -> {
+                            val accountId = parent.path.substringBeforeLast('/').substringAfterLast('/'); uuid(accountId)
+                            require(parent.path == "/workspaces/${saved.workspaceId}/accounts/$accountId/adjustments" && decodeResponse<AdjustmentCreate>(parent.body).id == base.entityId); "1"
+                        }
+
                         base.entityType == "transaction" && parent.method in setOf("POST", "PUT") &&
                             ApiClient.json.parseToJsonElement(parent.body).jsonObject["kind"]?.jsonPrimitive?.content == "refund" -> {
                             val input = if (parent.method == "POST") decodeResponse<RefundCreate>(parent.body) else decodeResponse<RefundReplace>(parent.body).let {
@@ -109,7 +154,7 @@ class OutboxStore(private val db: CapitalDatabase) {
                             else { require(input.fee?.id == base.entityId); input.expected_fee_version?.let { (BigInteger(it) + BigInteger.ONE).toString() } ?: "1" }
                         }
                         parent.method == "PUT" && parent.path == "/workspaces/${saved.workspaceId}/$collection/${base.entityId}" ->
-                            (BigInteger(when (base.entityType) { "tag" -> decodeResponse<TagUpdate>(parent.body).expected_version; "category" -> decodeResponse<CategoryUpdate>(parent.body).expected_version; "account" -> decodeResponse<AccountUpdate>(parent.body).expected_version; else -> { val parsed = ApiClient.json.parseToJsonElement(parent.body).jsonObject; require(parsed["kind"]?.jsonPrimitive?.content in setOf("income", "expense")); requireNotNull(parsed["expected_version"]).jsonPrimitive.content } }) + BigInteger.ONE).toString()
+                            (BigInteger(when (base.entityType) { "tag" -> decodeResponse<TagUpdate>(parent.body).expected_version; "category" -> decodeResponse<CategoryUpdate>(parent.body).expected_version; "account" -> decodeResponse<AccountUpdate>(parent.body).expected_version; else -> { val parsed = ApiClient.json.parseToJsonElement(parent.body).jsonObject; require(parsed["kind"]?.jsonPrimitive?.content in setOf("income", "expense", "adjustment")); requireNotNull(parsed["expected_version"]).jsonPrimitive.content } }) + BigInteger.ONE).toString()
                         base.entityType == "account" && (parent.method == "POST" && parent.path == "/workspaces/${saved.workspaceId}/transactions" ||
                             parent.method in setOf("PUT", "DELETE") && parent.path.startsWith("/workspaces/${saved.workspaceId}/transactions/") && parent.path.substringAfterLast('/').matches(Regex("[a-f0-9-]{36}"))) -> {
                             val parsed = ApiClient.json.parseToJsonElement(parent.body).jsonObject
@@ -126,7 +171,7 @@ class OutboxStore(private val db: CapitalDatabase) {
                         }
                         else -> error("Invalid catalog dependency")
                     }
-                    require(identity.id == base.entityId && identity.workspace == saved.workspaceId && identity.version == expected)
+                    require(identity.id == base.entityId && identity.workspace == saved.workspaceId && (if (base.field == "balance_version") (data as SnapshotItemAccount).data.balance_version else identity.version) == expected)
                     predicted = data; break
                 }
                 requireNotNull(predicted)

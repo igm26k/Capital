@@ -85,7 +85,7 @@ class OfflineRefundStore(private val db: CapitalDatabase) {
         }
         val transactions = listOfNotNull(old, parent, transfer)
         val refs = accounts.map { "account" to it.id } + transactions.map { "transaction" to it.id } + input.tag_ids.map { "tag" to it }
-        val bases = accounts.map { OutboxBase("account", it.id, it.version) } + transactions.map { OutboxBase("transaction", it.id, it.version) }
+        val bases = ledgerAccountBases(accounts) + transactions.map { OutboxBase("transaction", it.id, it.version) }
         val command = OutboxStore(db).enqueue(saved, if (id == null) "transactions" else "transactions/$id", if (id == null) "POST" else "PUT", body, bases, dependencies(projection, refs), effects)
         LocalProjectionStore(db).read(MirrorScope(saved.origin, saved.ownerId, saved.workspaceId))
         return command
@@ -111,7 +111,7 @@ class OfflineRefundStore(private val db: CapitalDatabase) {
             OverlayEffect.upsert(SnapshotItemAccount("account", ledgerAccountDelta(accounts.single { it.id == entry.account_id }, BigInteger(entry.amount_minor).negate(), now))))
         transfer?.let { effects.add(OverlayEffect.upsert(SnapshotItemTransaction("transaction", it.copy(version = ledgerBump(it.version), updated_at = now)))) }
         val refs = accounts.map { "account" to it.id } + transactions.map { "transaction" to it.id }
-        val bases = accounts.map { OutboxBase("account", it.id, it.version) } + transactions.map { OutboxBase("transaction", it.id, it.version) }
+        val bases = ledgerAccountBases(accounts) + transactions.map { OutboxBase("transaction", it.id, it.version) }
         val command = OutboxStore(db).enqueue(saved, "transactions/$id", "DELETE", body, bases, dependencies(projection, refs), effects)
         LocalProjectionStore(db).read(MirrorScope(saved.origin, saved.ownerId, saved.workspaceId))
         command

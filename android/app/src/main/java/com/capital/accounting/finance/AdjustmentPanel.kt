@@ -14,7 +14,7 @@ import java.util.UUID
 @Composable
 fun AdjustmentPanel(model: AuthViewModel) {
     val state = model.state
-    val enabled = !state.busy && !state.financeBlocked && state.persisted
+    val enabled = !state.busy && !state.financeBlocked && state.persisted || state.canQueueAdjustments
     val guard = rememberDraftGuard("adjustment", enabled, render = false)
     val scope = LocalFinancialDraftScope.current
     val navigation = LocalFinancialEditor.current
@@ -25,6 +25,7 @@ fun AdjustmentPanel(model: AuthViewModel) {
     var reason by rememberFinancialDraft("adjustment.reason") { "" }
     var note by rememberFinancialDraft("adjustment.note") { "" }
     var zone by rememberFinancialDraft("adjustment.zone") { TimeZone.getDefault().id }
+    var handledLocalReceipt by remember { mutableStateOf(state.localCollectionReceipt?.actionId) }
     var handledReceipt by remember { mutableStateOf(state.transactionReceipt?.commandId) }
     var editingId by rememberFinancialDraft<String?>("adjustment.editingId") { null }
     var editingVersion by rememberFinancialDraft("adjustment.editingVersion") { "" }
@@ -48,7 +49,16 @@ fun AdjustmentPanel(model: AuthViewModel) {
     fun editAdjustment(item: Transaction) { guard.request { validation.reset(); editingId = item.id; editingVersion = item.version; accountId = item.entries.single().account_id; note = item.note; error = ""; navigation.value = "adjustment" } }
     fun deleteAdjustment(item: Transaction) { deleting = item }
     HandleFinancialTransaction("adjustment", enabled) { if (it.action == FinancialTransactionAction.EDIT) editAdjustment(it.transaction) else deleteAdjustment(it.transaction) }
-    LaunchedEffect(state.financialCommand?.commandId, state.transactionReceipt?.commandId, state.accounts, state.transactions) {
+    LaunchedEffect(state.financialCommand?.commandId, state.transactionReceipt?.commandId, state.localCollectionReceipt?.actionId, state.accounts, state.transactions) {
+        val local = state.localCollectionReceipt
+        if (local != null && local.actionId != handledLocalReceipt) {
+            handledLocalReceipt = local.actionId
+            if (local.collection == "transactions" && local.kind == "adjustment" && (local.created && editingId == null || local.recordId == editingId)) {
+                if (local.deleted) reset()
+                else state.transactions.find { it.id == local.recordId }?.let { editingVersion = it.version }
+                guard.markClean(); if (navigation.value == "adjustment") navigation.value = null
+            }
+        }
         val command = state.financialCommand
         if (command == null) {
             val receipt = state.transactionReceipt
@@ -95,7 +105,7 @@ fun AdjustmentPanel(model: AuthViewModel) {
                 ValidatedTextField(reason, { reason = it }, "Причина корректировки", "reason", validation, enabled, singleLine = false)
                 ValidatedTextField(zone, { zone = it }, "Часовой пояс корректировки", "zone", validation, enabled)
                 if (account.balance_version != balanceVersion) {
-                    Text("Версия остатка на сервере: ${account.balance_version}; черновика: $balanceVersion")
+                    Text(if (("account" to account.id) in state.localAffected) "Ожидаемая версия остатка: ${account.balance_version}; черновика: $balanceVersion" else "Версия остатка на сервере: ${account.balance_version}; черновика: $balanceVersion")
                     Button(enabled = enabled, onClick = { balanceVersion = account.balance_version }) { Text("Использовать обновленную версию остатка") }
                 }
             }
@@ -109,7 +119,7 @@ fun AdjustmentPanel(model: AuthViewModel) {
                 Text("Время корректировки: ${openingLocal(item.occurred_at, item.occurred_timezone)} · ${item.occurred_timezone}")
             }
             if (edited != null && edited.version != editingVersion) {
-                Text("Версия корректировки на сервере: ${edited.version}; черновика: $editingVersion")
+                Text(if (("transaction" to edited.id) in state.localAffected) "Ожидаемая версия корректировки: ${edited.version}; черновика: $editingVersion" else "Версия корректировки на сервере: ${edited.version}; черновика: $editingVersion")
                 Button(enabled = enabled, onClick = { editingVersion = edited.version }) { Text("Использовать обновленную версию корректировки") }
             }
             state.transactionConflict?.takeIf { it.kind == "adjustment" }?.let { Text("Корректировка на сервере: ${it.note}; версия ${it.version}") }

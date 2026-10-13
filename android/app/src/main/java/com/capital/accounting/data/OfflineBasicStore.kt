@@ -53,7 +53,7 @@ class OfflineBasicStore(private val db: CapitalDatabase) {
                 if (db.outbox().overlays(parent.position).any { (it.entityType to it.entityId) == reference }) { dependencies.add(parent.actionId); break }
             }
         }
-        val command = OutboxStore(db).enqueue(saved, "transactions", "POST", body, listOf(OutboxBase("account", account.id, account.version)), dependencies.toList(),
+        val command = OutboxStore(db).enqueue(saved, "transactions", "POST", body, ledgerAccountBases(listOf(account)), dependencies.toList(),
             listOf(OverlayEffect.upsert(SnapshotItemAccount("account", changed)), OverlayEffect.upsert(SnapshotItemTransaction("transaction", tx))))
         LocalProjectionStore(db).read(scope)
         command
@@ -105,7 +105,7 @@ class OfflineBasicStore(private val db: CapitalDatabase) {
             effects.add(OverlayEffect.upsert(SnapshotItemAccount("account", ledgerAccountDelta(item, delta, now))))
         }
         val refs = listOf("transaction" to id) + affected.map { "account" to it.id } + input.tags.map { "tag" to it } + input.parts.mapNotNull { it.category_id?.let { id -> "category" to id } }
-        val bases = listOf(OutboxBase("transaction", id, old.version)) + affected.map { OutboxBase("account", it.id, it.version) }
+        val bases = listOf(OutboxBase("transaction", id, old.version)) + ledgerAccountBases(affected)
         val command = OutboxStore(db).enqueue(saved, "transactions/$id", "PUT", body, bases, dependencies(projection, refs), effects)
         LocalProjectionStore(db).read(MirrorScope(saved.origin, saved.ownerId, saved.workspaceId))
         command
@@ -123,7 +123,7 @@ class OfflineBasicStore(private val db: CapitalDatabase) {
         ledgerBump(old.version)
         val effects = listOf(OverlayEffect.delete("transaction", id), OverlayEffect.upsert(SnapshotItemAccount("account", ledgerAccountDelta(account, BigInteger(entry.amount_minor).negate(), ledgerNow()))))
         val command = OutboxStore(db).enqueue(saved, "transactions/$id", "DELETE", body,
-            listOf(OutboxBase("transaction", id, old.version), OutboxBase("account", account.id, account.version)),
+            listOf(OutboxBase("transaction", id, old.version)) + ledgerAccountBases(listOf(account)),
             dependencies(projection, listOf("transaction" to id, "account" to account.id)), effects)
         LocalProjectionStore(db).read(MirrorScope(saved.origin, saved.ownerId, saved.workspaceId))
         command

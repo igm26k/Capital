@@ -66,7 +66,7 @@ class OfflineMirrorRuntimeTest {
     }
     @Test fun offline() {
         val previous = JSONObject(proof.readText()); assertNotEquals(previous.getInt("pid"), android.os.Process.myPid())
-        waitFor("Нет соединения. Показаны сохраненные данные; они могут быть устаревшими. Доходы, расходы, переводы и возвраты, изменения счетов, категорий и тегов сохраняются на устройстве.")
+        waitFor("Нет соединения. Показаны сохраненные данные; они могут быть устаревшими. Доходы, расходы, переводы, возвраты и корректировки остатков, изменения счетов, категорий и тегов сохраняются на устройстве.")
         compose.onNodeWithText("Изменить счет Offline cash").assertExists(); compose.onNodeWithText("Итого: 99,000 KWD").assertExists()
         compose.onNodeWithText("Добавить счет").assertIsEnabled()
         compose.onNodeWithText("Выйти").assertIsEnabled()
@@ -74,7 +74,7 @@ class OfflineMirrorRuntimeTest {
         raw(); val p = JSONObject(proof.readText()).put("cold_read", true); proof.writeText(p.toString()); write("offline")
     }
     @Test fun online() = runBlocking<Unit> {
-        waitFor("Нет соединения. Показаны сохраненные данные; они могут быть устаревшими. Доходы, расходы, переводы и возвраты, изменения счетов, категорий и тегов сохраняются на устройстве.")
+        waitFor("Нет соединения. Показаны сохраненные данные; они могут быть устаревшими. Доходы, расходы, переводы, возвраты и корректировки остатков, изменения счетов, категорий и тегов сохраняются на устройстве.")
         write("reconnect_ready")
         withTimeout(40000) { while (!File(app.filesDir, "offline-host-online.txt").exists()) delay(100) }
         compose.onNodeWithText("Проверить соединение").performScrollTo().performClick()
@@ -91,7 +91,7 @@ class OfflineMirrorRuntimeTest {
     @Test fun denied() = runBlocking<Unit> {
         waitFor("Сессия завершена. Войдите снова.")
         compose.onNodeWithText("Изменить счет Offline cash").assertDoesNotExist()
-        compose.onNodeWithText("Нет соединения. Показаны сохраненные данные; они могут быть устаревшими. Доходы, расходы, переводы и возвраты, изменения счетов, категорий и тегов сохраняются на устройстве.").assertDoesNotExist()
+        compose.onNodeWithText("Нет соединения. Показаны сохраненные данные; они могут быть устаревшими. Доходы, расходы, переводы, возвраты и корректировки остатков, изменения счетов, категорий и тегов сохраняются на устройстве.").assertDoesNotExist()
         assertTrue(app.credentialVault.load(origin) is VaultRead.Empty)
         raw(); val p = JSONObject(proof.readText()).put("denied_hidden", true).put("no_commands", true); proof.writeText(p.toString()); write("verified")
     }
