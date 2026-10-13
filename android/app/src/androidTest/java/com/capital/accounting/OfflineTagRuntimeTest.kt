@@ -24,7 +24,7 @@ import java.io.File
 import java.security.MessageDigest
 import java.util.UUID
 
-private const val offlineTagBanner = "Нет соединения. Показаны сохраненные данные; они могут быть устаревшими. Новые доходы и расходы, изменения счетов, категорий и тегов сохраняются на устройстве."
+private const val offlineTagBanner = "Нет соединения. Показаны сохраненные данные; они могут быть устаревшими. Новые переводы, доходы и расходы, изменения счетов, категорий и тегов сохраняются на устройстве."
 private fun commandHash(body: String) = MessageDigest.getInstance("SHA-256").digest(body.toByteArray()).joinToString("") { "%02x".format(it) }
 @RunWith(AndroidJUnit4::class)
 class OfflineTagPrepareTest {
@@ -131,13 +131,33 @@ class OfflineTagRuntimeTest {
             click("Удалить операцию $note"); click("Подтвердить удаление операции")
             compose.waitUntil(60000) { compose.onAllNodesWithText("Удалить операцию $note").fetchSemanticsNodes().isEmpty() }
         }
-        wait("Локальные изменения ожидают синхронизации: 18.")
+        compose.onNodeWithContentDescription("Раздел Счета").performClick(); click("Добавить счет")
+        wait("Название счета"); compose.onNodeWithText("Название счета").performTextInput("Offline target")
+        click("KWD"); compose.onNodeWithText("Начальный остаток").performTextClearance(); compose.onNodeWithText("Начальный остаток").performTextInput("10,000")
+        compose.onNodeWithText("Дата открытия (YYYY-MM-DDTHH:MM:SS)").performTextClearance(); compose.onNodeWithText("Дата открытия (YYYY-MM-DDTHH:MM:SS)").performTextInput("2026-10-13T12:00:00")
+        compose.onNodeWithText("Часовой пояс открытия").performTextClearance(); compose.onNodeWithText("Часовой пояс открытия").performTextInput("UTC")
+        click("Создать счет"); wait("Offline target")
+        compose.onNodeWithContentDescription("Раздел Операции").performClick(); click("Новый перевод"); wait("Сумма списания перевода")
+        click("Списать со счета: Renamed offline cash · KWD"); click("Зачислить на счет: Offline target · KWD")
+        compose.onNodeWithText("Сумма списания перевода").performTextInput("12,345")
+        compose.onNodeWithText("Дата перевода (YYYY-MM-DDTHH:MM:SS)").performTextClearance(); compose.onNodeWithText("Дата перевода (YYYY-MM-DDTHH:MM:SS)").performTextInput("2026-10-13T12:10:00")
+        compose.onNodeWithText("Часовой пояс перевода").performTextClearance(); compose.onNodeWithText("Часовой пояс перевода").performTextInput("UTC")
+        compose.onNodeWithText("Примечание перевода").performTextInput("Offline transfer")
+        click("Добавить комиссию перевода"); click("Счет комиссии: Renamed offline cash · KWD")
+        compose.onNodeWithText("Сумма комиссии перевода").performTextInput("0,111")
+        click("Категория комиссии 1: Offline parent")
+        compose.onNodeWithContentDescription("Тег комиссии Offline second tag").performScrollTo().performClick()
+        click("Сохранить перевод")
+        compose.waitUntil(60000) { compose.onAllNodesWithText("Сумма списания перевода").fetchSemanticsNodes().isEmpty() }
+        wait("Локальные изменения ожидают синхронизации: 20.")
         runBlocking {
             val data = JSONObject(proof.readText()); val scope = MirrorScope("https://localhost:8444", data.getString("owner"), data.getString("workspace"))
-            val commands = app.database.outbox().commands(scope.key); assertEquals(18, commands.size); assertTrue(commands.all { it.state == "queued" })
+            val commands = app.database.outbox().commands(scope.key); assertEquals(20, commands.size); assertTrue(commands.all { it.state == "queued" })
             val visible = LocalProjectionStore(app.database).read(scope)!!
-            assertEquals("123456", visible.visible.accounts.single().posted_balance_minor)
-            assertTrue(visible.visible.transactions.all { it.kind == "opening" })
+            assertEquals(mapOf("Renamed offline cash" to "111000", "Offline target" to "22345"), visible.visible.accounts.associate { it.name to it.posted_balance_minor })
+            val localTransfer = visible.visible.transactions.single { it.kind == "transfer" }
+            assertEquals(Rate("1", "1"), localTransfer.rate)
+            assertEquals("-111", visible.visible.transactions.single { it.id == localTransfer.fee_transaction_id }.entries.single().amount_minor)
             val original = SnapshotStore(app.database).read(scope)!!; assertEquals("1", original.head.sequence)
             assertEquals("Existing offline tag", original.items.filterIsInstance<SnapshotItemTag>().single().data.name)
             val changed = commands.first { it.path.endsWith("/tags/${data.getString("tag")}") }; assertEquals("1", decodeResponse<TagUpdate>(changed.body).expected_version)
@@ -149,21 +169,27 @@ class OfflineTagRuntimeTest {
     @Test fun onlineColdRecover() {
         val before = JSONObject(proof.readText()); assertNotEquals(before.getInt("pid"), Process.myPid())
         wait("Синхронизация завершена.")
-        compose.waitUntil(60000) { compose.onAllNodesWithText("Локальные изменения ожидают синхронизации: 18.").fetchSemanticsNodes().isEmpty() }
+        compose.waitUntil(60000) { compose.onAllNodesWithText("Локальные изменения ожидают синхронизации: 20.").fetchSemanticsNodes().isEmpty() }
         compose.onNodeWithContentDescription("Раздел Еще").performClick(); wait("Тег: Edited offline first · В архиве"); wait("Тег: Offline second tag"); wait("Тег: Archived offline tag · В архиве"); wait("Категория: Offline parent / Archived child · В архиве")
         runBlocking {
             val scope = MirrorScope("https://localhost:8444", before.getString("owner"), before.getString("workspace")); val commands = app.database.outbox().commands(scope.key)
-            assertEquals(18, commands.size)
+            assertEquals(20, commands.size)
             for ((index, command) in commands.withIndex()) {
                 assertEquals(before.getJSONArray("actions").getString(index), command.actionId); assertEquals(before.getJSONArray("hashes").getString(index), commandHash(command.body))
                 assertEquals("applied", command.state); assertTrue(app.database.outbox().overlays(command.position).isEmpty())
             }
-            val mirror = SnapshotStore(app.database).read(scope)!!; assertEquals("19", mirror.head.sequence)
+            val mirror = SnapshotStore(app.database).read(scope)!!; assertEquals("21", mirror.head.sequence)
             assertEquals("2", mirror.items.filterIsInstance<SnapshotItemTag>().first { it.data.id == before.getString("tag") }.data.version)
-            val account = mirror.items.filterIsInstance<SnapshotItemAccount>().single().data
-            assertEquals("123456", account.posted_balance_minor); assertEquals("10", account.version); assertEquals("7", account.balance_version); assertNull(account.archived_at)
-            assertTrue(mirror.finance().transactions.all { it.kind == "opening" })
-            assertEquals(1, mirror.items.filterIsInstance<SnapshotItemTransaction>().count { it.data.kind == "opening" })
+            val account = mirror.items.filterIsInstance<SnapshotItemAccount>().single { it.data.name == "Renamed offline cash" }.data
+            assertEquals("111000", account.posted_balance_minor); assertEquals("11", account.version); assertEquals("8", account.balance_version); assertNull(account.archived_at)
+            assertEquals("22345", mirror.finance().accounts.single { it.name == "Offline target" }.posted_balance_minor)
+            val transfer = mirror.finance().transactions.single { it.kind == "transfer" }
+            val originalTransfer = decodeResponse<TransferCreate>(commands.single { it.path.endsWith("/transactions") && JSONObject(it.body).getString("kind") == "transfer" }.body)
+            assertEquals(originalTransfer.id, transfer.id); assertEquals(originalTransfer.fee!!.id, transfer.fee_transaction_id)
+            assertEquals(Rate("1", "1"), transfer.rate)
+            val fee = mirror.finance().transactions.single { it.id == transfer.fee_transaction_id }
+            assertEquals(transfer.id, fee.parent_transaction_id); assertEquals("-111", fee.entries.single().amount_minor)
+            assertEquals(2, mirror.items.filterIsInstance<SnapshotItemTransaction>().count { it.data.kind == "opening" })
             before.put("stage", "verified").put("pid", Process.myPid()).put("cold_recovered", true).put("command_preserved", true).put("pull_covered", true)
             proof.writeText(before.toString())
             val saved = (app.credentialVault.load(scope.origin) as VaultRead.Available).session

@@ -7,7 +7,6 @@ import com.capital.accounting.finance.Money
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import java.math.BigInteger
-import java.text.ParsePosition
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -29,20 +28,20 @@ class OfflineBasicStore(private val db: CapitalDatabase) {
         require(projection.visible.transactions.none { it.id == input.id })
         val account = requireNotNull(projection.visible.accounts.find { it.id == input.accountId })
         require(account.archived_at == null && input.timezone in TimeZone.getAvailableIDs())
-        require(instant(input.occurred) >= instant(account.opened_at) && instant(input.occurred) <= BigInteger.valueOf(System.currentTimeMillis()).multiply(BigInteger.valueOf(1000)))
+        require(ledgerInstant(input.occurred) >= ledgerInstant(account.opened_at) && ledgerInstant(input.occurred) <= BigInteger.valueOf(System.currentTimeMillis()).multiply(BigInteger.valueOf(1000)))
         require(input.note.length <= 2000 && input.payee.length <= 200)
-        val amount = positive(input.amount, account.currency)
+        val amount = ledgerPositive(input.amount, account.currency)
         require(input.tags.size <= 50 && input.tags.toSet().size == input.tags.size)
         require(input.tags.all { id -> projection.visible.tags.any { it.id == id && it.archived_at == null } })
         require(input.parts.size in 1..100 && input.parts.map { it.id }.toSet().size == input.parts.size)
         require(input.parts.all { part -> part.category_id == null || projection.visible.categories.any { it.id == part.category_id && it.archived_at == null } })
-        require(input.parts.fold(BigInteger.ZERO) { sum, part -> sum + positive(part.amount_minor, account.currency) } == amount)
+        require(input.parts.fold(BigInteger.ZERO) { sum, part -> sum + ledgerPositive(part.amount_minor, account.currency) } == amount)
         val now = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.ROOT).apply { timeZone = TimeZone.getTimeZone("UTC") }.format(Date())
         val signed = if (input.kind == "expense") amount.negate() else amount
         val posted = (BigInteger(account.posted_balance_minor) + signed).toString()
         val projected = (BigInteger(posted) + BigInteger(account.pending_delta_minor)).toString()
         Money.display(posted, account.currency); Money.display(projected, account.currency)
-        val changed = account.copy(version = bump(account.version), balance_version = bump(account.balance_version), updated_at = now,
+        val changed = account.copy(version = ledgerBump(account.version), balance_version = ledgerBump(account.balance_version), updated_at = now,
             posted_balance_minor = posted, projected_balance_minor = projected)
         val tx = Transaction(input.id, saved.workspaceId, "1", now, now, null, input.kind, "posted", input.occurred, input.timezone, input.note, input.payee,
             null, null, null, null, listOf(Entry(UUID.randomUUID().toString(), account.id, account.currency, signed.toString())),
@@ -77,25 +76,25 @@ class OfflineBasicStore(private val db: CapitalDatabase) {
         val previousAccount = projection.visible.accounts.single { it.id == previousEntry.account_id }
         require(account.archived_at == null && previousAccount.archived_at == null && account.currency == previousAccount.currency)
         require(input.timezone in TimeZone.getAvailableIDs() && input.note.length <= 2000 && input.payee.length <= 200)
-        require(instant(input.occurred) >= instant(account.opened_at) && instant(input.occurred) <= BigInteger.valueOf(System.currentTimeMillis()).multiply(BigInteger.valueOf(1000)))
-        val amount = positive(input.amount, account.currency)
+        require(ledgerInstant(input.occurred) >= ledgerInstant(account.opened_at) && ledgerInstant(input.occurred) <= BigInteger.valueOf(System.currentTimeMillis()).multiply(BigInteger.valueOf(1000)))
+        val amount = ledgerPositive(input.amount, account.currency)
         require(input.tags.size <= 50 && input.tags.toSet().size == input.tags.size)
         require(input.tags.all { id -> projection.visible.tags.any { it.id == id && (it.archived_at == null || id in old.tag_ids) } })
         require(input.parts.size in 1..100 && input.parts.map { it.id }.toSet().size == input.parts.size)
         require(input.parts.all { part -> part.category_id == null || projection.visible.categories.any { it.id == part.category_id &&
             (it.archived_at == null || old.allocations.any { prior -> prior.id == part.id && prior.category_id == part.category_id }) } })
-        require(input.parts.fold(BigInteger.ZERO) { sum, part -> sum + positive(part.amount_minor, account.currency) } == amount)
+        require(input.parts.fold(BigInteger.ZERO) { sum, part -> sum + ledgerPositive(part.amount_minor, account.currency) } == amount)
         val signed = if (old.kind == "expense") amount.negate() else amount
-        val movementChanged = previousEntry.account_id != account.id || BigInteger(previousEntry.amount_minor) != signed || instant(old.occurred_at) != instant(input.occurred)
+        val movementChanged = previousEntry.account_id != account.id || BigInteger(previousEntry.amount_minor) != signed || ledgerInstant(old.occurred_at) != ledgerInstant(input.occurred)
         val hasRefund = projection.visible.transactions.any { it.kind == "refund" && it.parent_transaction_id == id && it.status in setOf("posted", "pending") }
         if (hasRefund) require(!movementChanged && old.allocations.associate { it.id to (it.amount_minor to it.category_id) } == input.parts.associate { it.id to (it.amount_minor to it.category_id) })
-        val now = localNow()
+        val now = ledgerNow()
         val parts = input.parts.map { part ->
             val prior = old.allocations.find { it.id == part.id }
             val refunded = if (old.kind == "expense" && prior != null) BigInteger(prior.amount_minor) - BigInteger(prior.remaining_refundable_minor) else BigInteger.ZERO
             Allocation(part.id, part.category_id, part.amount_minor, null, if (old.kind == "expense") (BigInteger(part.amount_minor) - refunded).toString() else "0")
         }
-        val changed = old.copy(version = bump(old.version), updated_at = now, occurred_at = input.occurred, occurred_timezone = input.timezone,
+        val changed = old.copy(version = ledgerBump(old.version), updated_at = now, occurred_at = input.occurred, occurred_timezone = input.timezone,
             note = input.note, payee = input.payee, tag_ids = input.tags, allocations = parts,
             entries = listOf(previousEntry.copy(account_id = account.id, amount_minor = signed.toString())))
         val effects = mutableListOf(OverlayEffect.upsert(SnapshotItemTransaction("transaction", changed)))
@@ -103,7 +102,7 @@ class OfflineBasicStore(private val db: CapitalDatabase) {
         if (movementChanged) for (item in affected) {
             val delta = (if (item.id == previousAccount.id) BigInteger(previousEntry.amount_minor).negate() else BigInteger.ZERO) +
                 (if (item.id == account.id) signed else BigInteger.ZERO)
-            effects.add(OverlayEffect.upsert(SnapshotItemAccount("account", changedAccount(item, delta, now))))
+            effects.add(OverlayEffect.upsert(SnapshotItemAccount("account", ledgerAccountDelta(item, delta, now))))
         }
         val refs = listOf("transaction" to id) + affected.map { "account" to it.id } + input.tags.map { "tag" to it } + input.parts.mapNotNull { it.category_id?.let { id -> "category" to id } }
         val bases = listOf(OutboxBase("transaction", id, old.version)) + affected.map { OutboxBase("account", it.id, it.version) }
@@ -121,8 +120,8 @@ class OfflineBasicStore(private val db: CapitalDatabase) {
         require(projection.visible.transactions.none { it.kind == "refund" && it.parent_transaction_id == id && it.status in setOf("posted", "pending") })
         val entry = old.entries.single(); val account = projection.visible.accounts.single { it.id == entry.account_id }
         require(account.archived_at == null)
-        bump(old.version)
-        val effects = listOf(OverlayEffect.delete("transaction", id), OverlayEffect.upsert(SnapshotItemAccount("account", changedAccount(account, BigInteger(entry.amount_minor).negate(), localNow()))))
+        ledgerBump(old.version)
+        val effects = listOf(OverlayEffect.delete("transaction", id), OverlayEffect.upsert(SnapshotItemAccount("account", ledgerAccountDelta(account, BigInteger(entry.amount_minor).negate(), ledgerNow()))))
         val command = OutboxStore(db).enqueue(saved, "transactions/$id", "DELETE", body,
             listOf(OutboxBase("transaction", id, old.version), OutboxBase("account", account.id, account.version)),
             dependencies(projection, listOf("transaction" to id, "account" to account.id)), effects)
@@ -148,23 +147,4 @@ class OfflineBasicStore(private val db: CapitalDatabase) {
 private data class BasicIntent(val id: String, val kind: String, val accountId: String, val amount: String, val occurred: String, val timezone: String,
     val note: String, val payee: String, val tags: List<String>, val parts: List<AllocationInput>) {
     override fun toString() = "BasicIntent([redacted])"
-}
-private fun positive(value: String, currency: String): BigInteger {
-    require(value.matches(Regex("[1-9][0-9]*"))); Money.display(value, currency); return BigInteger(value)
-}
-private fun bump(value: String): String = (BigInteger(value) + BigInteger.ONE).also { require(it <= BigInteger.valueOf(Long.MAX_VALUE)) }.toString()
-private fun instant(value: String): BigInteger {
-    require(value.matches(Regex("[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{1,6})?Z")))
-    val parser = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.ROOT).apply { isLenient = false; timeZone = TimeZone.getTimeZone("UTC") }
-    val position = ParsePosition(0); val date = requireNotNull(parser.parse(value.take(19), position)); require(position.index == 19)
-    return BigInteger.valueOf(date.time).multiply(BigInteger.valueOf(1000)) + BigInteger(value.drop(19).removeSuffix("Z").removePrefix(".").padEnd(6, '0'))
-}
-
-private fun localNow(): String = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.ROOT).apply { timeZone = TimeZone.getTimeZone("UTC") }.format(Date())
-private fun changedAccount(account: Account, delta: BigInteger, now: String): Account {
-    val posted = (BigInteger(account.posted_balance_minor) + delta).toString()
-    val projected = (BigInteger(posted) + BigInteger(account.pending_delta_minor)).toString()
-    Money.display(posted, account.currency); Money.display(projected, account.currency)
-    return account.copy(version = bump(account.version), balance_version = bump(account.balance_version), updated_at = now,
-        posted_balance_minor = posted, projected_balance_minor = projected)
 }

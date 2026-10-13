@@ -78,9 +78,9 @@ fun TransactionPanel(model: AuthViewModel) {
         val local = state.localCollectionReceipt
         if (local != null && local.actionId != handledLocalReceipt) {
             handledLocalReceipt = local.actionId
-            if (local.collection == "transactions" && local.created && editingId == null) {
+            if (local.collection == "transactions" && local.kind in setOf("income", "expense") && local.created && editingId == null) {
                 parts = parts.map { it.copy(id = UUID.randomUUID().toString()) }; guard.markClean(); navigation.value = null
-            } else if (local.collection == "transactions" && local.recordId == editingId) {
+            } else if (local.collection == "transactions" && local.kind in setOf("income", "expense") && local.recordId == editingId) {
                 if (local.deleted) { editingId = null; original = null; amount = ""; note = ""; parts = listOf(AllocationDraft()); selectedTags = emptyList() }
                 else state.transactions.find { it.id == editingId }?.let { original = it; editingVersion = it.version }
                 guard.markClean(); if (navigation.value == "transaction") navigation.value = null

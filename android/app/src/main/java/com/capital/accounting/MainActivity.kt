@@ -68,7 +68,7 @@ class MainActivity : ComponentActivity() {
                                     Text("Устройство: ${state.auth.session.device_name}")
                                     Text("Сессия действует до: ${state.auth.session.expires_at}")
                                     if (state.offline) {
-                                        Text("Нет соединения. Показаны сохраненные данные; они могут быть устаревшими. Новые доходы и расходы, изменения счетов, категорий и тегов сохраняются на устройстве.")
+                                        Text("Нет соединения. Показаны сохраненные данные; они могут быть устаревшими. Новые переводы, доходы и расходы, изменения счетов, категорий и тегов сохраняются на устройстве.")
                                         Button(enabled = !state.busy, onClick = model::loadOverview) { Text("Проверить соединение") }
                                     }
                                     if (state.localPending > 0) Text("Локальные изменения ожидают синхронизации: ${state.localPending}.")

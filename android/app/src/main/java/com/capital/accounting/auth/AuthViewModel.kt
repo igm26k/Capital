@@ -13,6 +13,7 @@ import com.capital.accounting.api.*
 import com.capital.accounting.data.ConnectionSettings
 import com.capital.accounting.data.FinancialCommand
 import com.capital.accounting.data.IdentityStore
+import com.capital.accounting.data.OfflineTransferStore
 import com.capital.accounting.data.OfflineBasicStore
 import com.capital.accounting.data.OfflineAccountStore
 import com.capital.accounting.data.OfflineCategoryStore
@@ -39,7 +40,7 @@ data class TransactionReceipt(val commandId: String, val transactionId: String, 
     val transaction get() = records.find { it.id == transactionId }
 }
 
-data class LocalCollectionReceipt(val actionId: String, val collection: String, val recordId: String, val created: Boolean, val deleted: Boolean = false)
+data class LocalCollectionReceipt(val actionId: String, val collection: String, val recordId: String, val created: Boolean, val deleted: Boolean = false, val kind: String? = null)
 
 data class CollectionReceipt(val commandId: String, val collection: String, val recordId: String, val created: Boolean, val result: MutationResult)
 data class ClassificationReceipt(val commandId: String, val ids: Set<String>)
@@ -61,6 +62,7 @@ data class AuthState(
     val financeBlocked: Boolean = true, val accountConflict: Account? = null, val transactionConflict: Transaction? = null, val categoryConflict: Category? = null, val tagConflict: Tag? = null,
 
 ) {
+    val canQueueTransfers get() = canQueueCatalog
     val canQueueBasicCreates get() = canQueueCatalog
     val canQueueAccounts get() = canQueueCatalog
     val canQueueCatalog get() = offline && auth != null && persisted && !busy && !logoutPending && revokePendingId == null && financialCommand == null && localBlocked == 0
@@ -481,10 +483,11 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             try {
                 val store = OfflineBasicStore(app.database)
-                val queued = if (id == null) store.create(saved, body) else if (delete) store.delete(saved, body, id) else store.replace(saved, body, id)
+                val kind = ApiClient.json.parseToJsonElement(body).jsonObject["kind"]?.jsonPrimitive?.content ?: state.transactions.find { it.id == id }?.kind
+                val queued = if (id == null && kind == "transfer") OfflineTransferStore(app.database).create(saved, body) else if (id == null) store.create(saved, body) else if (delete) store.delete(saved, body, id) else store.replace(saved, body, id)
                 val projection = requireNotNull(LocalProjectionStore(app.database).read(MirrorScope(saved.origin, saved.ownerId, saved.workspaceId)))
                 val recordId = id ?: requireNotNull(ApiClient.json.parseToJsonElement(body).jsonObject["id"]).jsonPrimitive.content
-                state = state.withProjection(projection).copy(busy = false, localCollectionReceipt = LocalCollectionReceipt(queued.actionId, "transactions", recordId, id == null, delete),
+                state = state.withProjection(projection).copy(busy = false, localCollectionReceipt = LocalCollectionReceipt(queued.actionId, "transactions", recordId, id == null, delete, kind),
                     message = "Операция сохранена на устройстве и ожидает синхронизации.")
                 synchronizeQueue()
             } catch (e: CancellationException) { throw e }

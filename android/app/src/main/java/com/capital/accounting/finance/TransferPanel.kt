@@ -17,12 +17,14 @@ import java.util.*
 @Composable
 fun TransferPanel(model: AuthViewModel) {
     val state = model.state
-    val enabled = !state.busy && !state.financeBlocked && state.persisted
+    val onlineEnabled = !state.busy && !state.financeBlocked && state.persisted
+    val enabled = onlineEnabled || state.canQueueTransfers
     val guard = rememberDraftGuard("transfer", enabled, render = false)
     val scope = LocalFinancialDraftScope.current
     val navigation = LocalFinancialEditor.current
     val editorOpen = navigation.value == "transfer"
     val accounts = state.accounts.filter { it.deleted_at == null && it.archived_at == null }
+    var handledLocalReceipt by remember { mutableStateOf(state.localCollectionReceipt?.actionId) }
     var handledReceipt by remember { mutableStateOf(state.transactionReceipt?.commandId) }
     var editingId by rememberFinancialDraft<String?>("transfer.editingId") { null }
     var editingVersion by rememberFinancialDraft("transfer.editingVersion") { "" }
@@ -88,8 +90,15 @@ fun TransferPanel(model: AuthViewModel) {
         error = ""; navigation.value = "transfer"
     } }
     fun deleteTransfer(transfer: Transaction, fee: Transaction?) { deleting = transfer; deletingFee = fee }
-    HandleFinancialTransaction("transfer", enabled) { if (it.action == FinancialTransactionAction.EDIT) editTransfer(it.transaction, it.fee) else deleteTransfer(it.transaction, it.fee) }
-    LaunchedEffect(state.financialCommand?.commandId, state.transactionReceipt?.commandId, state.accounts, state.transactions) {
+    HandleFinancialTransaction("transfer", onlineEnabled) { if (it.action == FinancialTransactionAction.EDIT) editTransfer(it.transaction, it.fee) else deleteTransfer(it.transaction, it.fee) }
+    LaunchedEffect(state.financialCommand?.commandId, state.transactionReceipt?.commandId, state.localCollectionReceipt?.actionId, state.accounts, state.transactions) {
+        val local = state.localCollectionReceipt
+        if (local != null && local.actionId != handledLocalReceipt) {
+            handledLocalReceipt = local.actionId
+            if (local.collection == "transactions" && local.kind == "transfer" && local.created && editingId == null) {
+                guard.markClean(); if (navigation.value == "transfer") navigation.value = null
+            }
+        }
         val command = state.financialCommand
         if (command == null) {
             val receipt = state.transactionReceipt
@@ -210,7 +219,7 @@ fun TransferPanel(model: AuthViewModel) {
         }
         if (error.isNotEmpty()) Text(error)
         if (editingId != null && state.transactionsLoaded && state.transactions.none { it.id == editingId }) Text("Перевод удален на сервере. Черновик сохранен; отмените редактирование.")
-        Button(enabled = enabled && (editingId == null || state.transactions.any { it.id == editingId }) && source != null && target != null && source.id != target.id && (!feeEnabled || feeAccount != null), onClick = save@{
+        Button(enabled = enabled && (!state.offline || editingId == null) && (editingId == null || state.transactions.any { it.id == editingId }) && source != null && target != null && source.id != target.id && (!feeEnabled || feeAccount != null), onClick = save@{
             error = ""
             val fromCurrency = source?.currency ?: return@save
             val toCurrency = target?.currency ?: return@save
@@ -262,7 +271,7 @@ fun TransferPanel(model: AuthViewModel) {
             Text("Списание и зачисление будут исключены из остатков.")
             deletingFee?.let { Text("Вместе с переводом будет удалена комиссия: ${it.note}; ${it.entries.joinToString { entry -> Money.display(entry.amount_minor, entry.currency) }}") }
             state.transactions.filter { it.kind == "refund" && it.parent_transaction_id in listOf(transfer.id, transfer.fee_transaction_id) }.forEach { Text("Зависимый возврат: ${it.note}. Сначала удалите возврат.") }
-            Button(enabled = enabled && state.transactions.any { it.id == transfer.id } && (transfer.fee_transaction_id == null || deletingFee?.id == transfer.fee_transaction_id), onClick = {
+            Button(enabled = onlineEnabled && state.transactions.any { it.id == transfer.id } && (transfer.fee_transaction_id == null || deletingFee?.id == transfer.fee_transaction_id), onClick = {
                 val related = deletingFee?.let { listOf(VersionExpectation(it.id, it.version)) } ?: emptyList()
                 model.submitTransaction(ApiClient.json.encodeToString(TransactionDelete(transfer.version, related)), transfer.id, delete = true)
                 deleting = null; deletingFee = null
@@ -271,7 +280,7 @@ fun TransferPanel(model: AuthViewModel) {
         }
         (state.historyItems ?: state.transactions).filter { it.kind == "transfer" }.forEach { transfer ->
             TextButton(enabled = enabled && (transfer.fee_transaction_id == null || state.transactions.any { it.id == transfer.fee_transaction_id }), onClick = { editTransfer(transfer, state.transactions.find { it.id == transfer.fee_transaction_id }) }) { Text("Изменить перевод ${transfer.note}") }
-            TextButton(enabled = enabled, onClick = { deleteTransfer(transfer, state.transactions.find { it.id == transfer.fee_transaction_id }) }) { Text("Удалить перевод ${transfer.note}") }
+            TextButton(enabled = onlineEnabled, onClick = { deleteTransfer(transfer, state.transactions.find { it.id == transfer.fee_transaction_id }) }) { Text("Удалить перевод ${transfer.note}") }
         }
     }
 }
