@@ -143,6 +143,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         candidate = saved
         state = AuthState(saved.origin, busy = holdBusy, auth = BearerAuth(identity.profile, identity.workspace, identity.session, "bearer", saved.token, "Bearer"),
             offline = true, overviewCached = true, financeBlocked = true, financialCommand = command).withProjection(projection)
+        if (state.localPending > 0) synchronizeQueue()
         return true
     }
 
@@ -157,6 +158,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         } catch (e: CancellationException) { throw e }
         catch (_: Exception) { state = AuthState(origin, busy = holdBusy, auth = auth, persisted = false, message = "Вход выполнен, но сессия не сохранена. Повторите сохранение."); return }
         fetchOverview(saved, holdBusy)
+        if (state.localPending > 0) synchronizeQueue()
     }
 
     fun loadOverview() {

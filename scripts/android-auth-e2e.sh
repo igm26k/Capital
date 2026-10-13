@@ -74,5 +74,6 @@ python3 scripts/check-android-cursor-runtime.py "$adb" "$serial"
 python3 scripts/check-android-offline-mirror.py "$adb" "$serial"
 python3 scripts/check-android-outbox-expiry.py "$adb" "$serial"
 python3 scripts/check-android-queue-worker.py "$adb" "$serial"
+python3 scripts/check-android-queue-startup.py "$adb" "$serial"
 python3 scripts/check-android-release-trust.py "$sdk"
-echo 'PASS 119/119 real Android instrumentation executions and auth runtime acceptance'
+echo 'PASS 121/121 real Android instrumentation executions and auth runtime acceptance'
