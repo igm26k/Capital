@@ -73,6 +73,9 @@ class MainActivity : ComponentActivity() {
                                     }
                                     if (state.localPending > 0) Text("Локальные изменения ожидают синхронизации: ${state.localPending}.")
                                     if (state.localBlocked > 0) Text("Сохраненные изменения требуют проверки: ${state.localBlocked}.")
+                                    if (state.queueMessage.isNotEmpty()) Text(state.queueMessage)
+                                    if (state.localPending + state.localBlocked > 0) Button(enabled = !state.busy && !state.queueRunning && state.persisted && state.financialCommand == null,
+                                        onClick = model::synchronizeQueue) { Text("Синхронизировать изменения") }
                                     Button(enabled = !state.busy && state.persisted, onClick = model::loadOverview) { Text("Обновить финансовые данные") }
                                     if (state.busy && !state.overviewLoaded) Text("Загрузка финансовых данных…")
                                     if (state.busy && state.overviewCached) Text("Показаны сохраненные финансовые данные. Выполняется синхронизация.")

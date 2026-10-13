@@ -7,6 +7,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.capital.accounting.api.*
 import com.capital.accounting.data.*
+import com.capital.accounting.auth.VaultRead
 import com.capital.accounting.sync.SnapshotBootstrap
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.encodeToString
@@ -43,7 +44,8 @@ class ProjectionScreenTest {
             app.database.settings().save(ConnectionSettings(origin = origin)); app.credentialVault.save(saved)
         }
         override fun after() = runBlocking<Unit> {
-            if (::auth.isInitialized) ApiClient(origin).request("/auth/logout", "POST", session = auth.credential(origin))
+            if (::auth.isInitialized) try { ApiClient(origin).request("/auth/logout", "POST", session = auth.credential(origin)) }
+            catch (e: ApiFailure) { if (e.status != 401) throw e }
         }
     }
     @get:Rule(order = 1) val compose = createAndroidComposeRule<MainActivity>()
@@ -65,10 +67,44 @@ class ProjectionScreenTest {
         compose.onNodeWithText("Локальные изменения ожидают синхронизации: 1.").assertDoesNotExist()
         runBlocking { assertEquals(tag, SnapshotStore(app.database).read(MirrorScope(origin, auth.profile.id, auth.workspace.id))!!.items.filterIsInstance<SnapshotItemTag>().single().data) }
     }
+    @Test fun explicitWorkerSyncConfirmsLocalTagAndRefreshesControls() {
+        wait("Локальные изменения ожидают синхронизации: 1."); more(); wait("Тег: Local projection tag")
+        compose.waitUntil(30000) { compose.onAllNodes(hasText("Синхронизировать изменения") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Синхронизировать изменения").performScrollTo().performClick()
+        wait("Синхронизация завершена.")
+        compose.waitUntil(30000) { compose.onAllNodes(hasText("Изменить тег Local projection tag") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Локальные изменения ожидают синхронизации: 1.").assertDoesNotExist()
+        runBlocking {
+            val scope = MirrorScope(origin, auth.profile.id, auth.workspace.id)
+            assertEquals(command.copy(state = "applied"), app.database.outbox().commands(scope.key).single())
+            assertTrue(app.database.outbox().overlays(command.position).isEmpty())
+            val confirmed = SnapshotStore(app.database).read(scope)!!
+            assertEquals("2", confirmed.head.sequence); assertEquals("2", confirmed.items.filterIsInstance<SnapshotItemTag>().single().data.version)
+            assertEquals("Local projection tag", confirmed.items.filterIsInstance<SnapshotItemTag>().single().data.name)
+        }
+        compose.activityRule.scenario.recreate(); wait("Тег: Local projection tag")
+        compose.waitUntil(30000) { compose.onAllNodes(hasText("Изменить тег Local projection tag") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+        runBlocking { assertEquals("2", SnapshotStore(app.database).read(MirrorScope(origin, auth.profile.id, auth.workspace.id))!!.head.sequence) }
+    }
+    @Test fun revokedSessionWorkerHidesCacheAndPreservesQueuedCommand() {
+        wait("Локальные изменения ожидают синхронизации: 1."); more(); wait("Тег: Local projection tag")
+        runBlocking { ApiClient(origin).request("/auth/logout", "POST", session = auth.credential(origin)) }
+        compose.waitUntil(30000) { compose.onAllNodes(hasText("Синхронизировать изменения") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Синхронизировать изменения").performScrollTo().performClick(); wait("Сессия завершена. Войдите снова.")
+        compose.onNodeWithText("Тег: Local projection tag").assertDoesNotExist()
+        compose.onNodeWithText("Войти").assertExists()
+        runBlocking {
+            assertTrue(app.credentialVault.load(origin) is VaultRead.Empty)
+            assertEquals(command, app.database.outbox().commands(MirrorScope(origin, auth.profile.id, auth.workspace.id).key).single())
+            assertEquals(1, app.database.outbox().overlays(command.position).size)
+        }
+    }
     @Test fun rejectedProjectionKeepsConfirmedTagAndBlocksWrites() {
         wait("Сохраненные изменения требуют проверки: 1."); more(); wait("Тег: Server projection tag")
         compose.onNodeWithText("Тег: Local projection tag").assertDoesNotExist()
         compose.onNodeWithText("Изменить тег Server projection tag").assertIsNotEnabled()
+        compose.waitUntil(30000) { compose.onAllNodes(hasText("Синхронизировать изменения") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Синхронизировать изменения").performScrollTo().performClick(); wait("Сохраненные изменения требуют проверки.")
         runBlocking {
             val scope = MirrorScope(origin, auth.profile.id, auth.workspace.id)
             assertEquals(command.copy(state = "rejected"), app.database.outbox().commands(scope.key).single())

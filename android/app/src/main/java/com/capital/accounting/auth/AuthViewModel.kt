@@ -1,6 +1,8 @@
 package com.capital.accounting.auth
 
 import android.app.Application
+import androidx.work.WorkManager
+import androidx.work.WorkInfo
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.compose.runtime.getValue
@@ -16,10 +18,13 @@ import com.capital.accounting.data.LocalProjectionStore
 import com.capital.accounting.data.MirrorFinance
 import com.capital.accounting.data.MirrorScope
 import com.capital.accounting.sync.MirrorSynchronizer
+import com.capital.accounting.sync.QueueScheduler
 import com.capital.accounting.finance.CommandRunner
 import com.capital.accounting.normalizedOrigin
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -42,7 +47,7 @@ data class AuthState(
     val detailStack: List<String> = emptyList(), val detailTransaction: Transaction? = null, val detailMissing: Boolean = false, val detailError: String = "",
     val collectionReceipt: CollectionReceipt? = null,
     val classificationReceipt: ClassificationReceipt? = null,
-    val accountsLoaded: Boolean = false, val overviewLoaded: Boolean = false, val overviewError: String = "", val overviewCached: Boolean = false, val offline: Boolean = false, val localPending: Int = 0, val localBlocked: Int = 0,
+    val accountsLoaded: Boolean = false, val overviewLoaded: Boolean = false, val overviewError: String = "", val overviewCached: Boolean = false, val offline: Boolean = false, val localPending: Int = 0, val localBlocked: Int = 0, val queueRunning: Boolean = false, val queueMessage: String = "",
     val transactionsLoaded: Boolean = false, val transactionReceipt: TransactionReceipt? = null,
     val historyFilter: TransactionFilter? = null, val historyItems: List<Transaction>? = null,
     val historyLimit: Int = 50, val historyNextCursor: String? = null, val historyCursors: List<String> = emptyList(), val historyError: String = "",
@@ -165,6 +170,49 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun synchronizeQueue() {
+        val saved = candidate ?: return
+        if (state.busy || state.queueRunning || state.auth == null || !state.persisted || state.logoutPending || state.revokePendingId != null ||
+            state.financialCommand != null || state.localPending + state.localBlocked == 0) return
+        state = state.copy(queueRunning = true, queueMessage = "Синхронизация ожидает соединения или выполняется.")
+        viewModelScope.launch {
+            try {
+                val id = QueueScheduler(app).schedule(saved)
+                val info = requireNotNull(WorkManager.getInstance(app).getWorkInfoByIdFlow(id).first { it != null && it.state.isFinished })
+                if (!queueScopeCurrent(saved)) return@launch
+                while (state.busy && queueScopeCurrent(saved)) delay(50)
+                if (!queueScopeCurrent(saved)) return@launch
+                val status = info.outputData.getString("status")
+                if (status == "AUTH_REQUIRED") {
+                    val stored = (app.credentialVault.load(saved.origin) as? VaultRead.Available)?.session
+                    if (stored != null && stored.ownerId == saved.ownerId && stored.workspaceId == saved.workspaceId && stored.sessionId == saved.sessionId && stored.generationId == saved.generationId && stored.token == saved.token &&
+                        !stored.logoutPending && stored.revokeSessionId == null) expireSession(saved.origin)
+                    else { candidate = null; state = AuthState(saved.origin, busy = false, message = "Сессия требует проверки. Войдите снова.") }
+                    return@launch
+                }
+                if (status == "SCOPE_CHANGED") {
+                    candidate = null; state = AuthState(saved.origin, busy = false, message = "Сессия или пространство изменились. Войдите снова.")
+                    return@launch
+                }
+                state = state.copy(queueRunning = false, queueMessage = when {
+                    info.state == WorkInfo.State.CANCELLED -> "Синхронизация прервана. Изменения сохранены."
+                    status == "IDLE" -> "Синхронизация завершена."
+                    else -> "Сохраненные изменения требуют проверки."
+                })
+                loadOverview()
+            } catch (e: CancellationException) { throw e }
+            catch (_: Exception) {
+                if (queueScopeCurrent(saved)) state = state.copy(queueRunning = false, queueMessage = "Не удалось запустить синхронизацию. Изменения сохранены.")
+            }
+        }
+    }
+    private fun queueScopeCurrent(saved: StoredSession): Boolean {
+        val active = candidate ?: return false
+        return state.auth != null && !state.logoutPending && state.revokePendingId == null &&
+            active.origin == saved.origin && active.ownerId == saved.ownerId && active.workspaceId == saved.workspaceId &&
+            active.sessionId == saved.sessionId && active.generationId == saved.generationId && active.token == saved.token && !active.logoutPending && active.revokeSessionId == null
+    }
+
     private fun AuthState.withFinance(finance: MirrorFinance): AuthState = copy(accounts = finance.accounts, accountsLoaded = true,
         transactions = finance.transactions, transactionsLoaded = true, categories = finance.categories, tags = finance.tags, overviewLoaded = true)
 
@@ -178,7 +226,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             val auth = decodeResponse<BearerAuth>(ApiClient(saved.origin).request("/auth/session", session = saved))
             require(auth.profile.id == saved.ownerId && auth.workspace.id == saved.workspaceId && auth.session.id == saved.sessionId && auth.access_token == saved.token && auth.workspace.sync_generation_id == mirror.head.generation)
             val updated = auth.credential(saved.origin)
-            app.credentialVault.save(updated); IdentityStore(app.database).save(auth, saved.origin); candidate = updated; state = state.copy(auth = auth)
+            app.credentialVault.save(updated); IdentityStore(app.database).save(auth, saved.origin); candidate = updated; state = state.copy(auth = auth, queueRunning = false, queueMessage = "")
         }
         val projection = requireNotNull(LocalProjectionStore(app.database).read(MirrorScope(saved.origin, saved.ownerId, saved.workspaceId)))
         require(projection.confirmed.head.generation == mirror.head.generation)
