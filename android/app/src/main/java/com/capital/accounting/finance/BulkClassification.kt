@@ -31,7 +31,7 @@ class BulkClassificationController(
     val tags: MutableState<List<String>>,
     val scope: FinancialDraftScope,
 ) {
-    val enabled get() = !model.state.busy && model.state.persisted && !model.state.financeBlocked && !scope.saving && !scope.failed
+    val enabled get() = !model.state.busy && model.state.persisted && (!model.state.financeBlocked || model.state.canQueueClassification) && !scope.saving && !scope.failed
     fun eligible(item: Transaction): Boolean = item.deleted_at == null && item.status == "posted" &&
         item.kind in listOf("income", "expense") && item.parent_transaction_id == null &&
         item.entries.size == 1 && item.allocations.size == 1 &&
@@ -41,9 +41,11 @@ class BulkClassificationController(
     fun label(item: Transaction) = item.note.ifEmpty { "${if (item.kind == "income") "Доход" else "Расход"} ${item.entries.joinToString { Money.display(it.amount_minor, it.currency) }} · ${openingLocal(item.occurred_at, item.occurred_timezone)}" }
     fun snapshot(item: Transaction) = BulkSelection(item.id, item.version, label(item))
     fun current(item: BulkSelection) = model.state.transactions.find { it.id == item.id }
+    fun categoryAvailable(id: String) = model.state.categories.any { it.id == id && it.deleted_at == null && (it.archived_at == null || selection.value.isNotEmpty() && selection.value.all { chosen -> current(chosen)?.allocations?.singleOrNull()?.category_id == id }) }
+    fun tagAvailable(id: String) = model.state.tags.any { it.id == id && it.deleted_at == null && (it.archived_at == null || selection.value.isNotEmpty() && selection.value.all { chosen -> current(chosen)?.tag_ids?.contains(id) == true }) }
     val valid get() = selection.value.isNotEmpty() && selection.value.all { chosen -> current(chosen)?.let { eligible(it) && it.version == chosen.version } == true } &&
-        (category.value == null || model.state.categories.any { it.id == category.value && it.archived_at == null && it.deleted_at == null }) &&
-        tags.value.all { id -> model.state.tags.any { it.id == id && it.archived_at == null && it.deleted_at == null } }
+        (category.value == null || categoryAvailable(category.value!!)) &&
+        tags.value.all(::tagAvailable)
 }
 
 @Composable
@@ -52,8 +54,14 @@ fun rememberBulkClassification(model: AuthViewModel): BulkClassificationControll
     val category = rememberFinancialDraft<String?>("bulk.categoryId") { null }
     val tags = rememberFinancialDraft<List<String>>("bulk.tags") { emptyList() }
     val controller = BulkClassificationController(model, selection, category, tags, LocalFinancialDraftScope.current)
+    var handledLocalReceipt by remember { mutableStateOf(model.state.localCollectionReceipt?.actionId) }
     var handledReceipt by remember { mutableStateOf(model.state.classificationReceipt?.commandId) }
-    LaunchedEffect(model.state.financialCommand?.commandId, model.state.classificationReceipt?.commandId) {
+    LaunchedEffect(model.state.financialCommand?.commandId, model.state.classificationReceipt?.commandId, model.state.localCollectionReceipt?.actionId) {
+        val local = model.state.localCollectionReceipt
+        if (local != null && local.actionId != handledLocalReceipt) {
+            handledLocalReceipt = local.actionId
+            if (local.collection == "classification") selection.value = selection.value.filterNot { it.id in local.ids }
+        }
         val command = model.state.financialCommand
         if (command?.path?.endsWith("/transactions/classification") == true) {
             val body = decodeResponse<BulkClassification>(command.body)
@@ -85,21 +93,21 @@ fun BulkClassificationControls(bulk: BulkClassificationController) {
         bulk.selection.value.forEach { selected ->
             val current = bulk.current(selected)
             if (current == null || !bulk.eligible(current) || current.version != selected.version) {
-                Text("${selected.label}: выбранная версия ${selected.version}; ${if (current != null && bulk.eligible(current)) "версия на сервере ${current.version}" else "операция недоступна для классификации"}")
+                Text("${selected.label}: выбранная версия ${selected.version}; ${if (current != null && bulk.eligible(current)) if (("transaction" to current.id) in bulk.model.state.localAffected) "ожидаемая версия ${current.version}" else "версия на сервере ${current.version}" else "операция недоступна для классификации"}")
                 TextButton(enabled = bulk.enabled, onClick = { bulk.selection.value = bulk.selection.value.filterNot { it.id == selected.id } }) { Text("Снять выбор: ${selected.label}") }
             }
         }
         TextButton(enabled = bulk.enabled, onClick = { bulk.selection.value = bulk.selection.value.map { selected -> bulk.current(selected)?.takeIf(bulk::eligible)?.let(bulk::snapshot) ?: selected } }) { Text("Обновить версии выбранных операций") }
         TextButton(enabled = bulk.enabled, onClick = { bulk.selection.value = emptyList() }) { Text("Снять выбор операций") }
         Text("Категория пакета: ${bulk.model.state.categories.find { it.id == bulk.category.value }?.name ?: "Без категории"}")
-        if (bulk.category.value != null && bulk.model.state.categories.none { it.id == bulk.category.value && it.archived_at == null && it.deleted_at == null }) {
+        if (bulk.category.value != null && !bulk.categoryAvailable(bulk.category.value!!)) {
             Text("Выбранная категория недоступна. Выберите другую или уберите категорию пакета.")
         }
         TextButton(enabled = bulk.enabled, onClick = { bulk.category.value = null }) { Text("Пакет без категории") }
         bulk.model.state.categories.filter { it.archived_at == null && it.deleted_at == null }.forEach { category ->
             TextButton(enabled = bulk.enabled, onClick = { bulk.category.value = category.id }) { Text("Категория пакета: ${category.name}") }
         }
-        if (bulk.tags.value.any { id -> bulk.model.state.tags.none { it.id == id && it.archived_at == null && it.deleted_at == null } }) {
+        if (bulk.tags.value.any { !bulk.tagAvailable(it) }) {
             Text("Некоторые выбранные теги недоступны. Уберите теги пакета и выберите актуальные.")
         }
         TextButton(enabled = bulk.enabled, onClick = { bulk.tags.value = emptyList() }) { Text("Пакет без тегов") }

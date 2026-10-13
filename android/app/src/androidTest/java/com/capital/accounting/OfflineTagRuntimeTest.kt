@@ -211,13 +211,20 @@ class OfflineTagRuntimeTest {
         compose.waitUntil(60000) { compose.onAllNodesWithText("Сумма операции").fetchSemanticsNodes().isEmpty() }
         click("Удалить корректировку Edited offline adjustment"); click("Подтвердить удаление корректировки")
         compose.waitUntil(60000) { compose.onAllNodesWithText("Удалить корректировку Edited offline adjustment").fetchSemanticsNodes().isEmpty() }
-        wait("Локальные изменения ожидают синхронизации: 35.")
+        compose.onNodeWithContentDescription("Классифицировать: Income after adjustment").performScrollTo().performClick()
+        wait("Выбрано для классификации: 1")
+        click("Категория пакета: Offline parent")
+        compose.onNodeWithContentDescription("Массовый тег Offline second tag").performScrollTo().performClick()
+        click("Применить классификацию к выбранным операциям")
+        wait("Локальные изменения ожидают синхронизации: 36."); wait("Выбрано для классификации: 0")
         runBlocking {
             val data = JSONObject(proof.readText()); val scope = MirrorScope("https://localhost:8444", data.getString("owner"), data.getString("workspace"))
-            val commands = app.database.outbox().commands(scope.key); assertEquals(35, commands.size); assertTrue(commands.all { it.state == "queued" })
+            val commands = app.database.outbox().commands(scope.key); assertEquals(36, commands.size); assertTrue(commands.all { it.state == "queued" })
             val visible = LocalProjectionStore(app.database).read(scope)!!
             assertEquals(mapOf("Renamed offline cash" to "124456", "Offline target" to "10000"), visible.visible.accounts.associate { it.name to it.posted_balance_minor })
-            assertEquals("1000", visible.visible.transactions.single { it.kind == "income" }.entries.single().amount_minor)
+            val localIncome = visible.visible.transactions.single { it.kind == "income" }
+            assertEquals("1000", localIncome.entries.single().amount_minor); assertEquals("2", localIncome.version)
+            assertNotNull(localIncome.allocations.single().category_id); assertEquals(1, localIncome.tag_ids.size)
             val original = SnapshotStore(app.database).read(scope)!!; assertEquals("1", original.head.sequence)
             assertEquals("Existing offline tag", original.items.filterIsInstance<SnapshotItemTag>().single().data.name)
             val changed = commands.first { it.path.endsWith("/tags/${data.getString("tag")}") }; assertEquals("1", decodeResponse<TagUpdate>(changed.body).expected_version)
@@ -232,25 +239,28 @@ class OfflineTagRuntimeTest {
         compose.waitUntil(480000) {
             runBlocking { app.database.withTransaction {
                 val commands = app.database.outbox().commands(queuedScope.key)
-                commands.size == 35 && commands.all { it.state == "applied" && app.database.outbox().overlays(it.position).isEmpty() } &&
-                    app.database.snapshots().head(queuedScope.key)?.sequence == "36"
+                commands.size == 36 && commands.all { it.state == "applied" && app.database.outbox().overlays(it.position).isEmpty() } &&
+                    app.database.snapshots().head(queuedScope.key)?.sequence == "37"
             } }
         }
-        compose.waitUntil(60000) { compose.onAllNodesWithText("Локальные изменения ожидают синхронизации: 35.").fetchSemanticsNodes().isEmpty() }
+        compose.waitUntil(60000) { compose.onAllNodesWithText("Локальные изменения ожидают синхронизации: 36.").fetchSemanticsNodes().isEmpty() }
         compose.onNodeWithContentDescription("Раздел Еще").performClick(); wait("Тег: Edited offline first · В архиве"); wait("Тег: Offline second tag"); wait("Тег: Archived offline tag · В архиве"); wait("Категория: Offline parent / Archived child · В архиве")
         runBlocking {
             val scope = MirrorScope("https://localhost:8444", before.getString("owner"), before.getString("workspace")); val commands = app.database.outbox().commands(scope.key)
-            assertEquals(35, commands.size)
+            assertEquals(36, commands.size)
             for ((index, command) in commands.withIndex()) {
                 assertEquals(before.getJSONArray("actions").getString(index), command.actionId); assertEquals(before.getJSONArray("hashes").getString(index), commandHash(command.body))
                 assertEquals("applied", command.state); assertTrue(app.database.outbox().overlays(command.position).isEmpty())
             }
-            val mirror = SnapshotStore(app.database).read(scope)!!; assertEquals("36", mirror.head.sequence)
+            val mirror = SnapshotStore(app.database).read(scope)!!; assertEquals("37", mirror.head.sequence)
             assertEquals("2", mirror.items.filterIsInstance<SnapshotItemTag>().first { it.data.id == before.getString("tag") }.data.version)
             val account = mirror.items.filterIsInstance<SnapshotItemAccount>().single { it.data.name == "Renamed offline cash" }.data
             assertEquals("124456", account.posted_balance_minor); assertEquals("24", account.version); assertEquals("21", account.balance_version); assertNull(account.archived_at)
             assertEquals("10000", mirror.finance().accounts.single { it.name == "Offline target" }.posted_balance_minor)
-            assertEquals("1000", mirror.finance().transactions.single { it.kind == "income" }.entries.single().amount_minor)
+            val income = mirror.finance().transactions.single { it.kind == "income" }
+            assertEquals("1000", income.entries.single().amount_minor); assertEquals("2", income.version)
+            assertEquals(mirror.finance().categories.single { it.name == "Offline parent" }.id, income.allocations.single().category_id)
+            assertEquals(listOf(mirror.finance().tags.single { it.name == "Offline second tag" }.id), income.tag_ids)
             val creation = commands.single { it.path.endsWith("/transactions") && JSONObject(it.body).getString("kind") == "transfer" }
             val result = decodeResponse<MutationResult>(app.database.receipts().get(creation.position)!!.payload)
             val transfer = result.transactions.single { it.kind == "transfer" }

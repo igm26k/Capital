@@ -13,6 +13,7 @@ import com.capital.accounting.api.*
 import com.capital.accounting.data.ConnectionSettings
 import com.capital.accounting.data.FinancialCommand
 import com.capital.accounting.data.IdentityStore
+import com.capital.accounting.data.OfflineClassificationStore
 import com.capital.accounting.data.OfflineAdjustmentStore
 import com.capital.accounting.data.OfflineRefundStore
 import com.capital.accounting.data.OfflineTransferStore
@@ -42,7 +43,7 @@ data class TransactionReceipt(val commandId: String, val transactionId: String, 
     val transaction get() = records.find { it.id == transactionId }
 }
 
-data class LocalCollectionReceipt(val actionId: String, val collection: String, val recordId: String, val created: Boolean, val deleted: Boolean = false, val kind: String? = null)
+data class LocalCollectionReceipt(val actionId: String, val collection: String, val recordId: String, val created: Boolean, val deleted: Boolean = false, val kind: String? = null, val ids: List<String> = emptyList())
 
 data class CollectionReceipt(val commandId: String, val collection: String, val recordId: String, val created: Boolean, val result: MutationResult)
 data class ClassificationReceipt(val commandId: String, val ids: Set<String>)
@@ -64,6 +65,7 @@ data class AuthState(
     val financeBlocked: Boolean = true, val accountConflict: Account? = null, val transactionConflict: Transaction? = null, val categoryConflict: Category? = null, val tagConflict: Tag? = null,
 
 ) {
+    val canQueueClassification get() = canQueueCatalog
     val canQueueAdjustments get() = canQueueCatalog
     val canQueueRefunds get() = canQueueCatalog
     val canQueueTransfers get() = canQueueCatalog
@@ -514,7 +516,23 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             catch (_: Exception) { state = state.copy(busy = false, message = "Не удалось сохранить локальную операцию. Проверьте сумму, дату и ссылки; черновик сохранен.") }
         }
     }
-    fun submitClassification(body: String) = submitFinancial(body, "transactions/classification", "POST")
+    fun submitClassification(body: String) {
+        if (!state.offline) { submitFinancial(body, "transactions/classification", "POST"); return }
+        val saved = candidate ?: return
+        if (!state.canQueueClassification) return
+        state = state.copy(busy = true, message = "")
+        viewModelScope.launch {
+            try {
+                val queued = OfflineClassificationStore(app.database).enqueue(saved, body)
+                val projection = requireNotNull(LocalProjectionStore(app.database).read(MirrorScope(saved.origin, saved.ownerId, saved.workspaceId)))
+                state = state.withProjection(projection).copy(busy = false,
+                    localCollectionReceipt = LocalCollectionReceipt(queued.actionId, "classification", queued.actionId, false, ids = decodeResponse<BulkClassification>(body).items.map { it.id }),
+                    message = "Классификация сохранена на устройстве и ожидает синхронизации.")
+                synchronizeQueue()
+            } catch (e: CancellationException) { throw e }
+            catch (_: Exception) { state = state.copy(busy = false, message = "Не удалось сохранить локальный пакет. Проверьте версии и доступность операций; выбор сохранен.") }
+        }
+    }
 
     fun submitCatalog(body: String, collection: String, id: String? = null) {
         require(collection in setOf("categories", "tags"))

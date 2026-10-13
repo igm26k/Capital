@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Offline catalog, basic/transfer/refund/adjustment CRUD UI with cold sync and isolated SQL acceptance."""
+"""Offline catalog, ledger CRUD and bulk classification UI with cold sync and isolated SQL acceptance."""
 import json
 import os
 from pathlib import Path
@@ -47,7 +47,7 @@ for key in ['actions', 'hashes']:
 for key in ['local_ui', 'confirmed_preserved', 'cold_recovered', 'command_preserved', 'pull_covered']:
     assert after[key] is True
 counts = json.loads(sql(f"SELECT json_build_object('actions',(SELECT count(*) FROM actions WHERE workspace_id='{w}'),'groups',(SELECT count(*) FROM sync_groups WHERE workspace_id='{w}'),'tags',(SELECT count(*) FROM tags WHERE workspace_id='{w}'),'archived',(SELECT count(*) FROM tags WHERE workspace_id='{w}' AND archived_at IS NOT NULL),'categories',(SELECT count(*) FROM categories WHERE workspace_id='{w}'),'archived_categories',(SELECT count(*) FROM categories WHERE workspace_id='{w}' AND archived_at IS NOT NULL),'accounts',(SELECT count(*) FROM accounts WHERE workspace_id='{w}'),'opening',(SELECT count(*) FROM transactions WHERE workspace_id='{w}' AND kind='opening'),'deleted',(SELECT count(*) FROM transactions WHERE workspace_id='{w}' AND deleted_at IS NOT NULL),'balance',(SELECT coalesce(sum(e.amount_minor),0)::text FROM entries e JOIN transactions t ON t.workspace_id=e.workspace_id AND t.id=e.transaction_id WHERE e.workspace_id='{w}' AND t.deleted_at IS NULL),'head',(SELECT last_sequence FROM sync_heads WHERE workspace_id='{w}'));\n"))
-assert counts == {'actions': 36, 'groups': 36, 'tags': 3, 'archived': 2, 'categories': 2, 'archived_categories': 1, 'accounts': 2, 'opening': 2, 'deleted': 8, 'balance': '134456', 'head': 36}
+assert counts == {'actions': 37, 'groups': 37, 'tags': 3, 'archived': 2, 'categories': 2, 'archived_categories': 1, 'accounts': 2, 'opening': 2, 'deleted': 8, 'balance': '134456', 'head': 37}
 after['sql_no_duplicate'] = True
 (checks / 'android-offline-tags-runtime.json').write_text(json.dumps(after))
-print('PASS offline catalog, basic/transfer/refund/adjustment CRUD UI, cold sync, original commands and SQL no duplicate')
+print('PASS offline catalog, ledger CRUD and bulk classification UI, cold sync, original commands and SQL no duplicate')

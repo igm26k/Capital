@@ -55,7 +55,7 @@ class OutboxStore(private val db: CapitalDatabase) {
         require(db.snapshots().head(scope.key)?.generation == saved.generationId)
         require(effects.size in 1..200 && effects.map { it.entityType to it.entityId }.toSet().size == effects.size)
         require(bases.size <= 200 && bases.map { Triple(it.entityType, it.entityId, it.field) }.toSet().size == bases.size)
-        require(dependencies.size <= 100 && dependencies.toSet().size == dependencies.size && action !in dependencies)
+        require(dependencies.size <= 300 && dependencies.toSet().size == dependencies.size && action !in dependencies)
         val queued = db.outbox().commands(scope.key).associateBy { it.actionId }
         for (dependency in dependencies) { uuid(dependency); require(requireNotNull(queued[dependency]).state in setOf("queued", "sending", "uncertain", "applied")) }
         val mirror = db.snapshots().records(scope.key).associateBy { it.entityType to it.entityId }
@@ -74,6 +74,9 @@ class OutboxStore(private val db: CapitalDatabase) {
                     require(data.entity_type == base.entityType)
                     val collection = when (base.entityType) { "tag" -> "tags"; "category" -> "categories"; "transaction" -> "transactions"; else -> "accounts" }
                     val expected = when {
+                        base.entityType == "transaction" && parent.method == "POST" && parent.path == "/workspaces/${saved.workspaceId}/transactions/classification" ->
+                            (BigInteger(decodeResponse<BulkClassification>(parent.body).items.single { it.id == base.entityId }.expected_version) + BigInteger.ONE).toString()
+
                         base.entityType == "account" && base.field == "balance_version" -> {
                             require(data is SnapshotItemAccount)
                             if (parent.method == "POST" && parent.path == "/workspaces/${saved.workspaceId}/accounts") {
