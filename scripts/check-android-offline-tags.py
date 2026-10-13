@@ -47,7 +47,7 @@ for key in ['actions', 'hashes']:
 for key in ['local_ui', 'confirmed_preserved', 'cold_recovered', 'command_preserved', 'pull_covered']:
     assert after[key] is True
 counts = json.loads(sql(f"SELECT json_build_object('actions',(SELECT count(*) FROM actions WHERE workspace_id='{w}'),'groups',(SELECT count(*) FROM sync_groups WHERE workspace_id='{w}'),'tags',(SELECT count(*) FROM tags WHERE workspace_id='{w}'),'archived',(SELECT count(*) FROM tags WHERE workspace_id='{w}' AND archived_at IS NOT NULL),'head',(SELECT last_sequence FROM sync_heads WHERE workspace_id='{w}'));\n"))
-assert counts == {'actions': 4, 'groups': 4, 'tags': 3, 'archived': 1, 'head': 4}
+assert counts == {'actions': 6, 'groups': 6, 'tags': 3, 'archived': 2, 'head': 6}
 after['sql_no_duplicate'] = True
 (checks / 'android-offline-tags-runtime.json').write_text(json.dumps(after))
 print('PASS offline tag UI create/update/archive, cold sync, original commands and SQL no duplicate')

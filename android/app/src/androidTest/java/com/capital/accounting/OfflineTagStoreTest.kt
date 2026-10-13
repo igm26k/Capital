@@ -55,4 +55,24 @@ class OfflineTagStoreTest {
             assertEquals(listOf(first), db.outbox().commands(scope.key))
         } finally { db.close(); context.deleteDatabase(name) }
     }
+    @Test fun createdTagEditArchiveChainUsesImmutablePredictedVersionsAndLeafCancel() = runBlocking<Unit> {
+        val name = "offline-tags-chain.db"; context.deleteDatabase(name); var db = open(name); val auth = auth(); val saved = auth.credential("https://accounting.example")
+        try {
+            seed(db, auth); val scope = MirrorScope(saved.origin, saved.ownerId, saved.workspaceId); val tagId = id()
+            val store = OfflineTagStore(db)
+            val first = store.enqueue(saved, ApiClient.json.encodeToString(TagCreate(tagId, "Created")))
+            val second = store.enqueue(saved, ApiClient.json.encodeToString(TagUpdate("1", "Edited", false)), tagId)
+            val third = store.enqueue(saved, ApiClient.json.encodeToString(TagUpdate("2", "Archived", true)), tagId)
+            assertEquals(listOf(first.actionId), ApiClient.json.decodeFromString<List<String>>(second.dependencies))
+            assertEquals(listOf(second.actionId), ApiClient.json.decodeFromString<List<String>>(third.dependencies))
+            db.close(); db = open(name); assertEquals(listOf(first, second, third), db.outbox().commands(scope.key))
+            assertEquals("3", LocalProjectionStore(db).read(scope)!!.visible.tags.first { it.id == tagId }.version)
+            assertTrue(SnapshotStore(db).read(scope)!!.items.none { it is SnapshotItemTag && it.data.id == tagId })
+            try { OutboxStore(db).cancelQueued(scope, first.actionId); fail("Parent cancelled") } catch (_: IllegalArgumentException) { }
+            OutboxStore(db).cancelQueued(scope, third.actionId)
+            val visible = LocalProjectionStore(db).read(scope)!!.visible.tags.first { it.id == tagId }
+            assertEquals("2", visible.version); assertEquals("Edited", visible.name); assertNull(visible.archived_at)
+        } finally { db.close(); context.deleteDatabase(name) }
+    }
+
 }

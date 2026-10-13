@@ -26,7 +26,7 @@ run_suite() {
 run_suite 'com.capital.accounting.FoundationTest,com.capital.accounting.CommandStoreTest,com.capital.accounting.CredentialVaultTest,com.capital.accounting.SettingsScreenTest' 7 ops/.runtime/checks/android-foundation-instrumentation.txt
 run_suite com.capital.accounting.FinancialDraftStoreTest 2 ops/.runtime/checks/android-draft-store-instrumentation.txt
 run_suite com.capital.accounting.SnapshotStoreTest 4 ops/.runtime/checks/android-snapshot-store-instrumentation.txt
-run_suite com.capital.accounting.OfflineTagStoreTest 2 ops/.runtime/checks/android-offline-tag-store-instrumentation.txt
+run_suite com.capital.accounting.OfflineTagStoreTest 3 ops/.runtime/checks/android-offline-tag-store-instrumentation.txt
 run_suite com.capital.accounting.LocalProjectionTest 2 ops/.runtime/checks/android-local-projection-instrumentation.txt
 run_suite com.capital.accounting.OutboxOutcomeTest 2 ops/.runtime/checks/android-outbox-outcome-instrumentation.txt
 run_suite com.capital.accounting.OutboxFailureTest 2 ops/.runtime/checks/android-outbox-failure-instrumentation.txt
@@ -46,6 +46,7 @@ python3 scripts/check-android-overview-runtime.py "$adb" "$serial"
 run_suite com.capital.accounting.FinancialAddScreenTest 1 ops/.runtime/checks/android-add-ui-instrumentation.txt
 python3 scripts/check-android-draft-runtime.py "$adb" "$serial"
 run_suite com.capital.accounting.ApiAuthTest 1 ops/.runtime/checks/android-api-auth-instrumentation.txt
+run_suite com.capital.accounting.TagDependencyApiTest 1 ops/.runtime/checks/android-tag-dependency-api-instrumentation.txt
 run_suite com.capital.accounting.QueueWorkerApiTest 1 ops/.runtime/checks/android-queue-worker-api-instrumentation.txt
 run_suite com.capital.accounting.QueueCoordinatorApiTest 1 ops/.runtime/checks/android-queue-coordinator-api-instrumentation.txt
 run_suite com.capital.accounting.OutboxSenderApiTest 1 ops/.runtime/checks/android-outbox-sender-api-instrumentation.txt
@@ -78,4 +79,4 @@ python3 scripts/check-android-queue-worker.py "$adb" "$serial"
 python3 scripts/check-android-queue-startup.py "$adb" "$serial"
 python3 scripts/check-android-offline-tags.py "$adb" "$serial"
 python3 scripts/check-android-release-trust.py "$sdk"
-echo 'PASS 126/126 real Android instrumentation executions and auth runtime acceptance'
+echo 'PASS 128/128 real Android instrumentation executions and auth runtime acceptance'

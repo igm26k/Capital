@@ -99,7 +99,7 @@ fun CatalogPanel(model: AuthViewModel) {
         }
         state.tags.forEach { item ->
             Text("Тег: ${item.name}${if (item.archived_at != null) " · В архиве" else ""}")
-            TextButton(enabled = tagEnabled && ("tag" to item.id) !in state.localAffected, onClick = { guard.request { collection = "tags"; id = item.id; version = item.version; name = item.name; parentId = null; archived = item.archived_at != null; error = ""; validation.reset(); navigation.value = "catalog"  } }) { Text("Изменить тег ${item.name}") }
+            TextButton(enabled = tagEnabled && (state.offline || ("tag" to item.id) !in state.localAffected), onClick = { guard.request { collection = "tags"; id = item.id; version = item.version; name = item.name; parentId = null; archived = item.archived_at != null; error = ""; validation.reset(); navigation.value = "catalog"  } }) { Text("Изменить тег ${item.name}") }
         }
     } else if (editorOpen) Dialog(onDismissRequest = ::close, properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)) {
         Surface(Modifier.fillMaxSize()) {
@@ -131,7 +131,7 @@ fun CatalogPanel(model: AuthViewModel) {
                 Text(if (archived) "Состояние классификации: В архиве" else "Состояние классификации: Активна")
                 val currentVersion = if (category) state.categories.find { it.id == id }?.version else state.tags.find { it.id == id }?.version
                 if (id != null && currentVersion != null && currentVersion != version) {
-                    Text("Версия классификации на сервере: $currentVersion; версия черновика: $version")
+                    Text(if (!category && ("tag" to id) in state.localAffected) "Ожидаемая версия тега: $currentVersion; версия черновика: $version" else "Версия классификации на сервере: $currentVersion; версия черновика: $version")
                     Button(enabled = enabled, onClick = { version = currentVersion }) { Text("Использовать обновленную версию классификации") }
                 }
                 state.categoryConflict?.let { Text("Категория на сервере: ${it.name}; версия ${it.version}") }
