@@ -18,6 +18,7 @@ class LocalProjectionStore(private val db: CapitalDatabase) {
         val pending = mutableListOf<OutboxCommand>(); val blocked = mutableListOf<OutboxCommand>()
         val affected = mutableSetOf<Pair<String, String>>()
         for (command in commands) {
+            if (command.state == "dismissed") { blockedIds.add(command.actionId); continue }
             val effects = db.outbox().overlays(command.position)
             if (command.state == "applied" && effects.isEmpty()) continue
             val dependencies = ApiClient.json.decodeFromString<List<String>>(command.dependencies)

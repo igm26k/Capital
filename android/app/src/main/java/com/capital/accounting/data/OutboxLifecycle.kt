@@ -16,7 +16,7 @@ class OutboxLifecycle(private val db: CapitalDatabase) {
         require(!saved.logoutPending && saved.revokeSessionId == null)
         val scope = MirrorScope(saved.origin, saved.ownerId, saved.workspaceId)
         val commands = db.outbox().commands(scope.key)
-        val head = commands.firstOrNull { it.state != "applied" } ?: return@withTransaction null
+        val head = commands.firstOrNull { it.state !in setOf("applied", "dismissed") } ?: return@withTransaction null
         if (head.state !in setOf("queued", "uncertain")) return@withTransaction null
         // A renewed bearer is permitted only for the original issuing session and generation.
         require(head.issuerSession == saved.sessionId && head.generation == saved.generationId)

@@ -24,6 +24,11 @@ import com.capital.accounting.data.OfflineCategoryStore
 import com.capital.accounting.data.OfflineTagStore
 import com.capital.accounting.data.LocalHistoryCursor
 import com.capital.accounting.data.LocalHistoryStore
+import com.capital.accounting.data.OutboxRecoveryStore
+import com.capital.accounting.data.OutboxDismissalPlan
+import com.capital.accounting.data.OutboxCommand
+import com.capital.accounting.data.OutboxFailure
+import com.capital.accounting.sync.OutboxReconciler
 import com.capital.accounting.data.OpeningLinkStore
 import com.capital.accounting.data.LocalProjection
 import com.capital.accounting.data.LocalProjectionStore
@@ -66,6 +71,8 @@ data class AuthState(
     val accountsLoaded: Boolean = false, val overviewLoaded: Boolean = false, val overviewError: String = "", val overviewCached: Boolean = false, val offline: Boolean = false, val localPending: Int = 0, val localBlocked: Int = 0, val queueRunning: Boolean = false, val queueMessage: String = "",
     val transactionsLoaded: Boolean = false, val transactionReceipt: TransactionReceipt? = null,
     val historyFilter: TransactionFilter? = null, val historyItems: List<Transaction>? = null,
+    val recoveryOpen: Boolean = false, val recoveryCommands: List<OutboxCommand> = emptyList(), val recoveryFailure: OutboxFailure? = null,
+    val recoveryPlan: OutboxDismissalPlan? = null, val recoveryError: String = "",
     val historyDataset: LocalHistoryCursor? = null, val historyLocalCursor: LocalHistoryCursor? = null, val historyLocal: Boolean = false,
     val historyLimit: Int = 50, val historyNextCursor: String? = null, val historyCursors: List<String> = emptyList(), val historyError: String = "",
     val financeBlocked: Boolean = true, val accountConflict: Account? = null, val transactionConflict: Transaction? = null, val categoryConflict: Category? = null, val tagConflict: Tag? = null,
@@ -233,6 +240,67 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
     }
+    fun closeQueueRecovery() { if (!state.busy) state = state.copy(recoveryOpen = false, recoveryPlan = null, recoveryError = "") }
+    fun openQueueRecovery() {
+        val saved = candidate ?: return
+        if (state.busy || state.auth == null || !state.persisted || state.logoutPending || state.revokePendingId != null) return
+        state = state.copy(busy = true, recoveryOpen = true, recoveryPlan = null, recoveryError = "")
+        viewModelScope.launch {
+            try { refreshRecovery(saved); state = state.copy(busy = false) }
+            catch (e: CancellationException) { throw e }
+            catch (e: Exception) { if (!financialFailure(saved, e)) state = state.copy(busy = false, recoveryError = "Не удалось прочитать сохранённые изменения.") }
+        }
+    }
+    private suspend fun refreshRecovery(saved: StoredSession) = app.database.withTransaction {
+        if (IdentityStore(app.database).read(saved) == null) throw ApiFailure(401, "unauthenticated")
+        val commands = app.database.outbox().commands(MirrorScope(saved.origin, saved.ownerId, saved.workspaceId).key)
+            .filter { it.state !in setOf("applied", "dismissed") }
+        val failure = commands.firstOrNull()?.let { app.database.failures().get(it.position) }
+        val projection = requireNotNull(LocalProjectionStore(app.database).read(MirrorScope(saved.origin, saved.ownerId, saved.workspaceId)))
+        require(projection.confirmed.head.generation == saved.generationId)
+        state = state.withProjection(projection).copy(recoveryCommands = commands, recoveryFailure = failure, recoveryPlan = null)
+    }
+    fun inspectQueueHead() {
+        val saved = candidate ?: return
+        val command = state.recoveryCommands.firstOrNull() ?: return
+        if (state.busy || state.offline || command.state !in setOf("sending", "uncertain", "reconcile", "rejected")) return
+        state = state.copy(busy = true, recoveryError = "")
+        viewModelScope.launch {
+            try {
+                val outcome = OutboxReconciler(app.database).inspect(saved, command.actionId)
+                readFinance(saved); refreshRecovery(candidate ?: saved)
+                state = state.copy(busy = false, recoveryError = if (outcome == null) "Результат неизвестен. Исходная команда сохранена; исключение недоступно." else "Результат сверён. Новая команда не отправлялась.")
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { if (!financialFailure(saved, e)) state = state.copy(busy = false, recoveryError = "Не удалось сверить результат. Исходная команда сохранена.") }
+        }
+    }
+    fun previewQueueDismissal() {
+        val saved = candidate ?: return
+        val head = state.recoveryCommands.firstOrNull() ?: return
+        if (state.busy || state.queueRunning || state.financialCommand != null) return
+        state = state.copy(busy = true, recoveryError = "")
+        viewModelScope.launch {
+            try { val plan = OutboxRecoveryStore(app.database).preview(saved, head.actionId); state = state.copy(busy = false, recoveryPlan = plan) }
+            catch (e: CancellationException) { throw e }
+            catch (e: Exception) { if (!financialFailure(saved, e)) state = state.copy(busy = false, recoveryError = "Результат не доказан или зависимые команды уже отправлялись. Исключение недоступно.") }
+        }
+    }
+    fun cancelQueueDismissal() { if (!state.busy) state = state.copy(recoveryPlan = null) }
+    fun dismissQueueBranch() {
+        val saved = candidate ?: return
+        val plan = state.recoveryPlan ?: return
+        if (state.busy || state.queueRunning || state.financialCommand != null) return
+        state = state.copy(busy = true, recoveryError = "")
+        viewModelScope.launch {
+            try {
+                OutboxRecoveryStore(app.database).dismiss(saved, plan)
+                refreshRecovery(saved)
+                state = state.copy(busy = false, recoveryError = "Изменения исключены из отправки. Исходные команды сохранены. Остальные изменения можно синхронизировать отдельно.")
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { if (!financialFailure(saved, e)) state = state.copy(busy = false, recoveryPlan = null, recoveryError = "Очередь изменилась. Проверьте её заново; команды сохранены.") }
+        }
+    }
+
     private fun queueScopeCurrent(saved: StoredSession): Boolean {
         val active = candidate ?: return false
         return state.auth != null && !state.logoutPending && state.revokePendingId == null &&

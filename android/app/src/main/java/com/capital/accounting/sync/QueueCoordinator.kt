@@ -20,7 +20,7 @@ class QueueCoordinator(private val db: CapitalDatabase) {
                 // Preserve the existing single-command editor's explicit ACK/recovery contract.
                 if (db.commands().get(scope.origin, scope.owner, scope.workspace) != null)
                     return@serialized QueueDrainResult(completed, QueueDrainStatus.BLOCKED)
-                var head = db.outbox().commands(scope.key).firstOrNull { it.state != "applied" }
+                var head = db.outbox().commands(scope.key).firstOrNull { it.state !in setOf("applied", "dismissed") }
                     ?: return@serialized QueueDrainResult(completed, QueueDrainStatus.IDLE)
                 if (head.state == "rejected") return@serialized QueueDrainResult(completed, QueueDrainStatus.BLOCKED)
                 if (head.state in setOf("sending", "uncertain", "reconcile")) {
@@ -47,7 +47,7 @@ class QueueCoordinator(private val db: CapitalDatabase) {
                     else -> return@serialized QueueDrainResult(completed, QueueDrainStatus.BLOCKED)
                 }
             }
-            val remaining = db.outbox().commands(scope.key).any { it.state != "applied" }
+            val remaining = db.outbox().commands(scope.key).any { it.state !in setOf("applied", "dismissed") }
             QueueDrainResult(completed, if (remaining) QueueDrainStatus.MORE else QueueDrainStatus.IDLE)
         }
     }

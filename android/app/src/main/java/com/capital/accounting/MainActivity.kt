@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.capital.accounting.auth.AuthViewModel
 import com.capital.accounting.finance.FinancialDraftContent
+import com.capital.accounting.finance.QueueRecovery
 import com.capital.accounting.finance.TransactionDetails
 import com.capital.accounting.finance.AccountPanel
 import com.capital.accounting.finance.AdjustmentPanel
@@ -49,6 +50,7 @@ class MainActivity : ComponentActivity() {
             LaunchedEffect(state.auth) { if (state.auth != null) password = "" }
             MaterialTheme(colorScheme = if (isSystemInDarkTheme()) darkColorScheme() else lightColorScheme()) {
                 CompositionLocalProvider(LocalFinancialSection provides section, LocalFinancialCreateRouter provides createRouter) {
+                    if (state.auth != null && state.recoveryOpen) QueueRecovery(model)
                     if (state.auth != null && state.detailStack.isNotEmpty()) TransactionDetails(model)
                     Surface(Modifier.fillMaxSize()) {
                         Column(Modifier.fillMaxSize()) {
@@ -76,6 +78,8 @@ class MainActivity : ComponentActivity() {
                                     if (state.queueMessage.isNotEmpty()) Text(state.queueMessage)
                                     if (state.localPending + state.localBlocked > 0) Button(enabled = !state.busy && !state.queueRunning && state.persisted && state.financialCommand == null,
                                         onClick = model::synchronizeQueue) { Text("Синхронизировать изменения") }
+                                    if (state.localPending + state.localBlocked > 0) Button(enabled = !state.busy && state.persisted,
+                                        onClick = model::openQueueRecovery) { Text("Разобрать сохранённые изменения") }
                                     Button(enabled = !state.busy && state.persisted, onClick = model::loadOverview) { Text("Обновить финансовые данные") }
                                     if (state.busy && !state.overviewLoaded) Text("Загрузка финансовых данных…")
                                     if (state.busy && state.overviewCached) Text("Показаны сохраненные финансовые данные. Выполняется синхронизация.")
