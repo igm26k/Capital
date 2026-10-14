@@ -6,6 +6,7 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.serialization.json.Json
 import okhttp3.Call
 import okhttp3.Callback
+import okhttp3.ConnectionPool
 import okhttp3.CookieJar
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -75,6 +76,8 @@ class ApiClient(origin: String) {
     companion object {
         val json = Json { ignoreUnknownKeys = false }
         private val client = OkHttpClient.Builder().cookieJar(CookieJar.NO_COOKIES)
+            // Retire idle sockets before the API/proxy idle deadlines; never retry a write implicitly.
+            .connectionPool(ConnectionPool(5, 30, TimeUnit.SECONDS))
             .followRedirects(false).followSslRedirects(false).retryOnConnectionFailure(false)
             .connectTimeout(10, TimeUnit.SECONDS).readTimeout(20, TimeUnit.SECONDS).callTimeout(30, TimeUnit.SECONDS).build()
     }
