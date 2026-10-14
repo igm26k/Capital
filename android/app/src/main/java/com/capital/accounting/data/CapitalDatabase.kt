@@ -20,7 +20,7 @@ interface SettingsDao {
     suspend fun save(settings: ConnectionSettings)
 }
 
-@Database(entities = [ConnectionSettings::class, FinancialCommand::class, SnapshotAttempt::class, SnapshotStage::class, SnapshotRecord::class, SnapshotToken::class, MirrorHead::class, MirrorRecord::class, MirrorTombstone::class, MirrorChange::class, CachedIdentity::class, OutboxCommand::class, OutboxOverlay::class, OutboxReceipt::class, OutboxFailure::class, OutboxOutcome::class], version = 11, exportSchema = true)
+@Database(entities = [ConnectionSettings::class, FinancialCommand::class, SnapshotAttempt::class, SnapshotStage::class, SnapshotRecord::class, SnapshotToken::class, MirrorHead::class, MirrorRecord::class, MirrorTombstone::class, MirrorChange::class, CachedIdentity::class, OutboxCommand::class, OutboxOverlay::class, OutboxReceipt::class, OutboxFailure::class, OutboxOutcome::class, OpeningLink::class], version = 12, exportSchema = true)
 abstract class CapitalDatabase : RoomDatabase() {
     abstract fun settings(): SettingsDao
     abstract fun commands(): CommandDao
@@ -30,9 +30,16 @@ abstract class CapitalDatabase : RoomDatabase() {
     abstract fun outbox(): OutboxDao
     abstract fun receipts(): OutboxReceiptDao
     abstract fun failures(): OutboxFailureDao
+    abstract fun openingLinks(): OpeningLinkDao
     abstract fun outcomes(): OutboxOutcomeDao
 
     companion object {
+        val MIGRATION_11_12 = object : androidx.room.migration.Migration(11, 12) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE opening_links (scope TEXT NOT NULL, accountId TEXT NOT NULL, generation TEXT NOT NULL, transactionId TEXT NOT NULL, PRIMARY KEY(scope,accountId))")
+                db.execSQL("CREATE UNIQUE INDEX index_opening_links_scope_transactionId ON opening_links(scope,transactionId)")
+            }
+        }
         val MIGRATION_10_11 = object : androidx.room.migration.Migration(10, 11) {
             override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
                 db.execSQL("CREATE TABLE outbox_outcomes (commandPosition INTEGER NOT NULL PRIMARY KEY, state TEXT NOT NULL, status INTEGER NOT NULL, generation TEXT, sequence TEXT, refs TEXT NOT NULL, FOREIGN KEY(commandPosition) REFERENCES outbox_commands(position) ON DELETE CASCADE)")

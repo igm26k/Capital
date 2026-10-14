@@ -22,7 +22,7 @@ class OutboxReceiptTest {
     private val context get() = ApplicationProvider.getApplicationContext<CapitalApplication>()
     private fun id() = UUID.randomUUID().toString()
     private val date = "2026-10-12T12:00:00Z"
-    private fun open(name: String) = Room.databaseBuilder(context, CapitalDatabase::class.java, name).addMigrations(CapitalDatabase.MIGRATION_8_9, CapitalDatabase.MIGRATION_9_10, CapitalDatabase.MIGRATION_10_11).build()
+    private fun open(name: String) = Room.databaseBuilder(context, CapitalDatabase::class.java, name).addMigrations(CapitalDatabase.MIGRATION_8_9, CapitalDatabase.MIGRATION_9_10, CapitalDatabase.MIGRATION_10_11, CapitalDatabase.MIGRATION_11_12).build()
     private fun saved() = StoredSession("https://accounting.example", "x".repeat(64), id(), id(), id(), id())
     private fun scope(s: StoredSession) = MirrorScope(s.origin, s.ownerId, s.workspaceId)
     private suspend fun snapshot(db: CapitalDatabase, s: StoredSession, sequence: String, tag: Tag?, generation: String = s.generationId) {
@@ -90,7 +90,7 @@ class OutboxReceiptTest {
         val name = "outbox-receipt-migration.db"; context.deleteDatabase(name); var db = open(name); val s = saved()
         try {
             val tag = tag(s); val c = prepare(db, s, tag); val overlays = db.outbox().overlays(c.position); db.close()
-            context.openOrCreateDatabase(name, 0, null).use { old -> old.execSQL("DROP TABLE outbox_outcomes"); old.execSQL("DROP TABLE outbox_failures"); old.execSQL("DROP TABLE outbox_receipts"); old.execSQL("DROP TABLE room_master_table"); old.execSQL("PRAGMA user_version=8") }
+            context.openOrCreateDatabase(name, 0, null).use { old -> old.execSQL("DROP TABLE opening_links"); old.execSQL("DROP TABLE outbox_outcomes"); old.execSQL("DROP TABLE outbox_failures"); old.execSQL("DROP TABLE outbox_receipts"); old.execSQL("DROP TABLE room_master_table"); old.execSQL("PRAGMA user_version=8") }
             db = open(name); assertEquals(c, db.outbox().commands(c.scope).single()); assertEquals(overlays, db.outbox().overlays(c.position))
             assertNull(db.receipts().get(c.position)); OutboxReceiptStore(db).applied(c, response(c, tag)); assertNotNull(db.receipts().get(c.position))
         } finally { db.close(); context.deleteDatabase(name) }

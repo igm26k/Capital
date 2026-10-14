@@ -20,7 +20,7 @@ class OutboxOutcomeTest {
     private val context get() = ApplicationProvider.getApplicationContext<CapitalApplication>()
     private fun id() = UUID.randomUUID().toString()
     private val date = "2026-10-12T12:00:00Z"
-    private fun open(name: String) = Room.databaseBuilder(context, CapitalDatabase::class.java, name).addMigrations(CapitalDatabase.MIGRATION_10_11).build()
+    private fun open(name: String) = Room.databaseBuilder(context, CapitalDatabase::class.java, name).addMigrations(CapitalDatabase.MIGRATION_10_11, CapitalDatabase.MIGRATION_11_12).build()
     private suspend fun prepare(db: CapitalDatabase): Pair<OutboxCommand, Tag> {
         val s = StoredSession("https://accounting.example", "x".repeat(64), id(), id(), id(), id())
         val scope = MirrorScope(s.origin, s.ownerId, s.workspaceId); db.snapshots().head(MirrorHead(scope.key, s.generationId, "0", "cursor"))
@@ -49,7 +49,7 @@ class OutboxOutcomeTest {
         val name = "outbox-outcome-migration.db"; context.deleteDatabase(name); var db = open(name)
         try {
             val (c, tag) = prepare(db); val effects = db.outbox().overlays(c.position); db.close()
-            context.openOrCreateDatabase(name, 0, null).use { old -> old.execSQL("DROP TABLE outbox_outcomes"); old.execSQL("DROP TABLE room_master_table"); old.execSQL("PRAGMA user_version=10") }
+            context.openOrCreateDatabase(name, 0, null).use { old -> old.execSQL("DROP TABLE opening_links"); old.execSQL("DROP TABLE outbox_outcomes"); old.execSQL("DROP TABLE room_master_table"); old.execSQL("PRAGMA user_version=10") }
             db = open(name); assertEquals(c, db.outbox().commands(c.scope).single()); assertEquals(effects, db.outbox().overlays(c.position))
             val rejected = outcome(c, tag).copy(state = "rejected", original_http_status = 409, generation_id = null, group_sequence = null, entity_refs = emptyList())
             val record = OutboxOutcomeStore(db).accept(c, ApiClient.json.encodeToString(rejected))

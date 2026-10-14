@@ -133,6 +133,14 @@ func MountLedger(mux *http.ServeMux, runner *commands.Runner, options AuthOption
 				result = map[string]any{"items": items, "next_cursor": nil}
 				return nil
 			}
+			if strings.HasSuffix(r.URL.Path, "/opening") {
+				if r.URL.RawQuery != "" {
+					return fail(400, "bad_request")
+				}
+				data, e := ledger.ReadAccountOpening(r.Context(), tx, workspace, id)
+				result = data
+				return e
+			}
 			resource := r.URL.Path
 			kind := ""
 			if strings.Contains(resource, "/categories") {
@@ -204,6 +212,7 @@ func MountLedger(mux *http.ServeMux, runner *commands.Runner, options AuthOption
 	mux.HandleFunc("GET /api/v1/currencies", read)
 	mux.HandleFunc("GET /api/v1/workspaces/{workspace_id}/accounts", read)
 	mux.HandleFunc("GET /api/v1/workspaces/{workspace_id}/accounts/{id}", read)
+	mux.HandleFunc("GET /api/v1/workspaces/{workspace_id}/accounts/{id}/opening", read)
 }
 
 type accountQuery struct {

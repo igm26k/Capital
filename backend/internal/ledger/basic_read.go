@@ -75,3 +75,19 @@ func ListTransactions(ctx context.Context, tx pgx.Tx, workspace string, q Transa
 	items, _, e := scanAggregates(rows)
 	return items, e
 }
+
+// The explicit relation also covers a zero opening, which has no entries.
+func ReadAccountOpening(ctx context.Context, tx pgx.Tx, workspace, accountID string) (json.RawMessage, error) {
+	if _, e := ReadAccount(ctx, tx, workspace, accountID); e != nil {
+		return nil, e
+	}
+	var id string
+	e := tx.QueryRow(ctx, `SELECT id::text FROM transactions WHERE workspace_id=$1 AND opening_account_id=$2 AND kind='opening' AND deleted_at IS NULL`, workspace, accountID).Scan(&id)
+	if errors.Is(e, pgx.ErrNoRows) {
+		return nil, &identity.Error{Status: 404, Code: "not_found"}
+	}
+	if e != nil {
+		return nil, e
+	}
+	return ReadTransaction(ctx, tx, workspace, id)
+}

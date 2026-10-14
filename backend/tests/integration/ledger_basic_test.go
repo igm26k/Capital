@@ -115,6 +115,9 @@ func TestLedgerBasic(t *testing.T) {
 				}
 			}
 		}
+		if method == "GET" && strings.HasSuffix(strings.Split(path, "?")[0], "/opening") && res.status == 200 {
+			schema = "Transaction"
+		}
 		observationsMutex.Lock()
 		observations = append(observations, observed{schema, res.body})
 		observationsMutex.Unlock()
@@ -211,6 +214,20 @@ func TestLedgerBasic(t *testing.T) {
 	if len(zero.body["transactions"].([]any)[0].(map[string]any)["entries"].([]any)) != 0 {
 		t.Fatal("zero opening has entry")
 	}
+	// Explicit opening relation stays read-only and covers zero balances.
+	for _, pair := range []struct {
+		id     string
+		result response
+	}{{accountID, first}, {zeroID, zero}} {
+		got := send("GET", root+"/"+pair.id+"/opening", nil, "", a.Credential)
+		expect(got, 200, "")
+		if !reflect.DeepEqual(got.body, pair.result.body["transactions"].([]any)[0]) {
+			t.Fatal("account opening differs")
+		}
+		expect(send("GET", root+"/"+pair.id+"/opening?limit=1", nil, "", a.Credential), 400, "bad_request")
+	}
+	expect(send("GET", root+"/"+zeroID+"/opening", nil, "", ""), 401, "unauthenticated")
+	expect(send("GET", root+"/"+zeroID+"/opening", nil, "", foreign.Credential), 404, "not_found")
 	negativeID := "c0000000-0000-4000-8000-000000000003"
 	negative := send("POST", root, input(negativeID, "-9000000000000000"), action(), a.Credential)
 	expect(negative, 201, "")
