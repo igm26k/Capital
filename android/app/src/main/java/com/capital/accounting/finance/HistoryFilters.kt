@@ -71,6 +71,7 @@ fun HistoryFilters(model: AuthViewModel) {
     if (state.historyFilter != null) Text(if (state.historyFilter.active) "Фильтры истории применены" else "Все операции по страницам")
     if (state.historyError.isNotEmpty()) Text(state.historyError)
     if (state.historyItems != null) Text("Показано операций: ${state.historyItems.size}")
-    if (state.historyNextCursor != null) Button(enabled = enabled, onClick = model::nextHistoryPage) { Text("Следующая страница истории") }
+    if (state.historyLocal) Text("История на устройстве${if (state.offline) " · сохранённые данные" else ""}")
+    if (state.historyLocalCursor != null) Button(enabled = enabled, onClick = model::nextHistoryPage) { Text("Следующая страница истории") }
     if ((state.historyItems ?: state.transactions).isEmpty()) Text(if (state.historyFilter?.active == true) "По фильтрам операций нет. Измените или сбросьте фильтры." else "Операций пока нет. Добавьте доход или расход.")
 }

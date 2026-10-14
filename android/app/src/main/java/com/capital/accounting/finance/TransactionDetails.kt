@@ -41,7 +41,7 @@ fun TransactionDetails(model: AuthViewModel) {
                         "adjustment" -> state.accounts.any { account -> account.id == target.entries.single().account_id && account.archived_at == null && account.deleted_at == null }
                         else -> false
                     }
-                    val enabled = !state.busy && state.persisted && !state.financeBlocked && router.canCreate && router.request == null && router.transactionRequest == null
+                    val enabled = !state.busy && state.persisted && (!state.financeBlocked || state.canQueueCatalog) && router.canCreate && router.request == null && router.transactionRequest == null
                     if (item.kind in setOf("income", "expense", "transfer", "refund", "adjustment")) {
                         fun act(action: FinancialTransactionAction) {
                             router.transactionRequest = FinancialTransactionRequest(action, requireNotNull(target), parent, fee, transfer)
@@ -59,7 +59,13 @@ fun TransactionDetails(model: AuthViewModel) {
                     }
                     Text("Тип: ${TransactionFilter.kinds[item.kind] ?: item.kind}")
                     Text("Статус детали: ${TransactionFilter.statuses[item.status] ?: item.status}")
-                    Text("Версия операции: ${item.version}")
+                    if (state.detailLocal) Text("Детали на устройстве${if (state.offline) " · сохранённые данные" else ""}")
+                    Text("${if (("transaction" to item.id) in state.localAffected) "Ожидаемая версия операции" else "Версия операции"}: ${item.version}")
+                    if (item.kind == "opening" && item.entries.isEmpty()) {
+                        val account = state.accounts.find { it.id == state.detailOpeningAccountId }
+                        Text("Счет детали: ${account?.name ?: "Связь со счётом требует соединения"}")
+                        if (account != null) Text("Сумма детали: ${Money.display("0", account.currency)}")
+                    }
                     item.entries.forEach { entry ->
                         val account = state.accounts.find { it.id == entry.account_id }
                         Text("Счет детали: ${account?.name ?: "Недоступный счет"}${if (account?.archived_at != null) " · В архиве" else ""}")
