@@ -9,14 +9,14 @@ import java.security.MessageDigest
 data class NotificationProfile(
     val id: String, val packageName: String, val template: String,
     val currency: String, val kind: String, val accountId: String,
-    val version: Int = 1, val expectedCardLastFour:String? = null, val enabled:Boolean = true,
+    val version: Int = 1, val expectedCardLastFour:String? = null, val enabled:Boolean = true, val autoCreatePending:Boolean = false,
 )
 @Serializable
 data class NotificationCandidate(
     val eventId: String, val profileId: String, val parserVersion: Int,
     val packageName: String, val accountId: String, val kind: String,
     val amountMinor: String, val currency: String, val merchant: String,
-    val cardLastFour: String?, val observedAtMillis: Long,
+    val cardLastFour: String?, val observedAtMillis: Long, val notificationKeyHash:String?=null,
 )
 
 data class NotificationEnvelope(
@@ -89,7 +89,8 @@ object NotificationParser {
         // SBN keys may embed private tags. Only their scoped digest is persisted.
         val identity = listOf(event.packageName, event.notificationKey, event.postedAtMillis.toString()).joinToString("\u0000")
         val id = MessageDigest.getInstance("SHA-256").digest(identity.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
+        val slot=MessageDigest.getInstance("SHA-256").digest(listOf(event.packageName,event.notificationKey).joinToString("\u0000").toByteArray(Charsets.UTF_8)).joinToString("") {"%02x".format(it)}
         return NotificationCandidate(id, profile.id, profile.version, profile.packageName, profile.accountId,
-            profile.kind, minor, currency, merchant, fields["card"], event.postedAtMillis)
+            profile.kind, minor, currency, merchant, fields["card"], event.postedAtMillis,slot)
     }
 }

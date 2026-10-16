@@ -24,6 +24,11 @@ fun SourceControls(source:SourcesModel,model:AuthViewModel) {
         if(pending.rejected)TextButton(enabled=!source.busy,onClick=source::dismissRejected){Text("Закрыть отклоненный запрос предложения")}
         else Button(enabled=!source.busy&&!state.offline,onClick=source::retry){Text("Повторить сохраненный запрос предложения")}
     }
+    source.autoPending?.let {pending->
+        Text("Сохранена автоматическая отправка. Остановка режима не отменяет уже принятые сервером задания; проверьте историю. Неизвестный запрос сохраняет прежние ключ, тело и сессию.")
+        if(pending.rejected)TextButton(enabled=enabled,onClick=source::dismissRejectedAutomatic){Text("Закрыть отклонённую автоматическую отправку")}
+        else TextButton(enabled=enabled,onClick=source::retryAutomatic){Text("Проверить прежний автоматический запрос")}
+    }
     if(source.hasMore)TextButton(enabled=!source.busy&&!state.offline&&source.before!=null,onClick=source::loadOlder){Text("Загрузить более ранние предложения")}
     source.items.filter {it.state!="dismissed"}.forEach {event->
         Text("${event.merchant.ifEmpty {"Без продавца"}} · ${Money.display(event.amount_minor,event.currency)}")

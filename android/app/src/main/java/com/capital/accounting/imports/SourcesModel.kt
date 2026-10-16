@@ -16,6 +16,8 @@ import kotlinx.serialization.encodeToString
 class SourcesModel(application:Application):AndroidViewModel(application) {
     private val app get()=getApplication<CapitalApplication>()
     private val store by lazy {PlanningStore(app,"sources")}
+    private val autoStore by lazy {PlanningStore(app,"source-auto")}
+    var autoPending by mutableStateOf<PlanningPending?>(null);private set
     private var session:StoredSession?=null
     var items by mutableStateOf<List<SourceEvent>>(emptyList());private set
     var hasMore by mutableStateOf(false);private set
@@ -31,9 +33,9 @@ class SourcesModel(application:Application):AndroidViewModel(application) {
     var delivered by mutableStateOf<Triple<NotificationBinding,String,String>?>(null);private set
     private fun same(s:StoredSession)=session?.let {it.notificationBinding()==s.notificationBinding()&&it.token==s.token}==true
     fun bind(s:StoredSession) {
-        if(same(s)){session=s;return};session=s;items=emptyList();hasMore=false;before=null;pending=null;busy=false;message="";targets=emptyMap();delivered=null;unauthorized=false;linking=null;candidates=emptyList();candidateCursor=null
+        if(same(s)){session=s;return};session=s;items=emptyList();hasMore=false;before=null;pending=null;autoPending=null;busy=false;message="";targets=emptyMap();delivered=null;unauthorized=false;linking=null;candidates=emptyList();candidateCursor=null
     }
-    fun clear(){session=null;items=emptyList();hasMore=false;before=null;pending=null;busy=false;message="";targets=emptyMap();delivered=null;unauthorized=false;linking=null;candidates=emptyList();candidateCursor=null}
+    fun clear(){session=null;items=emptyList();hasMore=false;before=null;pending=null;autoPending=null;busy=false;message="";targets=emptyMap();delivered=null;unauthorized=false;linking=null;candidates=emptyList();candidateCursor=null}
     private fun work(block:suspend(StoredSession)->Unit) {
         val saved=session?:return;if(busy)return;busy=true;message=""
         viewModelScope.launch {
@@ -49,7 +51,7 @@ class SourcesModel(application:Application):AndroidViewModel(application) {
         require(result.items.all {it.workspace_id==saved.workspaceId})
         if(same(saved)){items=if(older)(items+result.items).distinctBy {it.id} else result.items;hasMore=result.has_more;before=result.next_before_id;if(!older)targets=emptyMap()}
     }
-    fun load()=work {s->val value=store.pending(s);if(same(s))pending=value;refresh(s)}
+    fun load()=work {s->val value=store.pending(s);val automatic=autoStore.pending(s);if(same(s)){pending=value;autoPending=automatic};refresh(s)}
     fun loadOlder()=work {s->require(hasMore&&before!=null);refresh(s,true)}
     fun poll()=work {s->
         val values=items.filter {it.state=="queued"}.take(20).map {event->decodeResponse<SourceEvent>(ApiClient(s.origin).request("/workspaces/${s.workspaceId}/source-events/${event.id}",session=s)).also {require(it.workspace_id==s.workspaceId&&it.id==event.id)}}
@@ -61,7 +63,7 @@ class SourcesModel(application:Application):AndroidViewModel(application) {
         val result=decodeResponse<SourceEvent>(store.send(saved))
         if(command.path.endsWith("/source-events")) {
             val input=decodeResponse<SourceEventCreate>(command.body)
-            runCatching {app.notificationInbox.uploaded(saved.notificationBinding(),input.external_id,result.id)}
+            runCatching {app.notificationInbox.uploaded(saved.notificationBinding(),input.external_id,result.id,result.state)}
             if(same(saved))delivered=Triple(saved.notificationBinding(),input.external_id,result.id)
         }
         if(!same(saved))return
@@ -83,6 +85,22 @@ class SourcesModel(application:Application):AndroidViewModel(application) {
     }
     fun retry()=work {send(it)}
     fun dismissRejected()=work {s->store.dismissRejected(s);if(same(s))pending=null}
+    fun automaticStatus()=work {s->
+        val pending=autoStore.pending(s)
+        val local=app.notificationInbox.read(s.notificationBinding())
+        val missing=local.items.filter {it.automatic&&it.serverEventId!=null&&items.none {value->value.id==it.serverEventId}}.take(20)
+        val values=missing.map {item->decodeResponse<SourceEvent>(ApiClient(s.origin).request("/workspaces/${s.workspaceId}/source-events/${item.serverEventId}",session=s)).also {require(it.workspace_id==s.workspaceId&&it.id==item.serverEventId)}}
+        if(same(s)){autoPending=pending;items=(values+items).distinctBy {it.id}}
+    }
+    fun retryAutomatic()=work {s->
+        val command=requireNotNull(autoStore.pending(s));val input=decodeResponse<SourceEventCreate>(command.body)
+        try {
+            val result=decodeResponse<SourceEvent>(autoStore.send(s))
+            app.notificationInbox.uploaded(s.notificationBinding(),input.external_id,result.id,result.state)
+            if(same(s)){autoPending=null;delivered=Triple(s.notificationBinding(),input.external_id,result.id);items=(listOf(result)+items.filterNot {it.id==result.id});message="Сохраненный автоматический запрос проверен с прежним ключом."}
+        }finally{if(same(s))autoPending=autoStore.pending(s)}
+    }
+    fun dismissRejectedAutomatic()=work {s->autoStore.dismissRejected(s);if(same(s))autoPending=null}
     fun closeMatches(){linking=null;candidates=emptyList();candidateCursor=null}
     fun matches(event:SourceEvent,more:Boolean=false)=work {s->
         require(event.workspace_id==s.workspaceId)

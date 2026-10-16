@@ -12,18 +12,18 @@ data class NotificationBinding(val origin: String, val ownerId: String, val work
     override fun toString() = "NotificationBinding([redacted])"
 }
 @Serializable
-data class NotificationInboxItem(val eventId: String, val fingerprint: String, val candidate: NotificationCandidate?, val state: String = "review", val serverEventId:String? = null, val alternatives:List<NotificationCandidate> = emptyList(),val profileIds:List<String> = emptyList(),val revisions:List<NotificationCandidate> = emptyList())
+data class NotificationInboxItem(val eventId: String, val fingerprint: String, val candidate: NotificationCandidate?, val state: String = "review", val serverEventId:String? = null, val alternatives:List<NotificationCandidate> = emptyList(),val profileIds:List<String> = emptyList(),val revisions:List<NotificationCandidate> = emptyList(),val automatic:Boolean=false,val serverState:String?=null)
 @Serializable
 data class NotificationInbox(
     val binding: NotificationBinding, val enabled: Boolean = false,
     val profile: NotificationProfile? = null, val items: List<NotificationInboxItem> = emptyList(),
-    val rejected: Long = 0, val format: Int = 1, val profiles:List<NotificationProfile> = emptyList(),
+    val rejected: Long = 0, val format: Int = 1, val profiles:List<NotificationProfile> = emptyList(),val skipped:Long=0,
 ) {
     val configuredProfiles:List<NotificationProfile> get()=profiles.ifEmpty {listOfNotNull(profile)}
     fun configure(value:NotificationProfile):NotificationInbox {
         NotificationParser.validate(value)
         val prior=configuredProfiles.find {it.id==value.id}
-        require(prior==null || prior.copy(enabled=value.enabled)==value || items.isEmpty())
+        require(prior==null || prior.copy(enabled=value.enabled,autoCreatePending=value.autoCreatePending)==value || items.isEmpty())
         val configured=(configuredProfiles.filterNot {it.id==value.id}+value).sortedBy {it.id}
         require(configured.size<=20)
         return copy(profile=value,profiles=configured)
@@ -37,17 +37,18 @@ data class NotificationInbox(
             val definition=requireNotNull(configuredProfiles.find {it.id==candidate.profileId})
             require(definition.enabled && candidate.parserVersion==definition.version && candidate.accountId==definition.accountId && candidate.currency==definition.currency && candidate.packageName==definition.packageName && candidate.kind==definition.kind)
         }
-        val encoded=if(ordered.size==1)Json.encodeToString(ordered.single()) else Json.encodeToString(ordered)
+        val encoded=if(ordered.size==1)Json.encodeToString(ordered.single().copy(notificationKeyHash=null)) else Json.encodeToString(ordered.map {it.copy(notificationKeyHash=null)})
         val sha=MessageDigest.getInstance("SHA-256").digest(encoded.toByteArray()).joinToString("") {"%02x".format(it)}
         val id=ordered.first().eventId
         val previous=items.find {it.eventId==id}
         if(previous!=null) {
             if(previous.fingerprint==sha || previous.state=="dismissed")return this
-            return copy(items=items.map {if(it.eventId==id)it.copy(state="conflict",revisions=(it.revisions+ordered).distinct().takeLast(20)) else it})
+            return copy(items=items.map {if(it.eventId==id)it.copy(state="conflict",automatic=false,revisions=(it.revisions+ordered).distinct().takeLast(20)) else it})
         }
-        if(items.size>=1000)return copy(rejected=(rejected+1).coerceAtMost(1_000_000))
-        val item=NotificationInboxItem(id,sha,ordered.singleOrNull(),if(ordered.size==1)"review" else "ambiguous",alternatives=if(ordered.size>1)ordered else emptyList(),profileIds=ordered.map {it.profileId})
-        return copy(items=items+item)
+        val removable=items.firstOrNull {it.serverEventId!=null&&it.state in setOf("uploaded","dismissed")}
+        val retained=if(items.size<1000)items else if(removable!=null)items.filterNot {it.eventId==removable.eventId} else return copy(rejected=(rejected+1).coerceAtMost(1_000_000))
+        val item=NotificationInboxItem(id,sha,ordered.singleOrNull(),if(ordered.size==1)"review" else "ambiguous",alternatives=if(ordered.size>1)ordered else emptyList(),profileIds=ordered.map {it.profileId},automatic=ordered.size==1&&configuredProfiles.single {it.id==ordered.single().profileId}.autoCreatePending)
+        return copy(items=retained+item)
     }
     fun choose(id:String,profileId:String):NotificationInbox {
         val item=items.single {it.eventId==id}
@@ -55,9 +56,11 @@ data class NotificationInbox(
         val candidate=item.alternatives.single {it.profileId==profileId}
         return copy(items=items.map {if(it.eventId==id)it.copy(candidate=candidate,state="review") else it})
     }
-    fun uploaded(id:String,serverId:String):NotificationInbox {
+    fun skipped():NotificationInbox=copy(skipped=(skipped+1).coerceAtMost(1_000_000))
+    fun uploaded(id:String,serverId:String,serverState:String?=null):NotificationInbox {
+        require(serverId.matches(Regex("[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}")))
         require(items.any {it.eventId==id})
-        return copy(items=items.map {if(it.eventId==id)it.copy(state=if(it.state=="conflict")"conflict" else "uploaded",serverEventId=serverId) else it})
+        return copy(items=items.map {if(it.eventId==id)it.copy(state=if(it.state in setOf("conflict","dismissed"))it.state else "uploaded",serverEventId=serverId,serverState=serverState) else it})
     }
     fun dismiss(id: String): NotificationInbox {
         require(items.any { it.eventId == id })

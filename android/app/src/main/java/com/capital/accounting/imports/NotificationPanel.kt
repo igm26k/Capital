@@ -12,6 +12,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.delay
 import com.capital.accounting.CapitalApplication
 import com.capital.accounting.api.credential
+import com.capital.accounting.api.ApiClient
+import kotlinx.serialization.encodeToString
 import com.capital.accounting.auth.AuthViewModel
 import com.capital.accounting.finance.Money
 import kotlinx.coroutines.CancellationException
@@ -36,6 +38,8 @@ private fun NotificationPanelContent(model:AuthViewModel,binding:NotificationBin
     var profileId by remember {mutableStateOf(java.util.UUID.randomUUID().toString())}
     var expectedCard by remember {mutableStateOf("")}
     var profileEnabled by remember {mutableStateOf(true)}
+    var autoCreate by remember {mutableStateOf(false)}
+    var testedProfile by remember {mutableStateOf<String?>(null)}
     var localPage by remember {mutableStateOf(0)}
     var packageName by remember { mutableStateOf("") }
     var template by remember { mutableStateOf("") }
@@ -44,7 +48,7 @@ private fun NotificationPanelContent(model:AuthViewModel,binding:NotificationBin
     var sample by remember { mutableStateOf("") }
     var confirm by remember { mutableStateOf(false) }
     var access by remember { mutableStateOf(false) }
-    fun edit(value:NotificationProfile){profileId=value.id;packageName=value.packageName;template=value.template;account=value.accountId;kind=value.kind;expectedCard=value.expectedCardLastFour?:"";profileEnabled=value.enabled;sample=""}
+    fun edit(value:NotificationProfile){profileId=value.id;packageName=value.packageName;template=value.template;account=value.accountId;kind=value.kind;expectedCard=value.expectedCardLastFour?:"";profileEnabled=value.enabled;autoCreate=value.autoCreatePending;testedProfile=null;sample=""}
     fun refresh(loadEditor:Boolean=false) { scope.launch {
         busy=true
         try {
@@ -56,7 +60,7 @@ private fun NotificationPanelContent(model:AuthViewModel,binding:NotificationBin
     } }
     fun profile():NotificationProfile {
         val selected=model.state.accounts.single { it.id==account && it.deleted_at==null && it.archived_at==null }
-        return NotificationProfile(profileId,packageName.trim(),template,selected.currency,kind,selected.id,expectedCardLastFour=expectedCard.ifEmpty {null},enabled=profileEnabled)
+        return NotificationProfile(profileId,packageName.trim(),template,selected.currency,kind,selected.id,expectedCardLastFour=expectedCard.ifEmpty {null},enabled=profileEnabled,autoCreatePending=autoCreate)
     }
     TextButton(onClick={expanded=!expanded;if(expanded)refresh(true)}) { Text("Банковские уведомления: локальный разбор") }
     if(!expanded)return
@@ -68,11 +72,18 @@ private fun NotificationPanelContent(model:AuthViewModel,binding:NotificationBin
     LaunchedEffect(sources.unauthorized){if(sources.unauthorized)model.sessionUnauthorized(auth.session.id)}
     LaunchedEffect(sources.delivered){if(sources.delivered?.first==binding)refresh()}
     LaunchedEffect(sources.items.any {it.state=="queued"},sources.busy){if(!sources.busy&&sources.items.any {it.state=="queued"}){delay(2000);sources.poll()}}
+    LaunchedEffect(binding.key,inbox?.enabled,inbox?.configuredProfiles?.any {it.autoCreatePending&&it.enabled}) {
+        if(inbox?.enabled==true&&inbox?.configuredProfiles?.any {it.autoCreatePending&&it.enabled}==true) {
+            AutoSourceScheduler(context).schedule(binding)
+            while(true){delay(3000);refresh();sources.automaticStatus()}
+        }
+    }
     var refreshed by remember {mutableStateOf<List<Pair<String,String>>>(emptyList())}
     val completed=sources.items.filter {it.state=="applied"}.map {it.id to it.version}
     LaunchedEffect(completed,model.state.busy){if(completed.isNotEmpty()&&completed!=refreshed&&!model.state.busy){refreshed=completed;model.loadOverview()}}
-    Text("Доступ включается вами в настройках Android. Обрабатывается только выбранный пакет по вашему шаблону; полный текст не сохраняется и не отправляется. Локальные предложения не меняют остатки. Отправка и каждое финансовое действие требуют вашего подтверждения.")
+    Text("Доступ включается вами в настройках Android. Обрабатывается только выбранный пакет по вашему шаблону; полный текст не сохраняется и не отправляется. По умолчанию предложения остаются локальными. Автоматическая отправка и создание предварительных включаются отдельно для проверенного шаблона. Окончательное списание и отмена требуют явного подтверждения.")
     Text("Поддержка конкретного банка не подтверждена. Android может скрывать текст или пропускать уведомления; историю сверяйте с выпиской. Время предложения — время уведомления, а не доказанная дата покупки.")
+    Text("Уведомлений без безопасного разбора: ${inbox?.skipped?:0}; отклонено из-за заполнения: ${inbox?.rejected?:0}; ошибок приёма в этом процессе: ${store.captureErrors.get()}. Сверяйте полноту с выпиской.")
     if(message.isNotEmpty())Text(message)
     if(busy)CircularProgressIndicator()
     Text(if(access)"Системный доступ включен" else "Системный доступ выключен")
@@ -88,9 +99,11 @@ private fun NotificationPanelContent(model:AuthViewModel,binding:NotificationBin
     val editable=enabled && (knownProfile==null || inbox?.items?.isEmpty()!=false)
     Text("Профили приложений и счетов (до 20)")
     inbox?.configuredProfiles?.forEach {value->TextButton(enabled=!busy,onClick={edit(value)}){Text("${value.packageName} · ${model.state.accounts.find {it.id==value.accountId}?.name?:"Счет недоступен"}${value.expectedCardLastFour?.let {" · *$it"}?:""}${if(value.enabled)"" else " · выключен"}")}}
-    TextButton(enabled=enabled,onClick={profileId=java.util.UUID.randomUUID().toString();packageName="";template="";account="";kind="expense";expectedCard="";profileEnabled=true;sample=""}){Text("Добавить профиль другого приложения или карты")}
+    TextButton(enabled=enabled,onClick={profileId=java.util.UUID.randomUUID().toString();packageName="";template="";account="";kind="expense";expectedCard="";profileEnabled=true;autoCreate=false;testedProfile=null;sample=""}){Text("Добавить профиль другого приложения или карты")}
     if(!editable&&knownProfile!=null)Text("Привязка сохраненных наблюдений неизменяема. Для другого счета создайте новый профиль; старый можно выключить.")
     TextButton(enabled=enabled,onClick={profileEnabled=!profileEnabled}){Text(if(profileEnabled)"Профиль включен" else "Профиль выключен")}
+    TextButton(enabled=enabled,onClick={autoCreate=!autoCreate}){Text(if(autoCreate)"Автоматическая доставка и предварительные: включены" else "Автоматическая доставка и предварительные: выключены")}
+    Text("Автоматический режим отправляет только разобранные поля. Сервер создаёт предварительную операцию, если нет возможных дублей; неоднозначные случаи остаются для сверки. Старые ручные предложения автоматически не отправляются. Перед первым включением проверьте обезличенный пример.")
     OutlinedTextField(expectedCard,{expectedCard=it.filter {c->c in '0'..'9'}.take(4)},enabled=editable,label={Text("Фильтр последних 4 цифр карты (необязательно)")})
     BankAppPicker(packageName,editable){packageName=it}
     OutlinedTextField(template,{template=it},enabled=editable,label={Text("Шаблон текста уведомления")})
@@ -104,7 +117,7 @@ private fun NotificationPanelContent(model:AuthViewModel,binding:NotificationBin
     Button(enabled=!busy,onClick={
         message=try {
             val result=NotificationParser.parse(profile().copy(enabled=true),NotificationEnvelope(packageName.trim(),"local-preview",System.currentTimeMillis(),sample))
-            if(result==null)"Нет безопасного однозначного совпадения." else "Предпросмотр: ${Money.display(result.amountMinor,result.currency)} · ${result.merchant}"
+            if(result==null){testedProfile=null;"Нет безопасного однозначного совпадения."} else {testedProfile=ApiClient.json.encodeToString(profile().copy(enabled=true,autoCreatePending=false));"Предпросмотр: ${Money.display(result.amountMinor,result.currency)} · ${result.merchant}"}
         }catch(_:Exception) { "Проверьте счет, пакет и шаблон." }
         sample=""
     }) { Text("Проверить шаблон без сохранения операции") }
@@ -113,9 +126,11 @@ private fun NotificationPanelContent(model:AuthViewModel,binding:NotificationBin
         Button(enabled=!busy,onClick={scope.launch {busy=true;try{inbox=store.disable(binding);message="Прием всех профилей остановлен. Уже отправленные задания проверяйте на сервере."}catch(e:Exception){if(e is CancellationException)throw e;message="Не удалось остановить прием."}finally{busy=false}}}){Text("Остановить прием всех профилей")}
     } else if(inbox?.configuredProfiles?.isNotEmpty()==true) {
         Text("В новой сессии проверьте сохраненные привязки перед включением. Старые предложения и запросы не переиздаются.")
-        Button(enabled=enabled,onClick={scope.launch {busy=true;try{inbox=store.enable(binding);message="Прием сохраненных профилей включен для этой сессии."}catch(e:Exception){if(e is CancellationException)throw e;message="Проверьте профили и счета."}finally{busy=false}}}){Text("Включить прием сохраненных профилей")}
+        Button(enabled=enabled,onClick={scope.launch {busy=true;try{inbox=store.enable(binding);AutoSourceScheduler(context).schedule(binding);message="Прием сохраненных профилей включен для этой сессии."}catch(e:Exception){if(e is CancellationException)throw e;message="Проверьте профили и счета."}finally{busy=false}}}){Text("Включить прием сохраненных профилей")}
     }
-    if(confirm)AlertDialog(onDismissRequest={confirm=false},title={Text("Сохранить профиль разбора?")},text={Text("Если прием сессии включен, активный профиль начнет сохранять разобранные поля выбранного приложения. Иначе включите прием отдельной кнопкой. Системный доступ Android включается отдельно; остатки не изменяются.")},confirmButton={TextButton(onClick={confirm=false;scope.launch { busy=true;try { inbox=store.configure(binding,profile());message="Профиль сохранен. Проверьте состояние приема и системный доступ." }catch(e:Exception) { if(e is CancellationException)throw e;message="Проверьте шаблон и счет. Изменение привязки при сохраненных предложениях запрещено; создайте новый профиль." }finally{busy=false} }}){Text("Сохранить профиль")}},dismissButton={TextButton(onClick={confirm=false}){Text("Отмена")}})
+    if(confirm)AlertDialog(onDismissRequest={confirm=false},title={Text("Сохранить профиль разбора?")},text={Text("Если прием сессии включен, активный профиль начнет сохранять разобранные поля выбранного приложения. Иначе включите прием отдельной кнопкой. Системный доступ Android включается отдельно. При включённом автоматическом режиме новые однозначные уведомления отправляются и могут создавать предварительные операции; окончательное списание требует отдельного подтверждения.")},confirmButton={TextButton(onClick={confirm=false;scope.launch { busy=true;try { val value=profile();val approved=knownProfile?.let {it.autoCreatePending&&it.copy(enabled=value.enabled,autoCreatePending=value.autoCreatePending)==value}==true
+        require(!value.autoCreatePending||approved||testedProfile==ApiClient.json.encodeToString(value.copy(enabled=true,autoCreatePending=false)))
+        inbox=store.configure(binding,value);if(inbox?.enabled==true)AutoSourceScheduler(context).schedule(binding);message="Профиль сохранен. Проверьте состояние приема и системный доступ." }catch(e:Exception) { if(e is CancellationException)throw e;message="Проверьте шаблон и счёт. Перед включением автоматического режима выполните успешный предпросмотр; для изменения сохранённой привязки создайте новый профиль." }finally{busy=false} }}){Text("Сохранить профиль")}},dismissButton={TextButton(onClick={confirm=false}){Text("Отмена")}})
     inbox?.let { value ->
         if(value.rejected>0)Text("Локальная очередь заполнена: пропущено ${value.rejected}. Сверьте операции с выпиской.")
         if(store.captureErrors.get()>0)Text("Не удалось сохранить часть уведомлений: ${store.captureErrors.get()}. Сверьте операции с выпиской.")

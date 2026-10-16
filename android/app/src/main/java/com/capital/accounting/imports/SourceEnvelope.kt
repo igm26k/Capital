@@ -18,5 +18,5 @@ fun sourceEnvelope(binding:NotificationBinding,candidate:NotificationCandidate):
     val connection=UUID.nameUUIDFromBytes(namespace.toByteArray(Charsets.UTF_8)).toString()
     val record=UUID.nameUUIDFromBytes("$connection:${candidate.eventId}".toByteArray(Charsets.UTF_8)).toString()
     val observed=SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",Locale.ROOT).apply {timeZone=TimeZone.getTimeZone("UTC")}.format(Date(candidate.observedAtMillis))
-    return SourceEventCreate(record,connection,candidate.eventId,candidate.accountId,candidate.packageName,candidate.profileId,candidate.parserVersion,candidate.kind,candidate.amountMinor,candidate.currency,observed,"UTC",candidate.merchant,candidate.cardLastFour)
+    return SourceEventCreate(record,connection,candidate.eventId,candidate.accountId,candidate.packageName,candidate.profileId,candidate.parserVersion,candidate.kind,candidate.amountMinor,candidate.currency,observed,"UTC",candidate.merchant,candidate.cardLastFour,candidate.notificationKeyHash)
 }

@@ -21,8 +21,10 @@ class NotificationInboxStore(context: Context) {
     private val directory = File(context.noBackupFilesDir,"notification-inbox-v1")
     private val mutex = Mutex()
     val captureErrors = java.util.concurrent.atomic.AtomicLong(0)
-    @Volatile var active: NotificationInbox? = null; private set
-    fun pauseCapture() { active=null }
+    @Volatile private var cached: NotificationInbox? = null
+    @Volatile private var paused=false
+    val active:NotificationInbox? get()=if(paused)null else cached
+    fun pauseCapture() { paused=true;cached=null }
     private fun file(key: String): AtomicFile {
         require(key.matches(Regex("[0-9a-f]{64}")))
         check(directory.isDirectory || directory.mkdirs())
@@ -60,14 +62,14 @@ class NotificationInboxStore(context: Context) {
     }
     private fun save(value: NotificationInbox) {
         write(file(value.binding.key),ApiClient.json.encodeToString(value).toByteArray())
-        if(active?.binding==value.binding)active=value
+        if(active?.binding==value.binding)cached=value
     }
     suspend fun read(binding: NotificationBinding): NotificationInbox = withContext(Dispatchers.IO) { mutex.withLock { load(binding) } }
     suspend fun restoreActive(authorized: suspend (NotificationBinding) -> Boolean) = withContext(Dispatchers.IO) { mutex.withLock {
-        active=null
+        cached=null
         val pointer=AtomicFile(File(directory,"active"))
         val binding=try { ApiClient.json.decodeFromString<NotificationBinding>(bytes(pointer).decodeToString()) } catch(_:java.io.FileNotFoundException) { return@withLock }
-        if(authorized(binding))active=load(binding)
+        if(authorized(binding))cached=load(binding)
     } }
     suspend fun configure(binding: NotificationBinding, profile: NotificationProfile): NotificationInbox = withContext(Dispatchers.IO) { mutex.withLock {
         NotificationParser.validate(profile)
@@ -77,33 +79,33 @@ class NotificationInboxStore(context: Context) {
         save(updated)
         write(AtomicFile(File(directory,"profiles-${binding.configurationKey}.json")),ApiClient.json.encodeToString(NotificationConfiguration(binding,updated.configuredProfiles)).toByteArray())
         write(AtomicFile(File(directory,"active")),ApiClient.json.encodeToString(binding).toByteArray())
-        active=updated;updated
+        paused=false;cached=updated;updated
     } }
     suspend fun disable(binding: NotificationBinding): NotificationInbox = withContext(Dispatchers.IO) { mutex.withLock {
         val updated=load(binding).copy(enabled=false);save(updated);updated
     } }
     suspend fun capture(binding: NotificationBinding,candidates: List<NotificationCandidate>) = withContext(Dispatchers.IO) { mutex.withLock {
         if(active?.binding!=binding || active?.enabled!=true)return@withLock
-        save(load(binding).acceptMatches(candidates))
+        save(if(candidates.isEmpty())load(binding).skipped() else load(binding).acceptMatches(candidates))
     } }
     suspend fun enable(binding:NotificationBinding):NotificationInbox=withContext(Dispatchers.IO){mutex.withLock {
         val updated=load(binding).copy(enabled=true);require(updated.configuredProfiles.any {it.enabled});save(updated)
         write(AtomicFile(File(directory,"profiles-${binding.configurationKey}.json")),ApiClient.json.encodeToString(NotificationConfiguration(binding,updated.configuredProfiles)).toByteArray())
-        write(AtomicFile(File(directory,"active")),ApiClient.json.encodeToString(binding).toByteArray());active=updated;updated
+        write(AtomicFile(File(directory,"active")),ApiClient.json.encodeToString(binding).toByteArray());paused=false;cached=updated;updated
     }}
     suspend fun choose(binding:NotificationBinding,id:String,profileId:String):NotificationInbox=withContext(Dispatchers.IO){mutex.withLock {
         val updated=load(binding).choose(id,profileId);save(updated);updated
     }}
-    suspend fun uploaded(binding:NotificationBinding,id:String,serverId:String):NotificationInbox=withContext(Dispatchers.IO) {mutex.withLock {
+    suspend fun uploaded(binding:NotificationBinding,id:String,serverId:String,serverState:String?=null):NotificationInbox=withContext(Dispatchers.IO) {mutex.withLock {
         val original=load(binding)
         if(original.items.none {it.eventId==id})return@withLock original
-        val updated=original.uploaded(id,serverId);save(updated);updated
+        val updated=original.uploaded(id,serverId,serverState);save(updated);updated
     } }
     suspend fun dismiss(binding: NotificationBinding,id:String): NotificationInbox = withContext(Dispatchers.IO) { mutex.withLock {
         val updated=load(binding).dismiss(id);save(updated);updated
     } }
     suspend fun eraseAfterAccountDeletion(saved:StoredSession) = withContext(Dispatchers.IO) { mutex.withLock {
-        active=null
+        cached=null
         directory.listFiles()?.mapNotNull { Regex("([0-9a-f]{64})\\.json(?:\\.bak|\\.new)?").matchEntire(it.name)?.groupValues?.get(1) }?.distinct()?.forEach { key ->
             val disk=File(directory,"$key.json")
             val value=ApiClient.json.decodeFromString<NotificationInbox>(bytes(AtomicFile(disk)).decodeToString())

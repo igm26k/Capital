@@ -196,3 +196,31 @@ test('older source pages stay visible while their financial job completes', asyn
   const balance=await(await context.request.get(`${root}/accounts/${account.id}`)).json();
   expect(balance.pending_delta_minor).toBe('-100');expect(balance.projected_balance_minor).toBe('9900');
 });
+
+test('opt-in automatic intake creates one preliminary and keeps possible duplicates for review', async ({ page, context }) => {
+  await page.goto('/');await page.getByRole('button',{name:'Создать профиль',exact:true}).click();
+  await page.getByLabel('Электронная почта').fill(`source-link-${crypto.randomUUID()}@example.test`);
+  await page.getByLabel('Пароль',{exact:true}).fill('synthetic-browser-password-2026');
+  await page.getByRole('button',{name:'Зарегистрироваться',exact:true}).click();
+  await expect(page.getByRole('button',{name:'Выйти',exact:true})).toBeVisible();
+  await page.getByLabel('Название счета').fill('Source link cash');await page.getByLabel('Начальный остаток, EUR').fill('100,00');
+  await page.getByRole('button',{name:'Создать счет',exact:true}).click();await expect(page.locator('.accounts strong')).toHaveText('100,00 EUR');
+  const auth=await(await context.request.get('/api/v1/auth/session')).json(),root=`/api/v1/workspaces/${auth.workspace.id}`;
+  const account=(await(await context.request.get(`${root}/accounts`)).json()).items[0];
+  const headers={Origin:new URL(page.url()).origin,'X-CSRF-Token':auth.csrf_token,'X-Sync-Generation':auth.workspace.sync_generation_id};
+  const input={id:crypto.randomUUID(),connection_id:crypto.randomUUID(),external_id:'a'.repeat(64),account_id:account.id,package_name:'example.bank',profile_id:'automatic',notification_key_hash:'c'.repeat(64),parser_version:1,kind:'expense',amount_minor:'100',currency:'EUR',observed_at:new Date().toISOString(),observed_timezone:'UTC',merchant:'Automatic first',card_last_four:null};
+  const key=crypto.randomUUID();
+  const firstResponse=await context.request.post(`${root}/source-events/auto`,{headers:{...headers,'Idempotency-Key':key},data:input});expect(firstResponse.status()).toBe(201);
+  const receipt=await firstResponse.json();expect(receipt.state).toBe('queued');
+  const secondResponse=await context.request.post(`${root}/source-events/auto`,{headers:{...headers,'Idempotency-Key':crypto.randomUUID()},data:{...input,id:crypto.randomUUID(),external_id:'b'.repeat(64),notification_key_hash:'d'.repeat(64),merchant:'Automatic second'}});expect(secondResponse.status()).toBe(201);
+  const second=await secondResponse.json();expect(second.state).toBe('review');expect(second.transaction_id).toBeNull();
+  await expect.poll(async()=>{return(await(await context.request.get(`${root}/source-events/${receipt.id}`)).json()).state;}).toBe('applied');
+  const repeated=await context.request.post(`${root}/source-events/auto`,{headers:{...headers,'Idempotency-Key':key},data:input});expect(repeated.status()).toBe(201);expect(await repeated.json()).toEqual(receipt);
+  await page.locator('summary').filter({hasText:/^Банковские предложения$/}).click();
+  const panel=page.getByRole('region',{name:'Банковские предложения',exact:true}),card=panel.getByRole('article',{name:'Предложение Automatic second',exact:true});
+  await card.getByRole('button',{name:'Выбрать существующую операцию',exact:true}).click();
+  await panel.getByRole('dialog',{name:'Выбор операции для связи',exact:true}).getByRole('button',{name:/Automatic first/}).click();
+  await panel.getByRole('button',{name:'Подтвердить действие предложения',exact:true}).click();
+  await expect(card.getByRole('button',{name:'Проверить связанную операцию',exact:true})).toBeVisible();
+  const balances=await(await context.request.get(`${root}/accounts/${account.id}`)).json();expect(balances.posted_balance_minor).toBe('10000');expect(balances.pending_delta_minor).toBe('-100');expect(balances.projected_balance_minor).toBe('9900');
+});
