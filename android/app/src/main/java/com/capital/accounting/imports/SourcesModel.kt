@@ -83,7 +83,7 @@ class SourcesModel(application:Application):AndroidViewModel(application) {
         val suffix=cursor?.let {"&cursor="+java.net.URLEncoder.encode(it,"UTF-8")}?:""
         val page=decodeResponse<TransactionList>(ApiClient(s.origin).request("/workspaces/${s.workspaceId}/transactions?account_id=${event.account_id}&limit=100$suffix",session=s))
         require(page.items.all {it.workspace_id==s.workspaceId})
-        val allowed=page.items.filter {t->t.deleted_at==null&&t.kind==event.kind&&t.parent_transaction_id==null&&t.entries.size==1&&t.entries[0].account_id==event.account_id&&t.entries[0].currency==event.currency&&java.math.BigInteger(t.entries[0].amount_minor).abs().toString()==event.amount_minor}
+        val allowed=page.items.filter {t->t.deleted_at==null&&t.kind in setOf("expense","income","transfer","refund")&&t.entries.any {e->e.account_id==event.account_id&&e.currency==event.currency&&java.math.BigInteger(e.amount_minor)==java.math.BigInteger(event.amount_minor).multiply(java.math.BigInteger.valueOf(if(event.kind=="expense")-1L else 1L))}}
         if(same(s)){candidates=(if(more)candidates+allowed else allowed).distinctBy {it.id};candidateCursor=page.next_cursor}
     }
     fun target(event:SourceEvent)=work {s->

@@ -115,7 +115,7 @@ func ConfirmSourceEvent(workspace, id, generation string, input SourceDecision) 
 			if input.Decision == "link" {
 				// Explicit attachment is metadata only. Current amount/account/currency/kind/version must agree.
 				var valid bool
-				err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM transactions t JOIN entries e ON (e.workspace_id,e.transaction_id)=(t.workspace_id,t.id) WHERE t.workspace_id=$1 AND t.id=$2 AND t.version=$3::bigint AND t.deleted_at IS NULL AND t.parent_transaction_id IS NULL AND t.kind=$4 AND t.status IN ('pending','posted') AND e.account_id=$5 AND abs(e.amount_minor)=$6::bigint)`, workspace, *input.TransactionID, *input.TransactionVersion, event.Kind, event.AccountID, event.Amount).Scan(&valid)
+				err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM transactions t JOIN entries e ON (e.workspace_id,e.transaction_id)=(t.workspace_id,t.id) WHERE t.workspace_id=$1 AND t.id=$2 AND t.version=$3::bigint AND t.deleted_at IS NULL AND t.kind IN ('expense','income','transfer','refund') AND t.status IN ('pending','posted') AND e.account_id=$5 AND e.amount_minor=$6::bigint*CASE WHEN $4='expense' THEN -1 ELSE 1 END)`, workspace, *input.TransactionID, *input.TransactionVersion, event.Kind, event.AccountID, event.Amount).Scan(&valid)
 				if err != nil {
 					return nil, 0, err
 				}
@@ -204,6 +204,13 @@ func ProcessSourceEvents(ctx context.Context, auth *identity.Service, limit int)
 			}
 			var mutation commands.Mutation
 			if job.Decision == "create_pending" {
+				var currency string
+				if err = tx.QueryRow(ctx, `SELECT currency_code FROM accounts WHERE workspace_id=$1 AND id=$2 AND deleted_at IS NULL`, workspace, event.AccountID).Scan(&currency); err != nil {
+					return commands.Mutation{}, err
+				}
+				if currency != event.Currency {
+					return commands.Mutation{}, domainReject(422, "source_event_conflict")
+				}
 				basic := BasicInput{ID: job.TransactionID, Kind: event.Kind, AccountID: event.AccountID, Amount: event.Amount, OccurredAt: event.ObservedAt, Timezone: event.Timezone, Payee: event.Merchant, TagIDs: []string{}, Allocations: []AllocationInput{{ID: newID(), Amount: event.Amount}}}
 				mutation, err = createBasicStatus(workspace, basic, "pending")(ctx, tx, p)
 				if err == nil {
@@ -244,14 +251,26 @@ func ProcessSourceEvents(ctx context.Context, auth *identity.Service, limit int)
 	return count, nil
 }
 func transitionSourceTransaction(ctx context.Context, tx pgx.Tx, workspace string, event SourceEvent, job sourceJob) (commands.Mutation, error) {
-	accounts, err := lockAccounts(ctx, tx, workspace, event.AccountID)
+	var currentAccount, currency string
+	err := tx.QueryRow(ctx, `SELECT e.account_id::text,a.currency_code FROM entries e JOIN accounts a ON (a.workspace_id,a.id)=(e.workspace_id,e.account_id) WHERE e.workspace_id=$1 AND e.transaction_id=$2 ORDER BY e.account_id LIMIT 1`, workspace, job.TransactionID).Scan(&currentAccount, &currency)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return commands.Mutation{}, &identity.Error{Status: 404, Code: "not_found"}
+	}
+	if err != nil {
+		return commands.Mutation{}, err
+	}
+	if currency != event.Currency {
+		return commands.Mutation{}, domainReject(422, "source_event_conflict")
+	}
+	accounts, err := lockAccounts(ctx, tx, workspace, currentAccount)
 	if err != nil {
 		return commands.Mutation{}, err
 	}
 	var current int64
 	var status, kind string
 	var deleted *time.Time
-	err = tx.QueryRow(ctx, `SELECT version,status,kind,deleted_at FROM transactions WHERE workspace_id=$1 AND id=$2 FOR UPDATE`, workspace, job.TransactionID).Scan(&current, &status, &kind, &deleted)
+	var standalone bool
+	err = tx.QueryRow(ctx, `SELECT version,status,kind,deleted_at,parent_transaction_id IS NULL FROM transactions WHERE workspace_id=$1 AND id=$2 FOR UPDATE`, workspace, job.TransactionID).Scan(&current, &status, &kind, &deleted, &standalone)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return commands.Mutation{}, &identity.Error{Status: 404, Code: "not_found"}
 	}
@@ -262,14 +281,14 @@ func transitionSourceTransaction(ctx context.Context, tx pgx.Tx, workspace strin
 	if current != expected {
 		return commands.Mutation{}, transactionVersionConflict(job.TransactionID, current)
 	}
-	if deleted != nil || status != "pending" || kind != event.Kind || event.TransactionID == nil || *event.TransactionID != job.TransactionID {
+	if !standalone || deleted != nil || status != "pending" || kind != event.Kind || event.TransactionID == nil || *event.TransactionID != job.TransactionID {
 		return commands.Mutation{}, domainReject(422, "source_event_not_ready")
 	}
 	if current == math.MaxInt64 {
 		return commands.Mutation{}, &identity.Error{Status: 503, Code: "service_unavailable"}
 	}
 	var sameAccount bool
-	if err = tx.QueryRow(ctx, `SELECT count(*)=1 AND bool_and(account_id=$3::uuid) FROM entries WHERE workspace_id=$1 AND transaction_id=$2`, workspace, job.TransactionID, event.AccountID).Scan(&sameAccount); err != nil {
+	if err = tx.QueryRow(ctx, `SELECT count(*)=1 AND bool_and(account_id=$3::uuid) FROM entries WHERE workspace_id=$1 AND transaction_id=$2`, workspace, job.TransactionID, currentAccount).Scan(&sameAccount); err != nil {
 		return commands.Mutation{}, err
 	}
 	if !sameAccount {
@@ -286,7 +305,7 @@ func transitionSourceTransaction(ctx context.Context, tx pgx.Tx, workspace strin
 	if err != nil {
 		return commands.Mutation{}, err
 	}
-	account, err := bumpAccount(ctx, tx, workspace, accounts[event.AccountID])
+	account, err := bumpAccount(ctx, tx, workspace, accounts[currentAccount])
 	if err != nil {
 		return commands.Mutation{}, err
 	}

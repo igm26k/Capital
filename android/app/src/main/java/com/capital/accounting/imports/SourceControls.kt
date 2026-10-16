@@ -12,6 +12,7 @@ private data class SourceChoice(val event:SourceEvent,val decision:String,val tr
 fun SourceControls(source:SourcesModel,model:AuthViewModel) {
     val state=model.state
     var choice by remember {mutableStateOf<SourceChoice?>(null)}
+    fun actual(t:Transaction)="${t.kind} · ${t.occurred_at} · "+t.entries.joinToString("; ") {e->"${state.accounts.find {it.id==e.account_id}?.name?:e.account_id}: ${Money.display(e.amount_minor,e.currency)}"}
     val enabled=!state.busy&&!source.busy&&source.pending==null&&!state.offline&&state.persisted&&!state.financeBlocked
     Text("Предложения на сервере",style=MaterialTheme.typography.titleMedium)
     Text("После отправки предложение можно связать с существующей операцией или явно создать предварительную. Подтверждение не учитывает сумму второй раз; отмена удаляет предварительную запись.")
@@ -42,7 +43,8 @@ fun SourceControls(source:SourcesModel,model:AuthViewModel) {
                 if(transaction==null)Text("Связанная операция удалена или недоступна. Новая автоматически не создается.")
                 else {
                     Text("${if(transaction.status=="pending")"Предварительная" else "Подтвержденная"}: ${transaction.payee} · ${transaction.note}")
-                    if(transaction.status=="pending"&&(event.state=="applied"||event.state=="failed"&&!unknown)) {
+                    Text("Текущая операция: ${actual(transaction)}")
+                    if(transaction.status=="pending"&&transaction.kind==event.kind&&transaction.parent_transaction_id==null&&transaction.entries.size==1&&(event.state=="applied"||event.state=="failed"&&!unknown)) {
                         Button(enabled=enabled,onClick={choice=SourceChoice(event,"confirm_posted",transaction)}){Text("Подтвердить предварительную операцию")}
                         TextButton(enabled=enabled,onClick={choice=SourceChoice(event,"cancel_pending",transaction)}){Text("Отменить предварительную операцию")}
                     }
@@ -52,10 +54,10 @@ fun SourceControls(source:SourcesModel,model:AuthViewModel) {
     }
     source.linking?.let {event->
         Text("Связь для ${event.merchant}: выберите операцию того же счета, валюты и суммы. Сама операция не изменится.")
-        source.candidates.forEach {transaction->TextButton(enabled=enabled,onClick={choice=SourceChoice(event,"link",transaction);source.closeMatches()}){Text("${transaction.occurred_at} · ${transaction.payee.ifEmpty {"Без получателя"}} · ${Money.display(event.amount_minor,event.currency)}")}}
+        source.candidates.forEach {transaction->TextButton(enabled=enabled,onClick={choice=SourceChoice(event,"link",transaction);source.closeMatches()}){Text("${transaction.occurred_at} · ${transaction.payee.ifEmpty {"Без получателя"}} · ${actual(transaction)}")}}
         if(source.candidates.isEmpty())Text("Среди загруженных операций подходящих нет.")
         if(source.candidateCursor!=null)TextButton(enabled=!source.busy,onClick={source.matches(event,true)}){Text("Загрузить следующие операции для связи")}
         TextButton(enabled=!source.busy,onClick=source::closeMatches){Text("Закрыть выбор операции")}
     }
-    choice?.let {value->AlertDialog(onDismissRequest={choice=null},title={Text(when(value.decision){"create_pending"->"Создать предварительную операцию?";"link"->"Связать с выбранной операцией?";"confirm_posted"->"Подтвердить предварительную операцию?";"cancel_pending"->"Отменить предварительную операцию?";else->"Исключить предложение?"})},text={Text("${Money.display(value.event.amount_minor,value.event.currency)} · ${value.event.merchant}. Проверьте счет и историю. Пользовательские категории, теги и заметки не перезаписываются.")},confirmButton={TextButton(enabled=enabled,onClick={choice=null;source.decide(value.event,value.decision,value.transaction)}){Text("Подтвердить действие предложения")}},dismissButton={TextButton(onClick={choice=null}){Text("Отмена действия предложения")}})}
+    choice?.let {value->AlertDialog(onDismissRequest={choice=null},title={Text(when(value.decision){"create_pending"->"Создать предварительную операцию?";"link"->"Связать с выбранной операцией?";"confirm_posted"->"Подтвердить предварительную операцию?";"cancel_pending"->"Отменить предварительную операцию?";else->"Исключить предложение?"})},text={Text("Исходное уведомление: ${Money.display(value.event.amount_minor,value.event.currency)} · ${value.event.merchant}. "+(value.transaction?.let {"Действие применяется к текущей операции: ${actual(it)}. Ручные исправления суммы и счёта сохранятся. "}?:"")+"Пользовательские категории, теги и заметки не перезаписываются.")},confirmButton={TextButton(enabled=enabled,onClick={choice=null;source.decide(value.event,value.decision,value.transaction)}){Text("Подтвердить действие предложения")}},dismissButton={TextButton(onClick={choice=null}){Text("Отмена действия предложения")}})}
 }
