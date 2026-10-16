@@ -79,7 +79,7 @@ class PlanningStore(private val app: CapitalApplication, private val channel: St
                     if(value.path.endsWith("/confirm"))require(result.id==value.path.substringBefore("/confirm").substringAfterLast('/'))
                     else {
                         val input=decodeResponse<SourceEventCreate>(value.body)
-                        require(result.external_id==input.external_id && result.connection_id==input.connection_id && result.account_id==input.account_id)
+                        require(result.external_id==input.external_id && result.package_name==input.package_name && result.account_id==input.account_id)
                     }
                 }
                 check(s); require(read(s) == value); file(s).delete(); response

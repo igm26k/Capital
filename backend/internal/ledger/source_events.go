@@ -87,26 +87,51 @@ func CreateSourceEvent(workspace, generation string, input SourceEventInput) imp
 		if archived || currency != input.Currency {
 			return nil, 0, &identity.Error{Status: 422, Code: "validation_error"}
 		}
-		// The record UUID is a request handle; source identity remains stable even with another action/UUID.
-		canonical := input
-		canonical.ID = ""
-		raw, err := json.Marshal(canonical)
+		// Android notification identity is independent of parser/profile/account assignment.
+		// Preserve ambiguous legacy observations; never merge their financial records in migration.
+		hash := sourceFactsHash(input)
+		rows, err := tx.Query(ctx, `SELECT id::text,payload_hash,payload_hash_format,payload FROM source_events WHERE workspace_id=$1 AND actor_user_id=$2 AND external_id=$3 AND payload->>'package_name'=$4 ORDER BY received_at,id LIMIT 2`, workspace, p.Profile.ID, input.ExternalID, input.PackageName)
 		if err != nil {
 			return nil, 0, err
 		}
-		hash := sha256.Sum256(raw)
 		var oldID string
-		var oldHash []byte
-		err = tx.QueryRow(ctx, `SELECT id::text,payload_hash FROM source_events WHERE workspace_id=$1 AND actor_user_id=$2 AND connection_id=$3 AND external_id=$4`, workspace, p.Profile.ID, input.ConnectionID, input.ExternalID).Scan(&oldID, &oldHash)
-		if err == nil {
-			if subtle.ConstantTimeCompare(oldHash, hash[:]) != 1 {
+		var oldHash, oldPayload []byte
+		var format, countOld int
+		for rows.Next() {
+			countOld++
+			if err = rows.Scan(&oldID, &oldHash, &format, &oldPayload); err != nil {
+				rows.Close()
+				return nil, 0, err
+			}
+		}
+		err = rows.Err()
+		rows.Close()
+		if err != nil {
+			return nil, 0, err
+		}
+		if countOld > 1 {
+			return nil, 0, &identity.Error{Status: 409, Code: "source_event_conflict"}
+		}
+		if countOld == 1 {
+			var old SourceEventInput
+			if err = json.Unmarshal(oldPayload, &old); err != nil {
+				return nil, 0, err
+			}
+			oldFacts := sourceFactsHash(old)
+			expected := oldFacts
+			if format == 1 {
+				old.ID = ""
+				raw, _ := json.Marshal(old)
+				expected = sha256.Sum256(raw)
+			}
+			if subtle.ConstantTimeCompare(oldHash, expected[:]) != 1 {
+				return nil, 0, &identity.Error{Status: 503, Code: "service_unavailable"}
+			}
+			if subtle.ConstantTimeCompare(oldFacts[:], hash[:]) != 1 {
 				return nil, 0, &identity.Error{Status: 409, Code: "source_event_conflict"}
 			}
 			value, err := ReadSourceEvent(ctx, tx, workspace, oldID, p.Profile.ID)
 			return value, 200, err
-		}
-		if !errors.Is(err, pgx.ErrNoRows) {
-			return nil, 0, err
 		}
 		var count int
 		if err = tx.QueryRow(ctx, `SELECT count(*) FROM source_events WHERE workspace_id=$1 AND actor_user_id=$2`, workspace, p.Profile.ID).Scan(&count); err != nil {
@@ -115,11 +140,11 @@ func CreateSourceEvent(workspace, generation string, input SourceEventInput) imp
 		if count >= 10000 {
 			return nil, 0, &identity.Error{Status: 422, Code: "source_event_limit"}
 		}
-		raw, err = json.Marshal(input)
+		raw, err := json.Marshal(input)
 		if err != nil {
 			return nil, 0, err
 		}
-		tag, err := tx.Exec(ctx, `INSERT INTO source_events(workspace_id,id,actor_user_id,session_id,generation_id,connection_id,external_id,account_id,payload_hash,payload) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT(workspace_id,id) DO NOTHING`, workspace, input.ID, p.Profile.ID, p.Session.ID, generation, input.ConnectionID, input.ExternalID, input.AccountID, hash[:], raw)
+		tag, err := tx.Exec(ctx, `INSERT INTO source_events(workspace_id,id,actor_user_id,session_id,generation_id,connection_id,external_id,account_id,payload_hash,payload,notification_identity,payload_hash_format) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,2) ON CONFLICT(workspace_id,id) DO NOTHING`, workspace, input.ID, p.Profile.ID, p.Session.ID, generation, input.ConnectionID, input.ExternalID, input.AccountID, hash[:], raw, sourceNotificationIdentity(input))
 		if err != nil {
 			return nil, 0, err
 		}
@@ -172,4 +197,22 @@ func ListSourceEvents(ctx context.Context, tx pgx.Tx, workspace, owner string) (
 		items = items[:100]
 	}
 	return items, more, nil
+}
+
+// Provenance stays immutable on the original row, but changing a parser identifier cannot mint money.
+func sourceFactsHash(input SourceEventInput) [32]byte {
+	input.ID = ""
+	input.ConnectionID = ""
+	input.ProfileID = ""
+	input.ParserVersion = 0
+	input.Timezone = ""
+	if instant, err := ParseInstant(input.ObservedAt); err == nil {
+		input.ObservedAt = instant.UTC().Format(time.RFC3339Nano)
+	}
+	raw, _ := json.Marshal(input)
+	return sha256.Sum256(raw)
+}
+func sourceNotificationIdentity(input SourceEventInput) []byte {
+	hash := sha256.Sum256([]byte(input.PackageName + "\x00" + input.ExternalID))
+	return hash[:]
 }

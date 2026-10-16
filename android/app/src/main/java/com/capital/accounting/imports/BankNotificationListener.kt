@@ -12,7 +12,7 @@ import kotlinx.coroutines.channels.Channel
 /** Opt-in local capture only. Never sends money commands or uploads raw notifications. */
 class BankNotificationListener : NotificationListenerService() {
     private val scope=CoroutineScope(SupervisorJob()+Dispatchers.IO)
-    private val incoming=Channel<Pair<NotificationBinding,NotificationCandidate>>(64)
+    private val incoming=Channel<Pair<NotificationBinding,List<NotificationCandidate>>>(64)
     private val app get()=application as CapitalApplication
     override fun onCreate() {
         super.onCreate()
@@ -33,14 +33,15 @@ class BankNotificationListener : NotificationListenerService() {
     } } } }
     override fun onNotificationPosted(sbn:StatusBarNotification) {
         val inbox=app.notificationInbox.active ?: return
-        val profile=inbox.profile ?: return
-        if(!inbox.enabled || sbn.packageName!=profile.packageName || sbn.notification.flags and Notification.FLAG_GROUP_SUMMARY != 0)return
+        val profiles=inbox.configuredProfiles.filter {it.enabled&&it.packageName==sbn.packageName}
+        if(!inbox.enabled || profiles.isEmpty() || sbn.notification.flags and Notification.FLAG_GROUP_SUMMARY != 0)return
         // Read no extras from unselected packages; no bulk/history scan or notification dismissal.
         val text=sbn.notification.extras.getCharSequence(Notification.EXTRA_BIG_TEXT)
             ?: sbn.notification.extras.getCharSequence(Notification.EXTRA_TEXT) ?: return
         if(text.length !in 1..8192)return
-        val candidate=runCatching { NotificationParser.parse(profile,NotificationEnvelope(sbn.packageName,sbn.key,sbn.postTime,text.toString())) }.getOrNull() ?: return
-        if(incoming.trySend(inbox.binding to candidate).isFailure)app.notificationInbox.captureErrors.incrementAndGet()
+        val candidates=runCatching { NotificationParser.parseProfiles(profiles,NotificationEnvelope(sbn.packageName,sbn.key,sbn.postTime,text.toString())) }.getOrNull() ?: return
+        if(candidates.isEmpty())return
+        if(incoming.trySend(inbox.binding to candidates).isFailure)app.notificationInbox.captureErrors.incrementAndGet()
     }
     override fun onDestroy() { incoming.close();scope.cancel();super.onDestroy() }
 }

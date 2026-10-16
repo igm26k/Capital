@@ -30,9 +30,9 @@ class SourcesModel(application:Application):AndroidViewModel(application) {
     var delivered by mutableStateOf<Triple<NotificationBinding,String,String>?>(null);private set
     private fun same(s:StoredSession)=session?.let {it.notificationBinding()==s.notificationBinding()&&it.token==s.token}==true
     fun bind(s:StoredSession) {
-        if(same(s)){session=s;return};session=s;items=emptyList();pending=null;busy=false;message="";targets=emptyMap();delivered=null;unauthorized=false;linking=null;candidates=emptyList();candidateCursor=null
+        if(same(s)){session=s;return};session=s;items=emptyList();hasMore=false;pending=null;busy=false;message="";targets=emptyMap();delivered=null;unauthorized=false;linking=null;candidates=emptyList();candidateCursor=null
     }
-    fun clear(){session=null;items=emptyList();pending=null;busy=false;message="";targets=emptyMap();delivered=null;unauthorized=false;linking=null;candidates=emptyList();candidateCursor=null}
+    fun clear(){session=null;items=emptyList();hasMore=false;pending=null;busy=false;message="";targets=emptyMap();delivered=null;unauthorized=false;linking=null;candidates=emptyList();candidateCursor=null}
     private fun work(block:suspend(StoredSession)->Unit) {
         val saved=session?:return;if(busy)return;busy=true;message=""
         viewModelScope.launch {
@@ -52,13 +52,13 @@ class SourcesModel(application:Application):AndroidViewModel(application) {
         val command=requireNotNull(store.pending(saved))
         if(same(saved))pending=command
         val result=decodeResponse<SourceEvent>(store.send(saved))
-        if(!same(saved))return
-        pending=null
         if(command.path.endsWith("/source-events")) {
             val input=decodeResponse<SourceEventCreate>(command.body)
             runCatching {app.notificationInbox.uploaded(saved.notificationBinding(),input.external_id,result.id)}
-            delivered=Triple(saved.notificationBinding(),input.external_id,result.id)
+            if(same(saved))delivered=Triple(saved.notificationBinding(),input.external_id,result.id)
         }
+        if(!same(saved))return
+        pending=null
         refresh(saved)
         if(same(saved))message="Сохранено. Финансовые задания обрабатываются сервером; обновите данные после обработки."
     }

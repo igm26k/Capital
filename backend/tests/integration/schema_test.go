@@ -52,7 +52,7 @@ func TestSchema(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	if n, e := migrate.Apply(ctx, db, migrations.Files); e != nil || n != 9 {
+	if n, e := migrate.Apply(ctx, db, migrations.Files); e != nil || n != 10 {
 		t.Fatalf("schema migrations: count=%d error=%v", n, e)
 	}
 	if n, e := migrate.Apply(ctx, db, migrations.Files); e != nil || n != 0 {

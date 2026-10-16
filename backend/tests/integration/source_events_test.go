@@ -1,6 +1,8 @@
 package integration
 
 import (
+	"crypto/sha256"
+	"fmt"
 	"os"
 	"strings"
 	"sync"
@@ -8,7 +10,9 @@ import (
 )
 
 func (f *accessFixture) sourceEvent(account string) map[string]any {
-	return map[string]any{"id": f.id(), "connection_id": f.id(), "external_id": strings.Repeat("a", 64), "account_id": account, "package_name": "example.bank", "profile_id": "personal-v1", "parser_version": 1, "kind": "expense", "amount_minor": "100", "currency": "EUR", "observed_at": "2026-10-01T00:00:00Z", "observed_timezone": "UTC", "merchant": "Synthetic shop", "card_last_four": nil}
+	id := f.id()
+	external := fmt.Sprintf("%x", sha256.Sum256([]byte(id)))
+	return map[string]any{"id": id, "connection_id": f.id(), "external_id": external, "account_id": account, "package_name": "example.bank", "profile_id": "personal-v1", "parser_version": 1, "kind": "expense", "amount_minor": "100", "currency": "EUR", "observed_at": "2026-10-01T00:00:00Z", "observed_timezone": "UTC", "merchant": "Synthetic shop", "card_last_four": nil}
 }
 func TestSourceEvents(t *testing.T) {
 	f := newAccessFixture(t)
@@ -30,6 +34,16 @@ func TestSourceEvents(t *testing.T) {
 	fresh := accessClone(input)
 	fresh["id"] = f.id()
 	f.call(accessRequest{method: "POST", path: request.path, actor: a, key: f.id(), body: fresh}, 200, "")
+	changedProfile := accessClone(input)
+	changedProfile["id"] = f.id()
+	changedProfile["connection_id"] = f.id()
+	changedProfile["profile_id"] = "new-parser-profile"
+	changedProfile["observed_at"] = "2026-10-01T00:00:00.000Z"
+	changedProfile["observed_timezone"] = "Europe/Moscow"
+	same := f.call(accessRequest{method: "POST", path: request.path, actor: a, key: f.id(), body: changedProfile}, 200, "")
+	if same.body["id"] != input["id"] {
+		t.Fatal("profile change duplicated a physical notification")
+	}
 	conflict := accessClone(input)
 	conflict["amount_minor"] = "101"
 	f.call(accessRequest{method: "POST", path: request.path, actor: a, key: f.id(), body: conflict}, 409, "source_event_conflict")

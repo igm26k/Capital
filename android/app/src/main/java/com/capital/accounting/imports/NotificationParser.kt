@@ -9,7 +9,7 @@ import java.security.MessageDigest
 data class NotificationProfile(
     val id: String, val packageName: String, val template: String,
     val currency: String, val kind: String, val accountId: String,
-    val version: Int = 1,
+    val version: Int = 1, val expectedCardLastFour:String? = null, val enabled:Boolean = true,
 )
 @Serializable
 data class NotificationCandidate(
@@ -43,12 +43,18 @@ object NotificationParser {
         require(matches.zipWithNext().all { (a, b) -> b.range.first > a.range.last + 1 })
         // Braces cannot hide misspelled tokens or inject regex operators.
         require(token.replace(profile.template, "").none { it == '{' || it == '}' })
-        require(!secret.containsMatchIn(profile.template))
+        require(!secret.containsMatchIn(profile.template) && !longDigits.containsMatchIn(profile.template))
+        require(profile.expectedCardLastFour==null || (profile.expectedCardLastFour.matches(Regex("[0-9]{4}")) && "card" in names))
+    }
+
+    fun parseProfiles(profiles:List<NotificationProfile>,event:NotificationEnvelope):List<NotificationCandidate> {
+        require(profiles.size<=20 && profiles.map {it.id}.distinct().size==profiles.size)
+        return profiles.filter {it.enabled&&it.packageName==event.packageName}.sortedBy {it.id}.mapNotNull {parse(it,event)}
     }
 
     fun parse(profile: NotificationProfile, event: NotificationEnvelope): NotificationCandidate? {
         validate(profile)
-        if (event.packageName != profile.packageName || event.groupSummary || event.postedAtMillis <= 0 ||
+        if (!profile.enabled || event.packageName != profile.packageName || event.groupSummary || event.postedAtMillis <= 0 ||
             event.notificationKey.length !in 1..1024 || event.text.length !in 1..8192 ||
             secret.containsMatchIn(event.text) || longDigits.containsMatchIn(event.text)) return null
         val tokens = token.findAll(profile.template).toList()
@@ -70,6 +76,7 @@ object NotificationParser {
         }
         val match = Regex(pattern).matchEntire(event.text) ?: return null
         val fields = tokens.mapIndexed { index, field -> field.groupValues[1] to match.groupValues[index + 1] }.toMap()
+        if(profile.expectedCardLastFour!=null && fields["card"]!=profile.expectedCardLastFour)return null
         val currency = fields["currency"] ?: profile.currency
         if (currency != profile.currency) return null
         val value = fields.getValue("amount").replace('\u00a0', ' ').replace('\u202f', ' ')
