@@ -1032,7 +1032,7 @@ data class Error(
     val retry_after_seconds: Int?,
 ) : ActionResponse {
     init {
-        require(code in setOf("bad_request", "validation_error", "unauthenticated", "forbidden", "csrf_invalid", "not_found", "version_conflict", "idempotency_conflict", "dependent_transactions", "account_archived", "amount_out_of_range", "no_change", "rate_limited", "service_unavailable", "internal_error", "cursor_expired", "cursor_invalid", "snapshot_expired", "snapshot_too_large", "action_result_expired", "sync_group_too_large", "sync_generation_conflict", "registration_disabled", "planning_limit_exceeded", "password_invalid", "shared_workspace", "export_too_large", "import_not_ready", "import_source_pending", "import_row_changed", "resource_conflict", "confirmation_invalid", "source_event_conflict", "source_event_limit")) { "Invalid Error.code" }
+        require(code in setOf("bad_request", "validation_error", "unauthenticated", "forbidden", "csrf_invalid", "not_found", "version_conflict", "idempotency_conflict", "dependent_transactions", "account_archived", "amount_out_of_range", "no_change", "rate_limited", "service_unavailable", "internal_error", "cursor_expired", "cursor_invalid", "snapshot_expired", "snapshot_too_large", "action_result_expired", "sync_group_too_large", "sync_generation_conflict", "registration_disabled", "planning_limit_exceeded", "password_invalid", "shared_workspace", "export_too_large", "import_not_ready", "import_source_pending", "import_row_changed", "resource_conflict", "confirmation_invalid", "source_event_conflict", "source_event_limit", "source_event_not_ready")) { "Invalid Error.code" }
     }
     override fun toString() = "Error([redacted])"
 }
@@ -1433,11 +1433,13 @@ data class SourceEvent(
     val version: String,
     val state: String,
     val received_at: String,
+    val transaction_id: String?,
+    val error_code: String?,
 ) {
     init {
         require(parser_version == 1) { "Invalid SourceEvent.parser_version" }
         require(kind in setOf("expense", "income")) { "Invalid SourceEvent.kind" }
-        require(state in setOf("review", "dismissed", "applied")) { "Invalid SourceEvent.state" }
+        require(state in setOf("review", "queued", "failed", "dismissed", "applied")) { "Invalid SourceEvent.state" }
     }
     override fun toString() = "SourceEvent([redacted])"
 }
@@ -1448,4 +1450,17 @@ data class SourceEventList(
     val has_more: Boolean,
 ) {
     override fun toString() = "SourceEventList([redacted])"
+}
+
+@Serializable
+data class SourceEventDecision(
+    val expected_version: String,
+    val decision: String,
+    val transaction_id: String?,
+    val expected_transaction_version: String?,
+) {
+    init {
+        require(decision in setOf("create_pending", "link", "dismiss", "confirm_posted", "cancel_pending")) { "Invalid SourceEventDecision.decision" }
+    }
+    override fun toString() = "SourceEventDecision([redacted])"
 }

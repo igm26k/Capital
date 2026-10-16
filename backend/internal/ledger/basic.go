@@ -277,6 +277,10 @@ func writeBasicParts(ctx context.Context, tx pgx.Tx, workspace, id string, input
 	return nil
 }
 func CreateBasic(workspace string, input BasicInput) commands.Command {
+	return createBasicStatus(workspace, input, "posted")
+}
+
+func createBasicStatus(workspace string, input BasicInput, status string) commands.Command {
 	return func(ctx context.Context, tx pgx.Tx, _ identity.Principal) (commands.Mutation, error) {
 		// Serialize explicit fields so nil optional replacement fields cannot affect creation validation.
 		b, e := json.Marshal(input)
@@ -305,7 +309,7 @@ func CreateBasic(workspace string, input BasicInput) commands.Command {
 		if e = checkReferences(ctx, tx, workspace, input, nil, nil); e != nil {
 			return commands.Mutation{}, e
 		}
-		tag, e := tx.Exec(ctx, `INSERT INTO transactions(id,workspace_id,kind,status,occurred_at,occurred_timezone,note,payee) VALUES($1,$2,$3,'posted',$4,$5,$6,$7) ON CONFLICT(id) DO NOTHING`, input.ID, workspace, input.Kind, occurred, input.Timezone, input.Note, input.Payee)
+		tag, e := tx.Exec(ctx, `INSERT INTO transactions(id,workspace_id,kind,status,occurred_at,occurred_timezone,note,payee) VALUES($1,$2,$3,$8,$4,$5,$6,$7) ON CONFLICT(id) DO NOTHING`, input.ID, workspace, input.Kind, occurred, input.Timezone, input.Note, input.Payee, status)
 		if e != nil {
 			return commands.Mutation{}, e
 		}

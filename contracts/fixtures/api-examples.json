@@ -560,6 +560,16 @@
         "merchant": "SYNTHETIC SHOP",
         "card_last_four": "1234"
       }
+    },
+    {
+      "id": "source_create_pending_decision",
+      "schema": "SourceEventDecision",
+      "data": {
+        "expected_version": "1",
+        "decision": "create_pending",
+        "transaction_id": null,
+        "expected_transaction_version": null
+      }
     }
   ],
   "invalid": [
@@ -981,6 +991,26 @@
         "observed_timezone": "Europe/Moscow",
         "merchant": "SYNTHETIC SHOP",
         "card_last_four": "1234"
+      }
+    },
+    {
+      "id": "source_link_requires_version",
+      "schema": "SourceEventDecision",
+      "data": {
+        "expected_version": "1",
+        "decision": "link",
+        "transaction_id": null,
+        "expected_transaction_version": null
+      }
+    },
+    {
+      "id": "source_create_cannot_link",
+      "schema": "SourceEventDecision",
+      "data": {
+        "expected_version": "1",
+        "decision": "create_pending",
+        "transaction_id": "00000000-0000-4000-8000-000000000001",
+        "expected_transaction_version": null
       }
     }
   ],

@@ -82,6 +82,12 @@ func RunWorker(ctx context.Context, cfg Config, logger *slog.Logger) error {
 				}
 			}
 		}
+		sourceCount, sourceErr := ledger.ProcessSourceEvents(ctx, auth, 20)
+		if sourceErr != nil && ctx.Err() == nil {
+			logger.Error("source_events_failed")
+		} else if sourceCount > 0 {
+			logger.Info("source_events_processed", "count", sourceCount)
+		}
 		processed, importErr := ledger.ProcessImports(ctx, auth, 20)
 		if importErr != nil && ctx.Err() == nil {
 			logger.Error("csv_import_failed")

@@ -2,7 +2,7 @@
   "openapi": "3.1.1",
   "info": {
     "title": "Accounting future-stage API draft",
-    "version": "0.5.0",
+    "version": "0.6.0",
     "description": "Reserved for future bank integration contracts. Implemented budgeting, reporting and CSV operations are in openapi.json; the old reports/summary draft is replaced by GET reports."
   },
   "servers": [
@@ -1972,7 +1972,8 @@
               "resource_conflict",
               "confirmation_invalid",
               "source_event_conflict",
-              "source_event_limit"
+              "source_event_limit",
+              "source_event_not_ready"
             ]
           },
           "message": {
@@ -4663,12 +4664,27 @@
             "type": "string",
             "enum": [
               "review",
+              "queued",
+              "failed",
               "dismissed",
               "applied"
             ]
           },
           "received_at": {
             "$ref": "#/components/schemas/Instant"
+          },
+          "transaction_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "error_code": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [
@@ -4689,7 +4705,9 @@
           "workspace_id",
           "version",
           "state",
-          "received_at"
+          "received_at",
+          "transaction_id",
+          "error_code"
         ]
       },
       "SourceEventList": {
@@ -4710,6 +4728,79 @@
         "required": [
           "items",
           "has_more"
+        ]
+      },
+      "SourceEventDecision": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "expected_version": {
+            "$ref": "#/components/schemas/Version"
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "create_pending",
+              "link",
+              "dismiss",
+              "confirm_posted",
+              "cancel_pending"
+            ]
+          },
+          "transaction_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "expected_transaction_version": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[1-9][0-9]*$"
+          }
+        },
+        "required": [
+          "expected_version",
+          "decision",
+          "transaction_id",
+          "expected_transaction_version"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "decision": {
+                  "enum": [
+                    "create_pending",
+                    "dismiss"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "transaction_id": {
+                  "type": "null"
+                },
+                "expected_transaction_version": {
+                  "type": "null"
+                }
+              }
+            },
+            "else": {
+              "properties": {
+                "transaction_id": {
+                  "$ref": "#/components/schemas/UUID"
+                },
+                "expected_transaction_version": {
+                  "$ref": "#/components/schemas/Version"
+                }
+              }
+            }
+          }
         ]
       }
     },

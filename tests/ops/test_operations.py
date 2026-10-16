@@ -155,6 +155,17 @@ class BackupMonitoring(unittest.TestCase):
             self.assertIn('latest_backup_cycle_failed',health_check.backup_health(root,'test',now))
             (root/'test-backup-error.json').unlink();status['completed_at']=(now-datetime.timedelta(hours=27)).isoformat();backup.atomic_json(path,status)
             self.assertIn('backup_missing_stale_or_invalid',health_check.backup_health(root,'test',now))
+    def test_source_queue_failure_and_age_are_alerted(self):
+        import health_check
+        metrics={key:0 for key in ('email_failed','csv_failed','source_failed','snapshot_cleanup_overdue','email_oldest_pending_seconds','oldest_pending_seconds','source_oldest_pending_seconds')}
+        with mock.patch.object(health_check,'backup_health',return_value=[]),mock.patch.object(health_check,'smoke'),mock.patch.object(health_check.subprocess,'run') as command:
+            command.return_value.stdout=json.dumps(metrics)
+            self.assertTrue(health_check.check('test','https://example.invalid','/private')['healthy'])
+            metrics['source_failed']=1;metrics['source_oldest_pending_seconds']=301
+            command.return_value.stdout=json.dumps(metrics)
+            failed=health_check.check('test','https://example.invalid','/private')['failed']
+            self.assertIn('source_failed',failed);self.assertIn('source_oldest_pending_seconds',failed)
+
     def test_symlink_metadata_is_not_trusted(self):
         import health_check
         with tempfile.TemporaryDirectory() as directory:

@@ -34,9 +34,9 @@ def check(profile,origin,directory):
     try:
         result=subprocess.run([str(ROOT/'ops/monitor.sh'),profile],capture_output=True,text=True,check=True,timeout=15)
         metrics=json.loads(result.stdout)
-        for key in ('email_failed','csv_failed','snapshot_cleanup_overdue'):
+        for key in ('email_failed','csv_failed','source_failed','snapshot_cleanup_overdue'):
             if metrics[key]>0:failed.append(key)
-        for key in ('email_oldest_pending_seconds','oldest_pending_seconds'):
+        for key in ('email_oldest_pending_seconds','oldest_pending_seconds','source_oldest_pending_seconds'):
             if metrics[key]>300:failed.append(key)
     except Exception:failed.append('database_metrics')
     return {'healthy':not failed,'failed':failed,'metrics':metrics}

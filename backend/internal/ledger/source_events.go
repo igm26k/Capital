@@ -32,6 +32,8 @@ type SourceEventInput struct {
 	Card          *string `json:"card_last_four"`
 }
 type SourceEvent struct {
+	TransactionID *string `json:"transaction_id"`
+	ErrorCode     *string `json:"error_code"`
 	SourceEventInput
 	Workspace  string    `json:"workspace_id"`
 	Version    string    `json:"version"`
@@ -134,7 +136,7 @@ func ReadSourceEvent(ctx context.Context, tx pgx.Tx, workspace, id, owner string
 	if !uuid(id) {
 		return value, &identity.Error{Status: 400, Code: "bad_request"}
 	}
-	err := tx.QueryRow(ctx, `SELECT payload,workspace_id::text,version::text,state,received_at FROM source_events WHERE workspace_id=$1 AND id=$2 AND actor_user_id=$3`, workspace, id, owner).Scan(&raw, &value.Workspace, &value.Version, &value.State, &value.ReceivedAt)
+	err := tx.QueryRow(ctx, `SELECT payload,workspace_id::text,version::text,state,received_at,(SELECT transaction_id::text FROM transaction_sources s WHERE s.workspace_id=source_events.workspace_id AND s.event_id=source_events.id),error_code FROM source_events WHERE workspace_id=$1 AND id=$2 AND actor_user_id=$3`, workspace, id, owner).Scan(&raw, &value.Workspace, &value.Version, &value.State, &value.ReceivedAt, &value.TransactionID, &value.ErrorCode)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return value, &identity.Error{Status: 404, Code: "not_found"}
 	}
@@ -145,7 +147,7 @@ func ReadSourceEvent(ctx context.Context, tx pgx.Tx, workspace, id, owner string
 	return value, err
 }
 func ListSourceEvents(ctx context.Context, tx pgx.Tx, workspace, owner string) ([]SourceEvent, bool, error) {
-	rows, err := tx.Query(ctx, `SELECT payload,workspace_id::text,version::text,state,received_at FROM source_events WHERE workspace_id=$1 AND actor_user_id=$2 ORDER BY received_at DESC,id DESC LIMIT 101`, workspace, owner)
+	rows, err := tx.Query(ctx, `SELECT payload,workspace_id::text,version::text,state,received_at,(SELECT transaction_id::text FROM transaction_sources s WHERE s.workspace_id=source_events.workspace_id AND s.event_id=source_events.id),error_code FROM source_events WHERE workspace_id=$1 AND actor_user_id=$2 ORDER BY received_at DESC,id DESC LIMIT 101`, workspace, owner)
 	if err != nil {
 		return nil, false, err
 	}
@@ -154,7 +156,7 @@ func ListSourceEvents(ctx context.Context, tx pgx.Tx, workspace, owner string) (
 	for rows.Next() {
 		var value SourceEvent
 		var raw []byte
-		if err := rows.Scan(&raw, &value.Workspace, &value.Version, &value.State, &value.ReceivedAt); err != nil {
+		if err := rows.Scan(&raw, &value.Workspace, &value.Version, &value.State, &value.ReceivedAt, &value.TransactionID, &value.ErrorCode); err != nil {
 			return nil, false, err
 		}
 		if err := json.Unmarshal(raw, &value.SourceEventInput); err != nil {
