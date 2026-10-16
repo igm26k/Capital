@@ -68,16 +68,17 @@ def _ensure_identity(directory):
 def ensure_identity(directory):
     with locked(directory) as target:return _ensure_identity(target)
 
-def build(directory,sdk):
+def build(directory,sdk,verify_all=False):
     with locked(directory) as target:
         identity=_ensure_identity(target);environment=identity_environment(target);environment['ANDROID_HOME']=str(pathlib.Path(sdk).resolve())
         stamp=datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ')+'-'+uuid.uuid4().hex[:8]
         artifacts=target/'artifacts';artifacts.mkdir(mode=0o700,exist_ok=True);protected(artifacts,True)
         log=target/f'build-{stamp}.log'
         descriptor=os.open(log,os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600)
+        targets=['testDebugUnitTest','assembleDebug','assembleRelease','lintDebug','lintRelease'] if verify_all else ['assembleRelease','lintRelease']
         with os.fdopen(descriptor,'w') as output:
             try:
-                subprocess.run([str(ROOT/'android/gradlew'),'--no-daemon','-Dorg.gradle.jvmargs=-Xmx768m -Dfile.encoding=UTF-8','--max-workers=1','assembleRelease','lintRelease'],cwd=ROOT/'android',env=environment,stdout=output,stderr=subprocess.STDOUT,check=True)
+                subprocess.run([str(ROOT/'android/gradlew'),'--no-daemon','-Dorg.gradle.jvmargs=-Xmx768m -Dfile.encoding=UTF-8','--max-workers=1',*targets],cwd=ROOT/'android',env=environment,stdout=output,stderr=subprocess.STDOUT,check=True)
                 apk=ROOT/'android/app/build/outputs/apk/release/app-release.apk'
                 verifier=pathlib.Path(sdk)/'build-tools/36.0.0/apksigner'
                 result=run([str(verifier),'verify','--print-certs',str(apk)])
@@ -90,19 +91,19 @@ def build(directory,sdk):
             except Exception:raise RuntimeError('Personal APK build failed; inspect protected build log. Existing signing key is unchanged') from None
         head=run(['git','-C',str(ROOT),'rev-parse','HEAD']).stdout.decode().strip()
         dirty=bool(run(['git','-C',str(ROOT),'status','--porcelain']).stdout)
-        proof={'apk':str(destination),'sha256':hashlib.sha256(destination.read_bytes()).hexdigest(),'certificate_sha256':identity['certificate_sha256'],'identity':identity['identity'],'source_head':head,'source_dirty':dirty,'signature_verified':True,'system_tls_verified':True,'published':False,'device_runtime_tested':False,'protected_log':str(log)}
+        proof={'apk':str(destination),'sha256':hashlib.sha256(destination.read_bytes()).hexdigest(),'certificate_sha256':identity['certificate_sha256'],'identity':identity['identity'],'source_head':head,'source_dirty':dirty,'verification_tasks':targets,'signature_verified':True,'system_tls_verified':True,'published':False,'device_runtime_tested':False,'protected_log':str(log)}
         file=artifacts/f'accounting-personal-{stamp}.json'
         with file.open('x') as output:json.dump(proof,output,indent=2);output.write('\n')
         return proof
 
 def main():
-    parser=argparse.ArgumentParser();parser.add_argument('--directory',default=str(ROOT/'ops/.runtime/personal-android'));parser.add_argument('--sdk',default=os.environ.get('ANDROID_HOME'));parser.add_argument('--identity-only',action='store_true');parser.add_argument('--plan',action='store_true');args=parser.parse_args();os.umask(0o077)
+    parser=argparse.ArgumentParser();parser.add_argument('--directory',default=str(ROOT/'ops/.runtime/personal-android'));parser.add_argument('--sdk',default=os.environ.get('ANDROID_HOME'));parser.add_argument('--identity-only',action='store_true');parser.add_argument('--plan',action='store_true');parser.add_argument('--verify-all',action='store_true');args=parser.parse_args();os.umask(0o077)
     if args.plan:print(json.dumps({'publishes':False,'builds':'signed APK','identity_reused':True,'mutations':False}));return 0
     try:
         if args.identity_only:result=ensure_identity(args.directory)
         else:
             if not args.sdk:raise RuntimeError('Provide Android SDK path')
-            result=build(args.directory,args.sdk)
+            result=build(args.directory,args.sdk,args.verify_all)
         print(json.dumps(result));return 0
     except Exception:print('Personal signing failed. Existing identity is never replaced; inspect private directory and build log.',file=sys.stderr);return 1
 if __name__=='__main__':sys.exit(main())

@@ -56,6 +56,7 @@ data class NotificationInbox(
         val candidate=item.alternatives.single {it.profileId==profileId}
         return copy(items=items.map {if(it.eventId==id)it.copy(candidate=candidate,state="review") else it})
     }
+    fun manualOnly(id:String):NotificationInbox=copy(items=items.map {if(it.eventId==id)it.copy(automatic=false) else it})
     fun skipped():NotificationInbox=copy(skipped=(skipped+1).coerceAtMost(1_000_000))
     fun uploaded(id:String,serverId:String,serverState:String?=null):NotificationInbox {
         require(serverId.matches(Regex("[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}")))

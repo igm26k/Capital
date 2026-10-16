@@ -41,6 +41,11 @@ class AutomaticSourceTest {
         assertEquals(candidate.notificationKeyHash,changed.notificationKeyHash);assertNotEquals(candidate.eventId,changed.eventId)
         assertFalse(automaticItem(inbox(),inbox().items.single().copy(candidate=candidate.copy(notificationKeyHash=null))))
     }
+    @Test fun rejectedDeliveryCanBeLeftForManualReviewWithoutAutomaticReissue() {
+        val manual=inbox().manualOnly(candidate.eventId).accept(candidate)
+        assertEquals(candidate,manual.items.single().candidate);assertEquals("review",manual.items.single().state)
+        assertFalse(automaticItem(manual,manual.items.single()))
+    }
     @Test fun changedFactsStopAutomaticRetry() {
         val changed=inbox().accept(candidate.copy(amountMinor="200"))
         assertEquals("conflict",changed.items.single().state);assertFalse(automaticItem(changed,changed.items.single()))

@@ -12,7 +12,7 @@ private data class SourceChoice(val event:SourceEvent,val decision:String,val tr
 fun SourceControls(source:SourcesModel,model:AuthViewModel) {
     val state=model.state
     var choice by remember {mutableStateOf<SourceChoice?>(null)}
-    fun actual(t:Transaction)="${t.kind} · ${t.occurred_at} · "+t.entries.joinToString("; ") {e->"${state.accounts.find {it.id==e.account_id}?.name?:e.account_id}: ${Money.display(e.amount_minor,e.currency)}"}
+    fun actual(t:Transaction)="${when(t.kind){"expense"->"Расход";"income"->"Доход";"transfer"->"Перевод";"refund"->"Возврат";else->"Корректировка"}} · ${t.occurred_at} · "+t.entries.joinToString("; ") {e->"${state.accounts.find {it.id==e.account_id}?.name?:e.account_id}: ${Money.display(e.amount_minor,e.currency)}"}
     val enabled=!state.busy&&!source.busy&&source.pending==null&&!state.offline&&state.persisted&&!state.financeBlocked
     Text("Предложения на сервере",style=MaterialTheme.typography.titleMedium)
     Text("После отправки предложение можно связать с существующей операцией или явно создать предварительную. Подтверждение не учитывает сумму второй раз; отмена удаляет предварительную запись.")
@@ -45,7 +45,7 @@ fun SourceControls(source:SourcesModel,model:AuthViewModel) {
             TextButton(enabled=!source.busy&&!state.offline,onClick={source.target(event)}){Text("Проверить связанную операцию")}
             if(source.targets.containsKey(event.id)) {
                 val transaction=source.targets[event.id]
-                if(transaction==null)Text("Связанная операция удалена или недоступна. Новая автоматически не создается.")
+                if(transaction==null){Text("Связанная операция удалена или недоступна. Новая автоматически не создается.");TextButton(enabled=enabled,onClick={source.matches(event)}){Text("Связать с другой существующей операцией")}}
                 else {
                     Text("${if(transaction.status=="pending")"Предварительная" else "Подтвержденная"}: ${transaction.payee} · ${transaction.note}")
                     Text("Текущая операция: ${actual(transaction)}")

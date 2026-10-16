@@ -50,7 +50,7 @@ fun CsvPanel(model:AuthViewModel){
     csv.preview?.let{p->
         Text("Результат CSV: ${when(p.state){"ready"->"Готов к подтверждению";"queued"->"Выполняется";"committed"->"Завершен";"failed"->"Нужна проверка и повтор";else->"Истек"}}")
         Text("Создано: ${p.processing.count{it.state=="applied"}}; сопоставлено: ${p.processing.count{it.state=="linked"}}; пропущено: ${p.processing.count{it.state=="skipped"}}")
-        p.error_code?.let{Text("${csvReason(it)} Уже записанные строки сохранятся.")}
+        p.error_code?.let{Text(if(p.state=="ready")"Появились новые возможные совпадения. Предпросмотр обновлён; проверьте решения и подтвердите их заново." else "${csvReason(it)} Уже записанные строки сохранятся.")}
         Button(enabled=enabled,onClick={csv.refresh();model.loadOverview()}){Text("Обновить результат CSV")}
         p.rows.drop(page*50).take(50).forEach{row->
             Text("Строка ${row.row_number}: ${row.occurred_at?:"—"} · ${row.amount_minor?.let{Money.displayAggregate(it,p.currency)}?:"—"} · ${row.payee}")

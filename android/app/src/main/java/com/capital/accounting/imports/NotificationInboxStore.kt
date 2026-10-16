@@ -101,6 +101,9 @@ class NotificationInboxStore(context: Context) {
         if(original.items.none {it.eventId==id})return@withLock original
         val updated=original.uploaded(id,serverId,serverState);save(updated);updated
     } }
+    suspend fun manualOnly(binding:NotificationBinding,id:String):NotificationInbox=withContext(Dispatchers.IO){mutex.withLock {
+        val updated=load(binding).manualOnly(id);save(updated);updated
+    }}
     suspend fun dismiss(binding: NotificationBinding,id:String): NotificationInbox = withContext(Dispatchers.IO) { mutex.withLock {
         val updated=load(binding).dismiss(id);save(updated);updated
     } }

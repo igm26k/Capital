@@ -100,7 +100,13 @@ class SourcesModel(application:Application):AndroidViewModel(application) {
             if(same(s)){autoPending=null;delivered=Triple(s.notificationBinding(),input.external_id,result.id);items=(listOf(result)+items.filterNot {it.id==result.id});message="Сохраненный автоматический запрос проверен с прежним ключом."}
         }finally{if(same(s))autoPending=autoStore.pending(s)}
     }
-    fun dismissRejectedAutomatic()=work {s->autoStore.dismissRejected(s);if(same(s))autoPending=null}
+    fun dismissRejectedAutomatic()=work {s->
+        val command=requireNotNull(autoStore.pending(s));require(command.rejected)
+        val input=decodeResponse<SourceEventCreate>(command.body)
+        app.notificationInbox.manualOnly(s.notificationBinding(),input.external_id)
+        autoStore.dismissRejected(s)
+        if(same(s)){autoPending=null;message="Отклонённая отправка закрыта. Предложение оставлено для ручной проверки и не будет автоматически отправлено снова."}
+    }
     fun closeMatches(){linking=null;candidates=emptyList();candidateCursor=null}
     fun matches(event:SourceEvent,more:Boolean=false)=work {s->
         require(event.workspace_id==s.workspaceId)
