@@ -1405,6 +1405,7 @@ data class SourceEventCreate(
     val observed_timezone: String,
     val merchant: String,
     val card_last_four: String?,
+    val notification_key_hash: String? = null,
 ) {
     init {
         require(parser_version == 1) { "Invalid SourceEventCreate.parser_version" }

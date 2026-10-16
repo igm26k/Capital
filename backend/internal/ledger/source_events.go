@@ -16,20 +16,21 @@ import (
 )
 
 type SourceEventInput struct {
-	ID            string  `json:"id"`
-	ConnectionID  string  `json:"connection_id"`
-	ExternalID    string  `json:"external_id"`
-	AccountID     string  `json:"account_id"`
-	PackageName   string  `json:"package_name"`
-	ProfileID     string  `json:"profile_id"`
-	ParserVersion int     `json:"parser_version"`
-	Kind          string  `json:"kind"`
-	Amount        string  `json:"amount_minor"`
-	Currency      string  `json:"currency"`
-	ObservedAt    string  `json:"observed_at"`
-	Timezone      string  `json:"observed_timezone"`
-	Merchant      string  `json:"merchant"`
-	Card          *string `json:"card_last_four"`
+	NotificationKeyHash *string `json:"notification_key_hash,omitempty"`
+	ID                  string  `json:"id"`
+	ConnectionID        string  `json:"connection_id"`
+	ExternalID          string  `json:"external_id"`
+	AccountID           string  `json:"account_id"`
+	PackageName         string  `json:"package_name"`
+	ProfileID           string  `json:"profile_id"`
+	ParserVersion       int     `json:"parser_version"`
+	Kind                string  `json:"kind"`
+	Amount              string  `json:"amount_minor"`
+	Currency            string  `json:"currency"`
+	ObservedAt          string  `json:"observed_at"`
+	Timezone            string  `json:"observed_timezone"`
+	Merchant            string  `json:"merchant"`
+	Card                *string `json:"card_last_four"`
 }
 type SourceEvent struct {
 	TransactionID *string `json:"transaction_id"`
@@ -41,6 +42,13 @@ type SourceEvent struct {
 	ReceivedAt time.Time `json:"received_at"`
 }
 
+// The slot digest is private intake provenance, omitted from public responses for old strict clients.
+func (event SourceEvent) MarshalJSON() ([]byte, error) {
+	type publicEvent SourceEvent
+	event.SourceEventInput.NotificationKeyHash = nil
+	return json.Marshal(publicEvent(event))
+}
+
 var sourceDigest = regexp.MustCompile(`^[0-9a-f]{64}$`)
 var sourcePackage = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)+$`)
 var lastFour = regexp.MustCompile(`^[0-9]{4}$`)
@@ -48,10 +56,19 @@ var lastFour = regexp.MustCompile(`^[0-9]{4}$`)
 func DecodeSourceEvent(body []byte) (SourceEventInput, error) {
 	var v SourceEventInput
 	fields := []string{"id", "connection_id", "external_id", "account_id", "package_name", "profile_id", "parser_version", "kind", "amount_minor", "currency", "observed_at", "observed_timezone", "merchant", "card_last_four"}
-	if err := decodeObject(body, &v, fields, []string{"card_last_four"}); err != nil {
+	var present map[string]json.RawMessage
+	if json.Unmarshal(body, &present) == nil {
+		if _, ok := present["notification_key_hash"]; ok {
+			fields = append(fields, "notification_key_hash")
+		}
+	}
+	if err := decodeObject(body, &v, fields, []string{"card_last_four", "notification_key_hash"}); err != nil {
 		return v, err
 	}
 	if !uuid(v.ID) || !uuid(v.ConnectionID) || !uuid(v.AccountID) || !sourceDigest.MatchString(v.ExternalID) || len(v.PackageName) > 200 || !sourcePackage.MatchString(v.PackageName) || !validText(v.ProfileID, 64) || strings.TrimSpace(v.ProfileID) == "" || v.ParserVersion != 1 || (v.Kind != "expense" && v.Kind != "income") || !validZone(v.Timezone) || !validText(v.Merchant, 120) {
+		return v, invalid()
+	}
+	if v.NotificationKeyHash != nil && !sourceDigest.MatchString(*v.NotificationKeyHash) {
 		return v, invalid()
 	}
 	if v.Card != nil && !lastFour.MatchString(*v.Card) {
@@ -174,6 +191,7 @@ func ReadSourceEvent(ctx context.Context, tx pgx.Tx, workspace, id, owner string
 
 // Provenance stays immutable on the original row, but changing a parser identifier cannot mint money.
 func sourceFactsHash(input SourceEventInput) [32]byte {
+	input.NotificationKeyHash = nil
 	input.ID = ""
 	input.ConnectionID = ""
 	input.ProfileID = ""

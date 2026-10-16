@@ -2,7 +2,7 @@
   "openapi": "3.1.1",
   "info": {
     "title": "Accounting API",
-    "version": "0.7.0",
+    "version": "0.7.1",
     "description": "Manual accounting, synchronization and exact reporting API. Bank integrations remain a final stage."
   },
   "servers": [
@@ -9019,6 +9019,14 @@
               "null"
             ],
             "pattern": "^[0-9]{4}$"
+          },
+          "notification_key_hash": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[0-9a-f]{64}$",
+            "description": "Optional SHA-256 of package and the original Android SBN key, independent of post time. Required for automatic preliminary creation; reused slots require review. Never contains a raw notification key and is omitted from public SourceEvent responses."
           }
         },
         "required": [
