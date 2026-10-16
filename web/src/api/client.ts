@@ -3,7 +3,14 @@ export class RequestError extends Error {
 }
 export async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (!path.startsWith('/') || path.startsWith('//')) throw new Error('Invalid API path');
-  const response = await fetch(`/api/v1${path}`, { ...init, credentials: 'include', cache: 'no-store' });
+  const read=(init.method??'GET').toUpperCase()==='GET';
+  async function fetchResponse():Promise<Response> {
+    for(let attempt=0;;attempt++) {
+      try{return await fetch(`/api/v1${path}`,{...init,credentials:'include',cache:'no-store'});}
+      catch(e){if(!read||attempt>=2||init.signal?.aborted)throw e;await new Promise(resolve=>setTimeout(resolve,200*(attempt+1)));}
+    }
+  }
+  const response=await fetchResponse();
   if (!response.ok) {
     const error = await response.json().catch(() => null);
     throw new RequestError(response.status, error?.code ?? 'http_error', error?.message ?? `HTTP ${response.status}`);

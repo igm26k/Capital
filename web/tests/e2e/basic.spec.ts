@@ -113,3 +113,22 @@ test('real cookie session, ledger, lost-response retry, container restart and te
   await page.getByRole('button', { name: 'Войти', exact: true }).click();
   await expect(page.getByText('987,66 EUR', { exact: true })).toBeVisible();
 });
+
+test('safe reads retry a dropped response without retrying writes automatically', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button',{name:'Создать профиль',exact:true}).click();
+  await page.getByLabel('Электронная почта').fill(email());
+  await page.getByLabel('Пароль',{exact:true}).fill(password);
+  await page.getByRole('button',{name:'Зарегистрироваться',exact:true}).click();
+  await expect(page.getByRole('button',{name:'Выйти',exact:true})).toBeVisible();
+  await page.getByLabel('Название счета').fill('Read recovery account');
+  await page.getByLabel('Начальный остаток, EUR').fill('5,00');
+  await page.getByRole('button',{name:'Создать счет',exact:true}).click();
+  await expect(page.locator('.accounts strong')).toHaveText('5,00 EUR');
+  let reads=0;
+  await page.route('**/api/v1/workspaces/*/accounts?*',async route=>{
+    if(route.request().method()!=='GET'){await route.continue();return;}
+    reads++;if(reads===1)await route.abort('connectionreset');else await route.continue();
+  });
+  await page.reload();await expect(page.locator('.accounts strong')).toHaveText('5,00 EUR');expect(reads).toBe(2);
+});

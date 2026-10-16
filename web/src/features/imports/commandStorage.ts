@@ -30,8 +30,29 @@ export async function clearCSVCommandsForOwner(owner: string): Promise<void> {
   try {
     await new Promise<void>((resolve, reject) => {
       const tx = db.transaction('commands', 'readwrite'), request = tx.objectStore('commands').openCursor();
-      request.onsuccess = () => { const cursor = request.result; if (!cursor) return; if (String(cursor.key).startsWith(`accounting.csv.pending.v1:${owner}:`)) cursor.delete(); cursor.continue(); };
+      request.onsuccess = () => { const cursor = request.result; if (!cursor) return; if ([`accounting.csv.pending.v1:${owner}:`,`accounting.sources.pending.v1:${owner}:`].some(prefix=>String(cursor.key).startsWith(prefix))) cursor.delete(); cursor.continue(); };
       tx.oncomplete = () => resolve(); tx.onabort = () => reject(new Error('Не удалось очистить локальное хранилище CSV.'));
     });
   } finally { db.close(); }
+}
+
+export class AuxiliaryCommandConflict extends Error {
+  constructor() { super('Запрос изменился в другой вкладке. Обновите данные и повторите проверку.'); }
+}
+/** Atomically claim/finish one auxiliary request. A stale tab cannot overwrite another unknown request. */
+export async function compareAuxiliaryCommand(key: string, expectedKey: string|null, value: object|null): Promise<void> {
+  const db=await database();
+  try {
+    await new Promise<void>((resolve,reject)=>{
+      const tx=db.transaction('commands','readwrite'),store=tx.objectStore('commands'),lookup=store.get(key);
+      let conflict=false;
+      lookup.onsuccess=()=>{
+        const current=lookup.result as {key?:unknown}|undefined;
+        if(expectedKey===null ? current!==undefined : !current||current.key!==expectedKey){conflict=true;tx.abort();return;}
+        try{value===null?store.delete(key):store.put(value,key);}catch{tx.abort();}
+      };
+      tx.oncomplete=()=>resolve();
+      tx.onabort=()=>reject(conflict?new AuxiliaryCommandConflict():new Error('Не удалось сохранить запрос. Проверьте доступное место.'));
+    });
+  }finally{db.close();}
 }

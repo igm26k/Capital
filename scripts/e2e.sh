@@ -8,4 +8,4 @@ trap '"${compose[@]}" down' EXIT
 ./scripts/local-tls.sh
 "${compose[@]}" up --build -d --wait
 curl --noproxy '*' --fail --silent --show-error --cacert ops/.runtime/tls/localhost.crt --retry 10 --retry-connrefused --retry-delay 1 --retry-all-errors https://localhost:8444/health/ready >/dev/null
-(cd web && npm ci && npm exec playwright test)
+(cd web && npm ci && npm exec playwright test -- "$@")

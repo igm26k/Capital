@@ -15,6 +15,7 @@ import { AdjustmentForm } from './features/transactions/AdjustmentForm';
 import { RefundForm } from './features/transactions/RefundForm';
 import { TransactionConflict, type ProposedTransaction, type TransactionComparison } from './features/transactions/TransactionConflict';
 import { clearCSVCommandsForOwner } from './features/imports/commandStorage';
+import { SourcesPanel } from './features/sources/SourcesPanel';
 import { CSVPanel } from './features/imports/CSVPanel';
 import { AnalyticsPanel } from './features/analytics/AnalyticsPanel';
 import { TransactionHistory } from './features/transactions/TransactionHistory';
@@ -34,6 +35,7 @@ export function App() {
   const activeSession = useRef<string | null>(null);
  const [analyticsOpen,setAnalyticsOpen]=useState(false);
  const [csvOpen,setCSVOpen]=useState(false);
+ const [sourcesOpen,setSourcesOpen]=useState(false);
  const [reportHistoryQuery,setReportHistoryQuery]=useState<string>();
   const [needsRefresh, setNeedsRefresh] = useState(false);
   const [auth, setAuth] = useState<Auth | null>(null), [starting, setStarting] = useState(true), [startupError, setStartupError] = useState('');
@@ -194,6 +196,7 @@ export function App() {
     <TransactionHistory filterQuery={reportHistoryQuery} key={`${auth.session.id}-${auth.workspace.id}`} workspace={auth.workspace.id} revision={historyRevision} accounts={accounts} categories={categories} tags={tags} disabled={busy || loading || !!pending || needsRefresh || !online} edit={id => void editTransaction(id)} refund={id => void newRefund(id)} remove={id => void deleteTransaction(id)} classify={body => create('transactions/classification', body)} fail={showError} />
     <details onToggle={e => setAnalyticsOpen(e.currentTarget.open)}><summary>Бюджеты, отчеты и правила</summary>{analyticsOpen && <AnalyticsPanel key={`${auth.session.id}:${auth.workspace.sync_generation_id}`} auth={auth} accounts={accounts} categories={categories} tags={tags} revision={historyRevision} classify={body => create('transactions/classification',body)} fail={showError} drill={query => {setReportHistoryQuery(`${query}&limit=25`);document.querySelector('.history')?.scrollIntoView();}} />}</details>
     <details onToggle={e=>setCSVOpen(e.currentTarget.open)}><summary>Импорт и экспорт CSV</summary>{csvOpen && <CSVPanel key={`${auth.session.id}:${auth.workspace.sync_generation_id}`} auth={auth} accounts={accounts} changed={()=>{void refresh(auth).catch(showError);}} fail={showError}/>}</details>
+    <details onToggle={e=>setSourcesOpen(e.currentTarget.open)}><summary>Банковские предложения</summary>{sourcesOpen&&<SourcesPanel key={`${auth.session.id}:${auth.workspace.sync_generation_id}`} auth={auth} accounts={accounts} changed={()=>{void refresh(auth).catch(showError);}} fail={showError}/>}</details>
     <p className="hint">Ручной учет и CSV. Банковские подключения пока недоступны.</p>
     <PrivacyPanel auth={auth} fail={showError} deleted={async()=>{
       let localCleared=true;try{await clearCSVCommandsForOwner(auth.profile.id);}catch{localCleared=false;}
