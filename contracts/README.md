@@ -31,3 +31,5 @@ python3 contracts/fixtures/check_financial_model.py
 ## Личные банковские наблюдения (0.5.0)
 
 POST/GET source-events и GET source-events/{id} принимают только typed notification metadata с частной видимостью автора. Это durable review intake, без финансового эффекта и новых сущностей sync mirror. Source identity не зависит от record UUID; conflicting payload не перезаписывает оригинал. Реальное банковское покрытие не заявляется. Контрактные и captured HTTP fixtures проверяются отдельно от device/runtime приемки.
+
+Core 0.7: POST source-events/auto — отдельное opt-in admission. Только новая безопасная запись ставит preliminary job; повтор существующего event не меняет его решения. Пустой продавец, совпадающая направленная сумма в окне ±72ч, прежнее наблюдение или queued CSV требуют review. GET source-events?limit=100&before_id=… возвращает next_before_id; legacy GET без query сохраняет прежние поля.

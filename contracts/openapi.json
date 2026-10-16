@@ -2,7 +2,7 @@
   "openapi": "3.1.1",
   "info": {
     "title": "Accounting API",
-    "version": "0.6.1",
+    "version": "0.7.0",
     "description": "Manual accounting, synchronization and exact reporting API. Bank integrations remain a final stage."
   },
   "servers": [
@@ -4485,6 +4485,95 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/SourceEventDecision"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspaces/{workspace_id}/source-events/auto": {
+      "post": {
+        "operationId": "source_events_auto",
+        "summary": "Opt-in structured notification intake; only a new event without possible duplicates may queue a preliminary operation",
+        "x-implementation-stage": 6,
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          },
+          {
+            "$ref": "#/components/parameters/ActionId"
+          },
+          {
+            "$ref": "#/components/parameters/SyncGeneration"
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfToken": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable structured event for review",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceEvent"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          },
+          "201": {
+            "description": "Durable structured event for review",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceEvent"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SourceEventCreate"
               }
             }
           }

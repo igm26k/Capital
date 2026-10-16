@@ -15,6 +15,10 @@ func MountSources(mux *http.ServeMux, auth *identity.Service, options AuthOption
 		v, _ := ledger.DecodeSourceEvent(req.Body)
 		return ledger.ExecuteImportSetting(r.Context(), auth, req, ledger.CreateSourceEvent(req.WorkspaceID, req.GenerationID, v))
 	}))
+	mux.HandleFunc("POST /api/v1/workspaces/{workspace_id}/source-events/auto", commandHTTPHandler(options, func(body []byte) error { _, err := ledger.DecodeSourceEvent(body); return err }, func(r *http.Request, req commands.Request) (commands.Result, error) {
+		input, _ := ledger.DecodeSourceEvent(req.Body)
+		return ledger.ExecuteImportSetting(r.Context(), auth, req, ledger.CreateAutomaticSourceEvent(req.WorkspaceID, req.GenerationID, input))
+	}))
 	mux.HandleFunc("POST /api/v1/workspaces/{workspace_id}/source-events/{id}/confirm", commandHTTPHandler(options, func(body []byte) error { _, err := ledger.DecodeSourceDecision(body); return err }, func(r *http.Request, req commands.Request) (commands.Result, error) {
 		if !validUUID(r.PathValue("id")) {
 			return commands.Result{}, fail(400, "bad_request")

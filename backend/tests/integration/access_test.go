@@ -480,6 +480,7 @@ func TestAccess(t *testing.T) {
 	routes = append(routes, accessRequest{method: "POST", path: rb + "/imports", body: csvBody}, accessRequest{method: "GET", path: rb + "/imports/" + f.id()}, accessRequest{method: "POST", path: rb + "/imports/" + f.id() + "/confirm", body: map[string]any{"expected_version": "1", "decisions": []any{}}}, accessRequest{method: "GET", path: rb + "/exports?from=2026-10-01T00:00:00Z&to=2026-11-01T00:00:00Z"})
 
 	routes = append(routes, accessRequest{method: "GET", path: rb + "/source-events"}, accessRequest{method: "GET", path: rb + "/source-events/" + f.id()}, accessRequest{method: "POST", path: rb + "/source-events", body: f.sourceEvent(foreign.account)})
+	routes = append(routes, accessRequest{method: "POST", path: rb + "/source-events/auto", body: f.sourceEvent(foreign.account)})
 	routes = append(routes, accessRequest{method: "POST", path: rb + "/source-events/" + f.id() + "/confirm", body: map[string]any{"expected_version": "1", "decision": "create_pending", "transaction_id": nil, "expected_transaction_version": nil}})
 
 	before := f.digest()
