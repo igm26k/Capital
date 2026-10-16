@@ -8,6 +8,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.app.NotificationManagerCompat
+import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.delay
 import com.capital.accounting.CapitalApplication
 import com.capital.accounting.api.credential
 import com.capital.accounting.auth.AuthViewModel
@@ -53,7 +55,18 @@ private fun NotificationPanelContent(model:AuthViewModel,binding:NotificationBin
     }
     TextButton(onClick={expanded=!expanded;if(expanded)refresh()}) { Text("Банковские уведомления: локальный разбор") }
     if(!expanded)return
-    Text("Доступ включается вами в настройках Android. Обрабатывается только выбранный пакет по вашему шаблону; полный текст не сохраняется и не отправляется. Предложения пока не изменяют остатки и не создают операции автоматически.")
+    val sources:SourcesModel=viewModel()
+    val auth=model.state.auth?:return
+    val saved=auth.credential(model.state.origin)
+    LaunchedEffect(saved.origin,saved.ownerId,saved.workspaceId,saved.generationId,saved.sessionId,saved.token){sources.bind(saved);sources.load()}
+    DisposableEffect(binding.key){onDispose{sources.clear()}}
+    LaunchedEffect(sources.unauthorized){if(sources.unauthorized)model.sessionUnauthorized(auth.session.id)}
+    LaunchedEffect(sources.delivered){if(sources.delivered?.first==binding)refresh()}
+    LaunchedEffect(sources.items.any {it.state=="queued"},sources.busy){if(!sources.busy&&sources.items.any {it.state=="queued"}){delay(2000);sources.load()}}
+    var refreshed by remember {mutableStateOf<List<Pair<String,String>>>(emptyList())}
+    val completed=sources.items.filter {it.state=="applied"}.map {it.id to it.version}
+    LaunchedEffect(completed,model.state.busy){if(completed.isNotEmpty()&&completed!=refreshed&&!model.state.busy){refreshed=completed;model.loadOverview()}}
+    Text("Доступ включается вами в настройках Android. Обрабатывается только выбранный пакет по вашему шаблону; полный текст не сохраняется и не отправляется. Локальные предложения не меняют остатки. Отправка и каждое финансовое действие требуют вашего подтверждения.")
     Text("Поддержка конкретного банка не подтверждена. Android может скрывать текст или пропускать уведомления; историю сверяйте с выпиской. Время предложения — время уведомления, а не доказанная дата покупки.")
     if(message.isNotEmpty())Text(message)
     if(busy)CircularProgressIndicator()
@@ -95,8 +108,11 @@ private fun NotificationPanelContent(model:AuthViewModel,binding:NotificationBin
                 Text("${Money.display(c.amountMinor,c.currency)} · ${c.merchant}")
                 Text("Получено: ${java.util.Date(c.observedAtMillis)}${if(c.cardLastFour==null)"" else " · карта *${c.cardLastFour}"}")
                 if(item.state=="conflict")Text("Уведомление изменилось. Исходное предложение сохранено; требуется сверка.")
+                if(item.serverEventId!=null)Text("Предложение сохранено на сервере. Управляйте им в списке ниже.")
+                if(item.state=="review"&&item.serverEventId==null)Button(enabled=enabled&&!sources.busy&&sources.pending==null,onClick={sources.upload(binding,c)}){Text("Отправить разобранное предложение на сервер")}
                 TextButton(enabled=!busy,onClick={scope.launch { busy=true;try{inbox=store.dismiss(binding,item.eventId)}catch(e:Exception){if(e is CancellationException)throw e;message="Не удалось исключить предложение."}finally{busy=false} }}){Text("Исключить предложение, сохранив защиту от повтора")}
             }
         }
     }
+    SourceControls(sources,model)
 }

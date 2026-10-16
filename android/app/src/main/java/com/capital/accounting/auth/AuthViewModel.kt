@@ -476,6 +476,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                 app.financialDrafts.erase(saved.origin,saved.ownerId,saved.workspaceId)
                 com.capital.accounting.finance.PlanningStore(app).eraseAfterAccountDeletion(saved)
                 com.capital.accounting.finance.PlanningStore(app,"csv").eraseAfterAccountDeletion(saved)
+                com.capital.accounting.finance.PlanningStore(app,"sources").eraseAfterAccountDeletion(saved)
                 app.getSharedPreferences("csv_jobs",0).edit().remove(com.capital.accounting.finance.csvJobKey(saved)).apply()
                 candidate = null
                 state = AuthState(saved.origin,busy=false,message="Профиль и личные данные удалены.")

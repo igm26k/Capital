@@ -72,6 +72,11 @@ class NotificationInboxStore(context: Context) {
         if(active?.binding!=binding || active?.enabled!=true)return@withLock
         save(load(binding).accept(candidate))
     } }
+    suspend fun uploaded(binding:NotificationBinding,id:String,serverId:String):NotificationInbox=withContext(Dispatchers.IO) {mutex.withLock {
+        val original=load(binding)
+        if(original.items.none {it.eventId==id})return@withLock original
+        val updated=original.uploaded(id,serverId);save(updated);updated
+    } }
     suspend fun dismiss(binding: NotificationBinding,id:String): NotificationInbox = withContext(Dispatchers.IO) { mutex.withLock {
         val updated=load(binding).dismiss(id);save(updated);updated
     } }

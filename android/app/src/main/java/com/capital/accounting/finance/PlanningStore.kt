@@ -21,11 +21,15 @@ data class PlanningPending(val origin: String, val owner: String, val workspace:
     override fun toString() = "PlanningPending([redacted])"
 }
 
-/** Explicit online settings commands, separate from the financial outbox. No automatic resend or rebase. */
+/** Explicit online auxiliary commands and source job submissions, separate from the financial outbox. No automatic resend or rebase. */
 class PlanningStore(private val app: CapitalApplication, private val channel: String = "planning") {
     companion object { private val gate = Mutex() }
-    init { require(channel in setOf("planning", "csv")) }
-    private fun allowed(s: StoredSession) = if (channel == "csv") Regex("/workspaces/${s.workspaceId}/imports(/[0-9a-f-]{36}/confirm)?") else Regex("/workspaces/${s.workspaceId}/(budgets|rules)(/[0-9a-f-]{36})?")
+    init { require(channel in setOf("planning", "csv", "sources")) }
+    private fun allowed(s: StoredSession) = when(channel) {
+        "csv" -> Regex("/workspaces/${s.workspaceId}/imports(/[0-9a-f-]{36}/confirm)?")
+        "sources" -> Regex("/workspaces/${s.workspaceId}/source-events(/[0-9a-f-]{36}/confirm)?")
+        else -> Regex("/workspaces/${s.workspaceId}/(budgets|rules)(/[0-9a-f-]{36})?")
+    }
     private fun file(s: StoredSession): AtomicFile {
         val key = MessageDigest.getInstance("SHA-256").digest("${s.origin}\n${s.ownerId}\n${s.workspaceId}\n${s.sessionId}".toByteArray()).joinToString("") { "%02x".format(it) }
         return AtomicFile(File(app.noBackupFilesDir, "$channel-$key.json"))
@@ -41,6 +45,7 @@ class PlanningStore(private val app: CapitalApplication, private val channel: St
             require(it.origin == s.origin && it.owner == s.ownerId && it.workspace == s.workspaceId && it.issuer == s.sessionId)
             require(it.path.matches(allowed(s)))
             require(it.method in setOf("POST", "PUT", "DELETE"))
+            if(channel=="sources")require(it.method=="POST")
         }
     }
     private fun write(s: StoredSession, pending: PlanningPending) {
@@ -54,7 +59,7 @@ class PlanningStore(private val app: CapitalApplication, private val channel: St
             check(s); require(read(s) == null)
             val value = PlanningPending(s.origin, s.ownerId, s.workspaceId, s.sessionId, s.generationId, UUID.randomUUID().toString(), path, method, body)
             require(path.matches(allowed(s)))
-            require(method in setOf("POST", "PUT", "DELETE")); write(s, value); value
+            require(method in setOf("POST", "PUT", "DELETE")); if(channel=="sources")require(method=="POST"); write(s, value); value
         }
     }
     suspend fun send(s: StoredSession): String = withContext(Dispatchers.IO) {
@@ -67,6 +72,15 @@ class PlanningStore(private val app: CapitalApplication, private val channel: St
                     require(result.workspace_id == s.workspaceId)
                     val expected = if (value.path.endsWith("/imports")) org.json.JSONObject(value.body).getString("id") else value.path.substringBefore("/confirm").substringAfterLast('/')
                     require(result.id == expected)
+                }
+                if(channel=="sources") {
+                    val result=decodeResponse<SourceEvent>(response)
+                    require(result.workspace_id==s.workspaceId)
+                    if(value.path.endsWith("/confirm"))require(result.id==value.path.substringBefore("/confirm").substringAfterLast('/'))
+                    else {
+                        val input=decodeResponse<SourceEventCreate>(value.body)
+                        require(result.external_id==input.external_id && result.connection_id==input.connection_id && result.account_id==input.account_id)
+                    }
                 }
                 check(s); require(read(s) == value); file(s).delete(); response
             } catch (e: ApiFailure) {

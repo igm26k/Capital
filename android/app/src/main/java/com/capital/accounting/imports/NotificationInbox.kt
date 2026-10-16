@@ -11,7 +11,7 @@ data class NotificationBinding(val origin: String, val ownerId: String, val work
     override fun toString() = "NotificationBinding([redacted])"
 }
 @Serializable
-data class NotificationInboxItem(val eventId: String, val fingerprint: String, val candidate: NotificationCandidate?, val state: String = "review")
+data class NotificationInboxItem(val eventId: String, val fingerprint: String, val candidate: NotificationCandidate?, val state: String = "review", val serverEventId:String? = null)
 @Serializable
 data class NotificationInbox(
     val binding: NotificationBinding, val enabled: Boolean = false,
@@ -27,6 +27,10 @@ data class NotificationInbox(
         if (previous != null) return if (previous.fingerprint == sha || previous.state == "dismissed") this else copy(items = items.map { if (it.eventId == candidate.eventId) it.copy(state="conflict") else it })
         if (items.size >= 1000) return copy(rejected = (rejected + 1).coerceAtMost(1_000_000))
         return copy(items = items + NotificationInboxItem(candidate.eventId, sha, candidate))
+    }
+    fun uploaded(id:String,serverId:String):NotificationInbox {
+        require(items.any {it.eventId==id})
+        return copy(items=items.map {if(it.eventId==id)it.copy(state=if(it.state=="conflict")"conflict" else "uploaded",serverEventId=serverId) else it})
     }
     fun dismiss(id: String): NotificationInbox {
         require(items.any { it.eventId == id })
