@@ -27,3 +27,7 @@ python3 contracts/fixtures/check_financial_model.py
 Финансовый sync v1 сохраняет прежние четыре entity types. Бюджеты/правила и контроль CSV используют отдельные versioned online receipts и не выдаются за финансовые outbox команды. Worker CSV каждую проводку выполняет через обычный финансовый runner с server-recorded issuing session, не сохраняя bearer token. Собственный CSV экспорт сопоставляет все существующие типы операций по source_transaction_id без перезаписи их текущих полей.
 
 2026-10-16: core OpenAPI0.4.0 содержит55операций. AUTH_EMAIL_VERIFICATION добавляет202 EmailChallenge к регистрации и три публичных rate-limited endpoints для registration confirm/recovery request/recovery confirm. Android DTO генерируются из того же core. ADR009 описывает одноразовые proofs, одинаковый ответ до подтверждения mailbox и отзыв всех сессий при reset.
+
+## Личные банковские наблюдения (0.5.0)
+
+POST/GET source-events и GET source-events/{id} принимают только typed notification metadata с частной видимостью автора. Это durable review intake, без финансового эффекта и новых сущностей sync mirror. Source identity не зависит от record UUID; conflicting payload не перезаписывает оригинал. Реальное банковское покрытие не заявляется. Контрактные и captured HTTP fixtures проверяются отдельно от device/runtime приемки.

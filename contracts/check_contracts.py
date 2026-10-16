@@ -286,7 +286,7 @@ def check_design_review(core, core_path, future, future_path):
         assert actual == case['expected'], case['id']
     assert all(case['status'] == 'open' and case['owner'] in owners for case in fixture['release_dependencies'])
     print(f'PASS: design-review matrix ({len(scenarios)} owned scenarios, contract paths/statuses/codes), {len(fixture["schema_cases"])} schema cases, 3 financial calculations, 4 generation cases')
-    print(f'NOT EXECUTED: {len(scenarios)} integration scenarios; public registration and recovery release dependencies remain open')
+    print(f'NOT EXECUTED: {len(scenarios)} integration scenarios by this static checker; actual acceptance is recorded separately (personal use, no publication)')
 
 
 def main():

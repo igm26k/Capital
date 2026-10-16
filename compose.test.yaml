@@ -126,7 +126,7 @@ services:
     profiles: [checks]
   reports-check:
     build: {context: ./backend, target: build}
-    command: [go, test, ./tests/integration, -run, '^Test(Reports|Planning|CSV|UserData|EmailAuth)$', -v, -count=1]
+    command: [go, test, ./tests/integration, -run, '^Test(Reports|Planning|CSV|UserData|EmailAuth|SourceEvents)$', -v, -count=1]
     environment:
       <<: *test-env
       GOCACHE: /tmp/accounting-go-check-build
@@ -136,6 +136,7 @@ services:
       CSV_RESPONSE_ARTIFACT: /output/csv-responses.json
       USER_DATA_RESPONSE_ARTIFACT: /output/user-data-responses.json
       EMAIL_RESPONSE_ARTIFACT: /output/email-responses.json
+      SOURCE_RESPONSE_ARTIFACT: /output/source-responses.json
     volumes: ["./ops/.runtime/checks:/output", "go-check-cache:/tmp/accounting-go-check-build"]
     networks: [private]
     depends_on:

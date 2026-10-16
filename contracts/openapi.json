@@ -2,7 +2,7 @@
   "openapi": "3.1.1",
   "info": {
     "title": "Accounting API",
-    "version": "0.4.0",
+    "version": "0.5.0",
     "description": "Manual accounting, synchronization and exact reporting API. Bank integrations remain a final stage."
   },
   "servers": [
@@ -4179,6 +4179,214 @@
         },
         "description": "Public rate-limited email proof flow. No session or bearer credential is proof of email ownership. Unknown, expired and consumed codes return confirmation_invalid. Recovery revokes all previous sessions. Start responses do not disclose account existence."
       }
+    },
+    "/workspaces/{workspace_id}/source-events": {
+      "get": {
+        "operationId": "source_events_list",
+        "summary": "Newest 100 own events; older events remain readable by ID",
+        "x-implementation-stage": 6,
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceEventList"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        }
+      },
+      "post": {
+        "operationId": "source_events_create",
+        "summary": "Store structured notification for review; no financial mutation",
+        "x-implementation-stage": 6,
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          },
+          {
+            "$ref": "#/components/parameters/ActionId"
+          },
+          {
+            "$ref": "#/components/parameters/SyncGeneration"
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfToken": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable structured event for review",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceEvent"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          },
+          "201": {
+            "description": "Durable structured event for review",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceEvent"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SourceEventCreate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspaces/{workspace_id}/source-events/{id}": {
+      "get": {
+        "operationId": "source_events_get",
+        "summary": "Read own structured event",
+        "x-implementation-stage": 6,
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          },
+          {
+            "$ref": "#/components/parameters/ResourceId"
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceEvent"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -6132,7 +6340,9 @@
               "import_source_pending",
               "import_row_changed",
               "resource_conflict",
-              "confirmation_invalid"
+              "confirmation_invalid",
+              "source_event_conflict",
+              "source_event_limit"
             ]
           },
           "message": {
@@ -8553,6 +8763,209 @@
           "password"
         ],
         "additionalProperties": false
+      },
+      "SourceEventCreate": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "connection_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "external_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "account_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "package_name": {
+            "type": "string",
+            "maxLength": 200,
+            "pattern": "^[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z][A-Za-z0-9_]*)+$"
+          },
+          "profile_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "parser_version": {
+            "type": "integer",
+            "const": 1
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "expense",
+              "income"
+            ]
+          },
+          "amount_minor": {
+            "$ref": "#/components/schemas/PositiveMoney"
+          },
+          "currency": {
+            "$ref": "#/components/schemas/CurrencyCode"
+          },
+          "observed_at": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "observed_timezone": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "merchant": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "card_last_four": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[0-9]{4}$"
+          }
+        },
+        "required": [
+          "id",
+          "connection_id",
+          "external_id",
+          "account_id",
+          "package_name",
+          "profile_id",
+          "parser_version",
+          "kind",
+          "amount_minor",
+          "currency",
+          "observed_at",
+          "observed_timezone",
+          "merchant",
+          "card_last_four"
+        ]
+      },
+      "SourceEvent": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "connection_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "external_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "account_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "package_name": {
+            "type": "string",
+            "maxLength": 200,
+            "pattern": "^[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z][A-Za-z0-9_]*)+$"
+          },
+          "profile_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "parser_version": {
+            "type": "integer",
+            "const": 1
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "expense",
+              "income"
+            ]
+          },
+          "amount_minor": {
+            "$ref": "#/components/schemas/PositiveMoney"
+          },
+          "currency": {
+            "$ref": "#/components/schemas/CurrencyCode"
+          },
+          "observed_at": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "observed_timezone": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "merchant": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "card_last_four": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[0-9]{4}$"
+          },
+          "workspace_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "version": {
+            "$ref": "#/components/schemas/Version"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "review",
+              "dismissed",
+              "applied"
+            ]
+          },
+          "received_at": {
+            "$ref": "#/components/schemas/Instant"
+          }
+        },
+        "required": [
+          "id",
+          "connection_id",
+          "external_id",
+          "account_id",
+          "package_name",
+          "profile_id",
+          "parser_version",
+          "kind",
+          "amount_minor",
+          "currency",
+          "observed_at",
+          "observed_timezone",
+          "merchant",
+          "card_last_four",
+          "workspace_id",
+          "version",
+          "state",
+          "received_at"
+        ]
+      },
+      "SourceEventList": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SourceEvent"
+            },
+            "maxItems": 100
+          },
+          "has_more": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items",
+          "has_more"
+        ]
       }
     },
     "parameters": {

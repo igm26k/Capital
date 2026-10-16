@@ -15,7 +15,7 @@ created=true
 "${compose[@]}" exec -T db sh -c 'exec pg_restore --exit-on-error --no-owner --no-privileges -U "$POSTGRES_USER" -d "$1"' sh "$clone" < "$backup"
 # Compare content hashes, not just counts or a successful pg_restore exit status.
 query="SET TIME ZONE 'UTC'; "
-for table in users sessions workspaces memberships accounts transactions entries allocations categories tags transaction_tags planning_resources planning_actions planning_audit csv_imports csv_rows csv_sources sync_heads actions sync_groups sync_changes sync_snapshots sync_snapshot_items audit_events auth_challenges auth_mail; do
+for table in users sessions workspaces memberships accounts transactions entries allocations categories tags transaction_tags planning_resources planning_actions planning_audit csv_imports csv_rows csv_sources sync_heads actions sync_groups sync_changes sync_snapshots sync_snapshot_items audit_events auth_challenges auth_mail source_events; do
     query+="SELECT '$table|'||coalesce(md5(string_agg(row_to_json(t)::text,E'\\n' ORDER BY row_to_json(t)::text)),'empty') FROM $table t; "
 done
 source_hash="$(printf '%s' "$query" | "${compose[@]}" exec -T db sh -c 'exec psql -X -q -A -t -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d accounting_test')"
@@ -39,5 +39,5 @@ SQL
 after_recovery="$(printf '%s' "$financial_query" | "${compose[@]}" exec -T db sh -c 'exec psql -X -q -A -t -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$1"' sh "$clone")"
 [[ "$before_recovery" == "$after_recovery" ]] || { echo 'Recovery procedure changed financial data or historical receipts.' >&2; exit 1; }
 mkdir -p ops/.runtime/checks
-printf '%s\n' '{"restored":true,"financial_content_equal":true,"isolated_test_database":true,"verified_tables":26,"generations_rotated":true,"restored_sessions_revoked":true,"snapshot_payloads_cleared":true,"csv_jobs_paused":true,"email_proofs_cleared":true,"email_canary_removed":true,"financial_content_preserved_after_rotation":true}' > ops/.runtime/checks/restore-result.json
+printf '%s\n' '{"restored":true,"financial_content_equal":true,"isolated_test_database":true,"verified_tables":27,"generations_rotated":true,"restored_sessions_revoked":true,"snapshot_payloads_cleared":true,"csv_jobs_paused":true,"email_proofs_cleared":true,"email_canary_removed":true,"financial_content_preserved_after_rotation":true}' > ops/.runtime/checks/restore-result.json
 echo 'PASS actual PostgreSQL restore; financial content hashes match.'

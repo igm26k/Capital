@@ -48,10 +48,10 @@ def main():
   processes=[subprocess.Popen(args,cwd=ROOT,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL) for _ in range(2)]
   assert sorted(p.wait() for p in processes)==[0,1]
   cycle.verify(collision)
-  proof={'real_postgres_dump':True,'signed_encrypted_roundtrip':True,'signing_key_rotation':True,'monthly_crash_recovery':True,'restored_tables':26,'failure_preserves_last_success':True,'successful_retry_clears_failure':True,'concurrent_publication_one_winner':True,'production_configured':False,'artifact_directory':str(base)}
+  proof={'real_postgres_dump':True,'signed_encrypted_roundtrip':True,'signing_key_rotation':True,'monthly_crash_recovery':True,'restored_tables':27,'failure_preserves_last_success':True,'successful_retry_clears_failure':True,'concurrent_publication_one_winner':True,'production_configured':False,'artifact_directory':str(base)}
  finally:
   for path in private:path.unlink(missing_ok=True)
-  if writers:command(C+['start',*writers])
+  if writers:command(C+['up','-d','--no-deps',*writers])
  proof['ephemeral_private_keys_removed']=all(not p.exists() for p in private)
  (ROOT/'ops/.runtime/checks/signed-backup-result.json').write_text(json.dumps(proof,indent=2)+'\n')
  print(json.dumps(proof))

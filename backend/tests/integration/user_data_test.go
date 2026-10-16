@@ -14,6 +14,8 @@ func TestUserData(t *testing.T) {
 	b := f.b
 	account := f.account(a)
 	other := f.account(b)
+	source := f.sourceEvent(account)
+	f.call(accessRequest{method: "POST", path: accessRoot(a) + "/source-events", actor: a, key: f.id(), body: source}, 201, "")
 	body := f.basic(account, "expense")
 	f.call(accessRequest{method: "POST", path: accessRoot(a) + "/transactions", actor: a, key: f.id(), body: body}, 201, "")
 
@@ -24,7 +26,7 @@ func TestUserData(t *testing.T) {
 	f.call(accessRequest{method: "POST", path: accessRoot(a) + "/imports/" + preview.body["id"].(string) + "/confirm", actor: a, key: f.id(), body: map[string]any{"expected_version": "1", "decisions": []any{map[string]any{"row_number": 2, "action": "create", "transaction_id": nil, "expected_transaction_version": nil}}}}, 200, "")
 	data := f.call(accessRequest{method: "GET", path: "/api/v1/me/export", actor: a}, 200, "")
 	raw := string(data.raw)
-	if !strings.Contains(raw, account) || strings.Contains(raw, other) || strings.Contains(raw, "password_hash") || strings.Contains(raw, "token_hash") || strings.Contains(raw, a.Credential) {
+	if !strings.Contains(raw, source["id"].(string)) || !strings.Contains(raw, account) || strings.Contains(raw, other) || strings.Contains(raw, "password_hash") || strings.Contains(raw, "token_hash") || strings.Contains(raw, a.Credential) {
 		t.Fatal("export leaked credentials or foreign data")
 	}
 	f.call(accessRequest{method: "GET", path: "/api/v1/me/export"}, 401, "unauthenticated")
@@ -46,6 +48,9 @@ func TestUserData(t *testing.T) {
 	}
 	if err := f.db.QueryRow(f.ctx, `SELECT count(*) FROM accounts WHERE workspace_id=$1`, b.Workspace.ID).Scan(&count); err != nil || count != 1 {
 		t.Fatal("another user was changed", err, count)
+	}
+	if err := f.db.QueryRow(f.ctx, `SELECT count(*) FROM source_events WHERE actor_user_id=$1`, a.Profile.ID).Scan(&count); err != nil || count != 0 {
+		t.Fatal("private source observations not erased", err, count)
 	}
 	f.call(accessRequest{method: "GET", path: accessRoot(b) + "/accounts/" + other, actor: b}, 200, "")
 	if n, err := ledger.ProcessImports(f.ctx, f.auth, 100); err != nil || n != 0 {

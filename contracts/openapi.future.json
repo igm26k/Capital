@@ -2,7 +2,7 @@
   "openapi": "3.1.1",
   "info": {
     "title": "Accounting future-stage API draft",
-    "version": "0.4.0",
+    "version": "0.5.0",
     "description": "Reserved for future bank integration contracts. Implemented budgeting, reporting and CSV operations are in openapi.json; the old reports/summary draft is replaced by GET reports."
   },
   "servers": [
@@ -1970,7 +1970,9 @@
               "import_source_pending",
               "import_row_changed",
               "resource_conflict",
-              "confirmation_invalid"
+              "confirmation_invalid",
+              "source_event_conflict",
+              "source_event_limit"
             ]
           },
           "message": {
@@ -4506,6 +4508,209 @@
           "expected_version"
         ],
         "additionalProperties": false
+      },
+      "SourceEventCreate": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "connection_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "external_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "account_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "package_name": {
+            "type": "string",
+            "maxLength": 200,
+            "pattern": "^[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z][A-Za-z0-9_]*)+$"
+          },
+          "profile_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "parser_version": {
+            "type": "integer",
+            "const": 1
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "expense",
+              "income"
+            ]
+          },
+          "amount_minor": {
+            "$ref": "#/components/schemas/PositiveMoney"
+          },
+          "currency": {
+            "$ref": "#/components/schemas/CurrencyCode"
+          },
+          "observed_at": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "observed_timezone": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "merchant": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "card_last_four": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[0-9]{4}$"
+          }
+        },
+        "required": [
+          "id",
+          "connection_id",
+          "external_id",
+          "account_id",
+          "package_name",
+          "profile_id",
+          "parser_version",
+          "kind",
+          "amount_minor",
+          "currency",
+          "observed_at",
+          "observed_timezone",
+          "merchant",
+          "card_last_four"
+        ]
+      },
+      "SourceEvent": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "connection_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "external_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "account_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "package_name": {
+            "type": "string",
+            "maxLength": 200,
+            "pattern": "^[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z][A-Za-z0-9_]*)+$"
+          },
+          "profile_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "parser_version": {
+            "type": "integer",
+            "const": 1
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "expense",
+              "income"
+            ]
+          },
+          "amount_minor": {
+            "$ref": "#/components/schemas/PositiveMoney"
+          },
+          "currency": {
+            "$ref": "#/components/schemas/CurrencyCode"
+          },
+          "observed_at": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "observed_timezone": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "merchant": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "card_last_four": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[0-9]{4}$"
+          },
+          "workspace_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "version": {
+            "$ref": "#/components/schemas/Version"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "review",
+              "dismissed",
+              "applied"
+            ]
+          },
+          "received_at": {
+            "$ref": "#/components/schemas/Instant"
+          }
+        },
+        "required": [
+          "id",
+          "connection_id",
+          "external_id",
+          "account_id",
+          "package_name",
+          "profile_id",
+          "parser_version",
+          "kind",
+          "amount_minor",
+          "currency",
+          "observed_at",
+          "observed_timezone",
+          "merchant",
+          "card_last_four",
+          "workspace_id",
+          "version",
+          "state",
+          "received_at"
+        ]
+      },
+      "SourceEventList": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SourceEvent"
+            },
+            "maxItems": 100
+          },
+          "has_more": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items",
+          "has_more"
+        ]
       }
     },
     "parameters": {

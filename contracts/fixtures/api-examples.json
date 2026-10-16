@@ -540,6 +540,26 @@
       "data": {
         "status": "password_changed"
       }
+    },
+    {
+      "id": "source_event_structured",
+      "schema": "SourceEventCreate",
+      "data": {
+        "id": "00000000-0000-4000-8000-000000000001",
+        "connection_id": "00000000-0000-4000-8000-000000000002",
+        "external_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "account_id": "00000000-0000-4000-8000-000000000003",
+        "package_name": "example.bank",
+        "profile_id": "personal-v1",
+        "parser_version": 1,
+        "kind": "expense",
+        "amount_minor": "123456",
+        "currency": "RUB",
+        "observed_at": "2026-10-16T09:00:00Z",
+        "observed_timezone": "Europe/Moscow",
+        "merchant": "SYNTHETIC SHOP",
+        "card_last_four": "1234"
+      }
     }
   ],
   "invalid": [
@@ -880,6 +900,87 @@
         "email": "owner@example.test",
         "code": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
         "password": "short"
+      }
+    },
+    {
+      "id": "source_event_raw_text",
+      "schema": "SourceEventCreate",
+      "data": {
+        "id": "00000000-0000-4000-8000-000000000001",
+        "connection_id": "00000000-0000-4000-8000-000000000002",
+        "external_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "account_id": "00000000-0000-4000-8000-000000000003",
+        "package_name": "example.bank",
+        "profile_id": "personal-v1",
+        "parser_version": 1,
+        "kind": "expense",
+        "amount_minor": "123456",
+        "currency": "RUB",
+        "observed_at": "2026-10-16T09:00:00Z",
+        "observed_timezone": "Europe/Moscow",
+        "merchant": "SYNTHETIC SHOP",
+        "card_last_four": "1234",
+        "raw_text": "must reject unknown payload"
+      }
+    },
+    {
+      "id": "source_event_zero",
+      "schema": "SourceEventCreate",
+      "data": {
+        "id": "00000000-0000-4000-8000-000000000001",
+        "connection_id": "00000000-0000-4000-8000-000000000002",
+        "external_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "account_id": "00000000-0000-4000-8000-000000000003",
+        "package_name": "example.bank",
+        "profile_id": "personal-v1",
+        "parser_version": 1,
+        "kind": "expense",
+        "amount_minor": "0",
+        "currency": "RUB",
+        "observed_at": "2026-10-16T09:00:00Z",
+        "observed_timezone": "Europe/Moscow",
+        "merchant": "SYNTHETIC SHOP",
+        "card_last_four": "1234"
+      }
+    },
+    {
+      "id": "source_event_full_card",
+      "schema": "SourceEventCreate",
+      "data": {
+        "id": "00000000-0000-4000-8000-000000000001",
+        "connection_id": "00000000-0000-4000-8000-000000000002",
+        "external_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "account_id": "00000000-0000-4000-8000-000000000003",
+        "package_name": "example.bank",
+        "profile_id": "personal-v1",
+        "parser_version": 1,
+        "kind": "expense",
+        "amount_minor": "123456",
+        "currency": "RUB",
+        "observed_at": "2026-10-16T09:00:00Z",
+        "observed_timezone": "Europe/Moscow",
+        "merchant": "SYNTHETIC SHOP",
+        "card_last_four": "4111111111111111"
+      }
+    },
+    {
+      "id": "source_event_unstable_identity",
+      "schema": "SourceEventCreate",
+      "data": {
+        "id": "00000000-0000-4000-8000-000000000001",
+        "connection_id": "00000000-0000-4000-8000-000000000002",
+        "external_id": "raw system key",
+        "account_id": "00000000-0000-4000-8000-000000000003",
+        "package_name": "example.bank",
+        "profile_id": "personal-v1",
+        "parser_version": 1,
+        "kind": "expense",
+        "amount_minor": "123456",
+        "currency": "RUB",
+        "observed_at": "2026-10-16T09:00:00Z",
+        "observed_timezone": "Europe/Moscow",
+        "merchant": "SYNTHETIC SHOP",
+        "card_last_four": "1234"
       }
     }
   ],

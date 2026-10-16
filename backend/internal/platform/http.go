@@ -66,6 +66,7 @@ func handler(database Pinger, logger *slog.Logger, auth *identity.Service, optio
 		httpapi.MountReports(mux, auth)
 		httpapi.MountPlanning(mux, auth, options)
 		httpapi.MountImports(mux, auth, options)
+		httpapi.MountSources(mux, auth, options)
 		httpapi.MountPull(mux, &commands.PullReader{Identity: auth, Keys: options.CursorKeys})
 		httpapi.MountSnapshots(mux, &commands.SnapshotService{Identity: auth, Keys: options.CursorKeys}, options)
 	}

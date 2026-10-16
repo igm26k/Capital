@@ -1,0 +1,173 @@
+package ledger
+
+import (
+	"accounting/backend/internal/identity"
+	"context"
+	"crypto/sha256"
+	"crypto/subtle"
+	"encoding/json"
+	"errors"
+	"regexp"
+	"strings"
+	"time"
+	"unicode"
+
+	"github.com/jackc/pgx/v5"
+)
+
+type SourceEventInput struct {
+	ID            string  `json:"id"`
+	ConnectionID  string  `json:"connection_id"`
+	ExternalID    string  `json:"external_id"`
+	AccountID     string  `json:"account_id"`
+	PackageName   string  `json:"package_name"`
+	ProfileID     string  `json:"profile_id"`
+	ParserVersion int     `json:"parser_version"`
+	Kind          string  `json:"kind"`
+	Amount        string  `json:"amount_minor"`
+	Currency      string  `json:"currency"`
+	ObservedAt    string  `json:"observed_at"`
+	Timezone      string  `json:"observed_timezone"`
+	Merchant      string  `json:"merchant"`
+	Card          *string `json:"card_last_four"`
+}
+type SourceEvent struct {
+	SourceEventInput
+	Workspace  string    `json:"workspace_id"`
+	Version    string    `json:"version"`
+	State      string    `json:"state"`
+	ReceivedAt time.Time `json:"received_at"`
+}
+
+var sourceDigest = regexp.MustCompile(`^[0-9a-f]{64}$`)
+var sourcePackage = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)+$`)
+var lastFour = regexp.MustCompile(`^[0-9]{4}$`)
+
+func DecodeSourceEvent(body []byte) (SourceEventInput, error) {
+	var v SourceEventInput
+	fields := []string{"id", "connection_id", "external_id", "account_id", "package_name", "profile_id", "parser_version", "kind", "amount_minor", "currency", "observed_at", "observed_timezone", "merchant", "card_last_four"}
+	if err := decodeObject(body, &v, fields, []string{"card_last_four"}); err != nil {
+		return v, err
+	}
+	if !uuid(v.ID) || !uuid(v.ConnectionID) || !uuid(v.AccountID) || !sourceDigest.MatchString(v.ExternalID) || len(v.PackageName) > 200 || !sourcePackage.MatchString(v.PackageName) || !validText(v.ProfileID, 64) || strings.TrimSpace(v.ProfileID) == "" || v.ParserVersion != 1 || (v.Kind != "expense" && v.Kind != "income") || !validZone(v.Timezone) || !validText(v.Merchant, 120) {
+		return v, invalid()
+	}
+	if v.Card != nil && !lastFour.MatchString(*v.Card) {
+		return v, invalid()
+	}
+	if _, err := ParsePositiveMoney(v.Amount); err != nil {
+		return v, invalid()
+	}
+	if _, err := ParseInstant(v.ObservedAt); err != nil {
+		return v, invalid()
+	}
+	if len(v.Currency) != 3 || strings.IndexFunc(v.Currency, func(r rune) bool { return r < 'A' || r > 'Z' }) >= 0 || strings.IndexFunc(v.Merchant, unicode.IsControl) >= 0 {
+		return v, invalid()
+	}
+	v.ID = strings.ToLower(v.ID)
+	v.AccountID = strings.ToLower(v.AccountID)
+	v.ConnectionID = strings.ToLower(v.ConnectionID)
+	return v, nil
+}
+
+// Intake shares auxiliary durable receipts and the head lock with CSV. It never creates money entries.
+func CreateSourceEvent(workspace, generation string, input SourceEventInput) importSetting {
+	return func(ctx context.Context, tx pgx.Tx, p identity.Principal) (any, int, error) {
+		var currency string
+		var archived bool
+		err := tx.QueryRow(ctx, `SELECT currency_code,archived_at IS NOT NULL FROM accounts WHERE workspace_id=$1 AND id=$2 AND deleted_at IS NULL`, workspace, input.AccountID).Scan(&currency, &archived)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, 0, &identity.Error{Status: 404, Code: "not_found"}
+		}
+		if err != nil {
+			return nil, 0, err
+		}
+		if archived || currency != input.Currency {
+			return nil, 0, &identity.Error{Status: 422, Code: "validation_error"}
+		}
+		// The record UUID is a request handle; source identity remains stable even with another action/UUID.
+		canonical := input
+		canonical.ID = ""
+		raw, err := json.Marshal(canonical)
+		if err != nil {
+			return nil, 0, err
+		}
+		hash := sha256.Sum256(raw)
+		var oldID string
+		var oldHash []byte
+		err = tx.QueryRow(ctx, `SELECT id::text,payload_hash FROM source_events WHERE workspace_id=$1 AND actor_user_id=$2 AND connection_id=$3 AND external_id=$4`, workspace, p.Profile.ID, input.ConnectionID, input.ExternalID).Scan(&oldID, &oldHash)
+		if err == nil {
+			if subtle.ConstantTimeCompare(oldHash, hash[:]) != 1 {
+				return nil, 0, &identity.Error{Status: 409, Code: "source_event_conflict"}
+			}
+			value, err := ReadSourceEvent(ctx, tx, workspace, oldID, p.Profile.ID)
+			return value, 200, err
+		}
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return nil, 0, err
+		}
+		var count int
+		if err = tx.QueryRow(ctx, `SELECT count(*) FROM source_events WHERE workspace_id=$1 AND actor_user_id=$2`, workspace, p.Profile.ID).Scan(&count); err != nil {
+			return nil, 0, err
+		}
+		if count >= 10000 {
+			return nil, 0, &identity.Error{Status: 422, Code: "source_event_limit"}
+		}
+		raw, err = json.Marshal(input)
+		if err != nil {
+			return nil, 0, err
+		}
+		tag, err := tx.Exec(ctx, `INSERT INTO source_events(workspace_id,id,actor_user_id,session_id,generation_id,connection_id,external_id,account_id,payload_hash,payload) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT(workspace_id,id) DO NOTHING`, workspace, input.ID, p.Profile.ID, p.Session.ID, generation, input.ConnectionID, input.ExternalID, input.AccountID, hash[:], raw)
+		if err != nil {
+			return nil, 0, err
+		}
+		if tag.RowsAffected() != 1 {
+			return nil, 0, &identity.Error{Status: 409, Code: "resource_conflict"}
+		}
+		value, err := ReadSourceEvent(ctx, tx, workspace, input.ID, p.Profile.ID)
+		return value, 201, err
+	}
+}
+func ReadSourceEvent(ctx context.Context, tx pgx.Tx, workspace, id, owner string) (SourceEvent, error) {
+	var value SourceEvent
+	var raw []byte
+	if !uuid(id) {
+		return value, &identity.Error{Status: 400, Code: "bad_request"}
+	}
+	err := tx.QueryRow(ctx, `SELECT payload,workspace_id::text,version::text,state,received_at FROM source_events WHERE workspace_id=$1 AND id=$2 AND actor_user_id=$3`, workspace, id, owner).Scan(&raw, &value.Workspace, &value.Version, &value.State, &value.ReceivedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return value, &identity.Error{Status: 404, Code: "not_found"}
+	}
+	if err != nil {
+		return value, err
+	}
+	err = json.Unmarshal(raw, &value.SourceEventInput)
+	return value, err
+}
+func ListSourceEvents(ctx context.Context, tx pgx.Tx, workspace, owner string) ([]SourceEvent, bool, error) {
+	rows, err := tx.Query(ctx, `SELECT payload,workspace_id::text,version::text,state,received_at FROM source_events WHERE workspace_id=$1 AND actor_user_id=$2 ORDER BY received_at DESC,id DESC LIMIT 101`, workspace, owner)
+	if err != nil {
+		return nil, false, err
+	}
+	defer rows.Close()
+	items := []SourceEvent{}
+	for rows.Next() {
+		var value SourceEvent
+		var raw []byte
+		if err := rows.Scan(&raw, &value.Workspace, &value.Version, &value.State, &value.ReceivedAt); err != nil {
+			return nil, false, err
+		}
+		if err := json.Unmarshal(raw, &value.SourceEventInput); err != nil {
+			return nil, false, err
+		}
+		items = append(items, value)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, false, err
+	}
+	more := len(items) > 100
+	if more {
+		items = items[:100]
+	}
+	return items, more, nil
+}

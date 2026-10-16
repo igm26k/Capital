@@ -1032,7 +1032,7 @@ data class Error(
     val retry_after_seconds: Int?,
 ) : ActionResponse {
     init {
-        require(code in setOf("bad_request", "validation_error", "unauthenticated", "forbidden", "csrf_invalid", "not_found", "version_conflict", "idempotency_conflict", "dependent_transactions", "account_archived", "amount_out_of_range", "no_change", "rate_limited", "service_unavailable", "internal_error", "cursor_expired", "cursor_invalid", "snapshot_expired", "snapshot_too_large", "action_result_expired", "sync_group_too_large", "sync_generation_conflict", "registration_disabled", "planning_limit_exceeded", "password_invalid", "shared_workspace", "export_too_large", "import_not_ready", "import_source_pending", "import_row_changed", "resource_conflict", "confirmation_invalid")) { "Invalid Error.code" }
+        require(code in setOf("bad_request", "validation_error", "unauthenticated", "forbidden", "csrf_invalid", "not_found", "version_conflict", "idempotency_conflict", "dependent_transactions", "account_archived", "amount_out_of_range", "no_change", "rate_limited", "service_unavailable", "internal_error", "cursor_expired", "cursor_invalid", "snapshot_expired", "snapshot_too_large", "action_result_expired", "sync_group_too_large", "sync_generation_conflict", "registration_disabled", "planning_limit_exceeded", "password_invalid", "shared_workspace", "export_too_large", "import_not_ready", "import_source_pending", "import_row_changed", "resource_conflict", "confirmation_invalid", "source_event_conflict", "source_event_limit")) { "Invalid Error.code" }
     }
     override fun toString() = "Error([redacted])"
 }
@@ -1387,4 +1387,65 @@ data class ExportResult(
         require(format == "csv") { "Invalid ExportResult.format" }
     }
     override fun toString() = "ExportResult([redacted])"
+}
+
+@Serializable
+data class SourceEventCreate(
+    val id: String,
+    val connection_id: String,
+    val external_id: String,
+    val account_id: String,
+    val package_name: String,
+    val profile_id: String,
+    val parser_version: Int,
+    val kind: String,
+    val amount_minor: String,
+    val currency: String,
+    val observed_at: String,
+    val observed_timezone: String,
+    val merchant: String,
+    val card_last_four: String?,
+) {
+    init {
+        require(parser_version == 1) { "Invalid SourceEventCreate.parser_version" }
+        require(kind in setOf("expense", "income")) { "Invalid SourceEventCreate.kind" }
+    }
+    override fun toString() = "SourceEventCreate([redacted])"
+}
+
+@Serializable
+data class SourceEvent(
+    val id: String,
+    val connection_id: String,
+    val external_id: String,
+    val account_id: String,
+    val package_name: String,
+    val profile_id: String,
+    val parser_version: Int,
+    val kind: String,
+    val amount_minor: String,
+    val currency: String,
+    val observed_at: String,
+    val observed_timezone: String,
+    val merchant: String,
+    val card_last_four: String?,
+    val workspace_id: String,
+    val version: String,
+    val state: String,
+    val received_at: String,
+) {
+    init {
+        require(parser_version == 1) { "Invalid SourceEvent.parser_version" }
+        require(kind in setOf("expense", "income")) { "Invalid SourceEvent.kind" }
+        require(state in setOf("review", "dismissed", "applied")) { "Invalid SourceEvent.state" }
+    }
+    override fun toString() = "SourceEvent([redacted])"
+}
+
+@Serializable
+data class SourceEventList(
+    val items: List<SourceEvent>,
+    val has_more: Boolean,
+) {
+    override fun toString() = "SourceEventList([redacted])"
 }

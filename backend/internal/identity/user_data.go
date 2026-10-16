@@ -38,7 +38,7 @@ func ExportUserData(ctx context.Context, tx pgx.Tx, p Principal) (UserDataExport
 	}
 	for _, w := range spaces {
 		value := map[string]any{"id": w.id, "name": w.name}
-		for _, table := range []string{"accounts", "transactions", "entries", "allocations", "categories", "tags", "transaction_tags", "planning_resources", "csv_imports", "csv_rows", "csv_sources"} {
+		for _, table := range []string{"accounts", "transactions", "entries", "allocations", "categories", "tags", "transaction_tags", "planning_resources", "csv_imports", "csv_rows", "csv_sources", "source_events"} {
 			expression := "to_jsonb(t)"
 			switch table {
 			case "accounts":
@@ -52,7 +52,7 @@ func ExportUserData(ctx context.Context, tx pgx.Tx, p Principal) (UserDataExport
 			}
 			filter := "workspace_id=$1"
 			arguments := []any{w.id}
-			if table == "csv_imports" {
+			if table == "csv_imports" || table == "source_events" {
 				filter += " AND actor_user_id=$2"
 				arguments = append(arguments, p.Profile.ID)
 			}
@@ -139,7 +139,7 @@ func (s *Service) DeleteUserData(ctx context.Context, tx pgx.Tx, p Principal, pa
 		if _, err := tx.Exec(ctx, `SELECT workspace_id FROM sync_heads WHERE workspace_id=$1 FOR UPDATE`, id); err != nil {
 			return err
 		}
-		for _, table := range []string{"csv_sources", "csv_rows", "csv_imports", "planning_audit", "planning_actions", "planning_resources", "sync_snapshot_items", "sync_snapshots", "audit_events", "sync_changes", "sync_groups", "actions", "transaction_tags", "allocations", "entries", "transactions", "accounts", "categories", "tags", "sync_heads", "memberships"} {
+		for _, table := range []string{"source_events", "csv_sources", "csv_rows", "csv_imports", "planning_audit", "planning_actions", "planning_resources", "sync_snapshot_items", "sync_snapshots", "audit_events", "sync_changes", "sync_groups", "actions", "transaction_tags", "allocations", "entries", "transactions", "accounts", "categories", "tags", "sync_heads", "memberships"} {
 			if _, err := tx.Exec(ctx, `DELETE FROM `+table+` WHERE workspace_id=$1`, id); err != nil {
 				return err
 			}
@@ -150,6 +150,9 @@ func (s *Service) DeleteUserData(ctx context.Context, tx pgx.Tx, p Principal, pa
 	}
 	// Financial records of other workspaces remain owned by those workspaces.
 	// Discard only uncommitted source reservations and private drafts of this user.
+	if _, err := tx.Exec(ctx, `DELETE FROM source_events WHERE actor_user_id=$1`, p.Profile.ID); err != nil {
+		return err
+	}
 	if _, err := tx.Exec(ctx, `DELETE FROM csv_sources s USING csv_imports i WHERE s.workspace_id=i.workspace_id AND s.import_id=i.id AND i.actor_user_id=$1 AND s.transaction_id IS NULL`, p.Profile.ID); err != nil {
 		return err
 	}

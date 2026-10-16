@@ -178,6 +178,12 @@ func accessSchema(method, path string, status int) string {
 	case "/currencies":
 		return "CurrencyList"
 	}
+	if strings.Contains(p, "/source-events") {
+		if method == "GET" && strings.HasSuffix(p, "/source-events") {
+			return "SourceEventList"
+		}
+		return "SourceEvent"
+	}
 	if strings.Contains(p, "/imports") {
 		return "ImportPreview"
 	}
@@ -472,6 +478,8 @@ func TestAccess(t *testing.T) {
 
 	csvBody := map[string]any{"id": f.id(), "format": "csv", "content_base64": "ZGF0ZSxhbW91bnQK", "mapping": map[string]any{"account_id": foreign.account, "date_column": "date", "amount_column": "amount", "payee_column": nil, "date_format": "YYYY-MM-DD", "timezone": "UTC", "delimiter": ",", "encoding": "UTF-8", "decimal_separator": ".", "amount_convention": "signed_income_positive"}}
 	routes = append(routes, accessRequest{method: "POST", path: rb + "/imports", body: csvBody}, accessRequest{method: "GET", path: rb + "/imports/" + f.id()}, accessRequest{method: "POST", path: rb + "/imports/" + f.id() + "/confirm", body: map[string]any{"expected_version": "1", "decisions": []any{}}}, accessRequest{method: "GET", path: rb + "/exports?from=2026-10-01T00:00:00Z&to=2026-11-01T00:00:00Z"})
+
+	routes = append(routes, accessRequest{method: "GET", path: rb + "/source-events"}, accessRequest{method: "GET", path: rb + "/source-events/" + f.id()}, accessRequest{method: "POST", path: rb + "/source-events", body: f.sourceEvent(foreign.account)})
 
 	before := f.digest()
 	for _, q := range routes {
