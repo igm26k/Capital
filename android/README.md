@@ -1,4 +1,33 @@
-# Android Capital
+# Android Capital / Accounting
+
+Kotlin/Compose клиент личного учёта: Keystore bearer auth, Room mirror, durable financial outbox, WorkManager, счета/операции/классификация, бюджеты/отчёты/правила, CSV, экспорт/удаление, устройства и восстановление доступа. Банковские уведомления подключаются отдельно в «Ещё»: несколько профилей приложений и карт, локальный exact parser, private inbox, typed доставка и сверка с серверными операциями.
+
+Автоматическая доставка предварительных выключена по умолчанию. Она требует успешного предпросмотра текущего шаблона и явного включения. Неоднозначность, повтор notification slot, конфликт и неизвестный исход не создают новую финансовую попытку. Полный текст/SBN key не сохраняются и не передаются; вместо ключа используются scoped digests. Старые ручные предложения не отправляются автоматически.
+
+Для сборки нужны JDK17, SDK platform36/build-tools36.0.0/platform-tools и зависимости из зафиксированных Gradle файлов. SDK задаётся `ANDROID_HOME` либо игнорируемым `local.properties`.
+
+```sh
+ANDROID_HOME=/path/to/sdk ./android/gradlew -p android --no-daemon --max-workers=1 testDebugUnitTest assembleDebug assembleRelease lintDebug lintRelease
+python3 scripts/generate-android-contracts.py --check
+```
+
+Для личного подписанного APK:
+
+```sh
+python3 ops/personal_signing.py --sdk /path/to/sdk --verify-all
+```
+
+Скрипт создаёт постоянную private identity один раз и использует её при обновлениях. Пароли и ключ не входят в Git. Подпись APK и compiled TLS проверяются перед сохранением артефакта. Подробности и резервирование ключа: [личный APK](../ops/runbooks/PERSONAL_ANDROID.md).
+
+Release использует системные CA и запрещает HTTP. Debug может доверять локальному тестовому CA для localhost/127.0.0.1; этот CA не попадает в release. Manifest отключает backup; credentials и typed notification files находятся в noBackup storage, token не сохраняется в Room/WorkData/логах. Listener защищён системным BIND_NOTIFICATION_LISTENER_SERVICE и включается владельцем в настройках. SMS, accessibility и QUERY_ALL_PACKAGES не используются; список launcher-приложений открывается только для выбора профиля.
+
+Эмуляторы по поручению владельца не запускаются. JVM/build/lint не выдаются за выполнение на устройстве. Исторические device proofs относятся к прежним APK; свежие native→API→Chrome и реальные банковские форматы требуют отдельного тестового устройства/образцов. Итоговые результаты: [STAGE-06-REPORT](../docs/agent-tasks/STAGE-06-REPORT.md).
+
+## История клиента и прежних запусков
+
+Ниже сохранены материалы прежних шагов. Они не заменяют текущий итог выше; описания «ещё реализуется» и результаты старых APK относятся к датам соответствующих шагов.
+
+### Материалы APP-01 и последующих шагов
 
 Основа APP-01: Kotlin/Compose, Room и WorkManager. В APP-02 реализованы HTTPS bearer login/register/restore/renew/logout и Keystore. Финансовые экраны еще реализуются, mirror/outbox относятся к S3-05. APK пока не является завершенным клиентом учета.
 
@@ -6,7 +35,7 @@
 
 ```bash
 make android-check
-# Запустите эмулятор API36 или подключите тестовое устройство с разрешенным adb.
+# Историческая команда; текущая приёмка не запускает эмуляторы. Нужен выделенный физический runner.
 make android-device-check
 ```
 

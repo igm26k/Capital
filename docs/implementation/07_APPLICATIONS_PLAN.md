@@ -27,3 +27,7 @@
 ## Следующий этап
 
 [Этап 3. Бюджеты и отчеты](05_BUDGETS_REPORTS_PLAN.md).
+
+## Итог доступной реализации 2026-10-16
+
+Android online/offline code, Room/outbox/recovery, financial UI и дополнительный банковский конвейер реализованы; последний подписанный APK прошёл93JVM/build/lint. Web29/29 и server/PG приняты. Последние device/native→server→Chrome gates не запускались: подключённых устройств0, эмуляторы запрещены владельцем. APP-02/S3-05/APP-03 остаются blocked только на физическую приёмку; старые device proofs не относятся к новому APK. См. STAGE-06-REPORT.
