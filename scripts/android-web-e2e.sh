@@ -19,6 +19,12 @@ make android-check
 "$adb" -s "$serial" install -r android/app/build/outputs/apk/debug/app-debug.apk
 "$adb" -s "$serial" install -r android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
 mkdir -p ops/.runtime/checks
+if [[ "${ANDROID_WEB_SCENARIO:-online}" == offline ]]; then
+    (cd web && npm ci)
+    python3 scripts/check-android-offline-tags.py "$adb" "$serial" --chrome
+    echo 'PASS offline Android forms -> cold queue recovery -> real API/PostgreSQL -> Chrome UI'
+    exit 0
+fi
 proof="$PWD/ops/.runtime/checks/android-web-proof.json"
 result="$PWD/ops/.runtime/checks/android-web-result.json"
 artifact=ops/.runtime/checks/android-web-instrumentation.txt
@@ -27,6 +33,6 @@ rm -f "$proof" "$result"
 rg -q '^OK \(1 test\)' "$artifact"
 ! rg -q 'INSTRUMENTATION_STATUS_CODE: -[1-4]' "$artifact"
 "$adb" -s "$serial" exec-out run-as com.capital.accounting cat files/android-web-proof.json > "$proof"
-(cd web && npm ci && ANDROID_WEB_PROOF="$proof" ANDROID_WEB_RESULT="$result" npm exec playwright test -- --config playwright.android.config.ts)
+(cd web && npm ci && ANDROID_WEB_PROOF="$proof" ANDROID_WEB_RESULT="$result" npm exec playwright test -- --config playwright.android.config.ts roundtrip.spec.ts)
 test -s "$result"
 echo 'PASS native Android forms -> real API/PostgreSQL -> Chrome UI and readonly reload'

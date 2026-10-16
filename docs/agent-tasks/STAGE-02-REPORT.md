@@ -675,3 +675,39 @@ Compose «Разобрать сохранённые изменения» пок�
 Регрессия **54/54 PASS** на предыдущем APK этого шага: storage28 + API17 + History4/Details5. Последние изменения затронули только отображение recovery dialog и добавили money test; остальные пути не запускались повторно в broad run. На финальном APK повторены combined offline UIhost3 и actual Worker host3: **6/6 PASS**, original commands/WorkSpec/backoff/cold recovery и SQL no duplicates. Combined queue36/head37/accounts124456/10000/accountversion24/balance_version21/deleted8/active-entrybalance134456 unchanged. Первый broad/host run также PASS; реальный delayed worker attempt4/backoff240 наблюдался без cancel/replacement.
 
 **52/52 unit**, final debug/test APK build, lint, generator --check, bash syntax и diff --check PASS. Full make gate не запускался; script теперь ожидает147 executions (122 direct +25 host). Общий план in_progress: далее аудит оставшейся APP-02/S3/APP-03 приемки, включая полные gates, recovery/epoch и Android→web convergence; цель не считается завершённой.
+
+
+## Шаг 88: восстановление snapshot при смене поколения — 2026-10-14
+
+Исходное дерево на `e81fadd` чистое: сохранение/сброс чужих изменений не требовались. Прочитаны общий план, планы реализации и карточки текущего этапа. Следующий незавершённый пакет — итоговая APP-02/S3-05/APP-03 приёмка; бюджеты, CSV, выпуск и банковский этап ещё не приняты.
+
+SnapshotBootstrap повторяет read-only загрузку в пределах существующего лимита двух попыток при доказанной смене поколения: несовпадении generation в metadata/финальной auth-проверке либо HTTP409 sync_generation_conflict. Перед повтором одной Room transaction удаляются только matching snapshot staging/attempt. Confirmed mirror и финансовые команды сохраняются; новые ключи/тела/поколения финансовым действиям не назначаются. Auth-проверка дополнена is_current.
+
+Существующий cold rotation scenario расширен на незавершённый snapshot и immutable outbox (uncertain + queued): после нового поколения старые overlays скрыты и команды блокируются; GET outcome404 не доказывает отсутствие действия; sender не может claim старую команду. Отдельное явное исключение queued-команды сохраняет uncertain root и исходные overlays. Host gate требует новые proof flags; число instrumentation executions не изменено.
+
+Ограничение текущего окружения: /dev/kvm отсутствует, emulator -accel-check сообщает отсутствие vmx/svm. Установлены JDK17, SDK36, Gradle wrapper, Compose, Node24 и Chrome. Попытки запуска API36 AOSP ATD с accel off и меньшим partition-size завершились FATAL: требуется7372.80MB userdata при доступных около4.9GB; emulator также повышает RAM до2560MB при host RAM1966MB. Подключённых ADB devices нет. Новые native assertions и full android-auth-e2e/android-web-e2e **not_run**, их успешность не заявляется. Статусы APP-02/S3-05/APP-03 остаются in_progress; приёмка требует подходящего устройства/эмулятора.
+
+Проверки сборки и доступные серверные/веб gates выполняются; окончательные результаты записываются ниже после завершения команд.
+
+Дополнительный дефект общего gate: первый `make access-check` выполнил native Go TestAccess/TestSessionRace и OpenAPI body validation, но check-access-responses отверг неполное покрытие — не был проверен GET accounts/{id}/opening, добавленный шагом85. Расширены accessSchema и таблица реальных запросов: own opening kind/account/exact10000, unauthenticated401, foreign workspace404 и foreign account reference404 даже при членстве в обоих workspace, разрешённое чтение при действующем membership. Assertion покрытия сохранён без ослабления. Повтор access-check выполняется; результат ниже.
+
+
+## Шаг 89: продолжение приемки и офлайн Android → Chrome — 2026-10-15
+
+Исходные десять незакоммиченных файлов шага88 сохранены, reset/stash/checkout не выполнялись. Сопоставлены FINANCE_APP_PLAN.md, планы реализации и карточки: первый незавершенный пакет — APP-02/S3-05/APP-03. Бюджеты, CSV, выпуск и банковский этап еще не приняты; банковские работы не начинались.
+
+Повтор `make access-check` после сохраненного исправления: PASS TestAccess/TestSessionRace; **209 HTTP ответов / 11 схем**, **28 / 3**, покрыты **36 API operations / 34 private guards**. `make check-contracts compose-check`, generator --check и diff --check PASS.
+
+В APP-03 добавлен отдельный `make android-offline-web-e2e`, который продолжает существующий настоящий outage/cold host сценарий browser чтением. Chrome сверяет точные KWD balances124456/10000, income1000/version2, категорию/тег, удаленные записи и readonly reload/SQL. Synthetic proof не содержит bearer/password. Native→Chrome результат не заявляется: target остановился на отсутствии `emulator-5556`; ADB devices пуст, accel-check — отсутствие vmx/svm. Ограничение среды шага88 остается актуальным. Статусы APP-02/S3-05/APP-03 — in_progress.
+
+
+Дополнительные проверки шага89: `make e2e` — **14/14 PASS** на настоящих Chrome/API/PostgreSQL; после штатного teardown тестовый Compose восстановлен, volumes не удалялись. `npm run build` и Playwright `--list` нового offline.spec.ts PASS; Bash/Python syntax PASS. Отдельная попытка tsc для browser tests остановилась на отсутствии `@types/node` (в существующем web project typecheck охватывает src); полная проверка типов тестов не заявляется. Native gate остановился до выполнения тестов из-за отсутствия эмулятора, а не из-за browser assertion.
+
+
+Итоговый Android gate после последнего изменения native proof: `ANDROID_HOME=/opt/accounting-sdk ./gradlew --no-daemon -Dorg.gradle.jvmargs='-Xmx768m -Dfile.encoding=UTF-8' --max-workers=1 assembleDebug assembleDebugAndroidTest testDebugUnitTest lintDebug` — **BUILD SUCCESSFUL**,82 tasks (7 executed/75 up-to-date),4m46s. Unit task использовал актуальный cache:52 tests/0 failures/0 errors/0 skipped. Instrumentation APK собран; его выполнение на устройстве **not_run**. Предыдущий перекрывающийся прогон также BUILD SUCCESSFUL; итоговым считается последний с обновленным OfflineTagRuntimeTest.
+
+Для продолжения нужны доступный Android emulator/device runner и три gates: `make android-auth-e2e`, `make android-web-e2e`, `make android-offline-web-e2e`. Только после реальных успешных результатов и итогового сопоставления критериев допускается закрытие APP-02/S3-05/APP-03 и переход к этапу3. Полная реализация исходного плана не заявляется.
+
+## Поручение продолжать без эмуляторов — 2026-10-15
+
+Пользователь явно разрешил продолжать реализацию без эмуляторов, не задавать входящих вопросов и выбирать решения самостоятельно по плану/спецификациям. Поэтому независимая работа этапов3–5 продолжена; native device acceptance не объявлена успешной и прежние reports не переписаны как done. Учет pending в бюджетах/отчетах подтвержден пользователем отдельно. Результаты продолжаются в STAGE-03/04/05-REPORT.md.

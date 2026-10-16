@@ -1,0 +1,14 @@
+[Unit]
+Description=Accounting verified HTTPS, backup freshness and aggregate queue checks
+After=docker.service network-online.target
+
+[Service]
+Type=oneshot
+User=accounting
+Group=accounting
+WorkingDirectory=/opt/accounting
+EnvironmentFile=/etc/accounting/backup.env
+UMask=0077
+ExecStart=/usr/bin/python3 /opt/accounting/ops/health_check.py prod --origin ${PRODUCTION_PUBLIC_ORIGIN} --backup-directory ${ACCOUNTING_BACKUP_DIR}
+NoNewPrivileges=true
+PrivateTmp=true

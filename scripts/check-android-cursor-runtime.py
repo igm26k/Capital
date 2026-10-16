@@ -47,6 +47,9 @@ for mode in ['expiry', 'rotation']:
     assert after['stage'] == 'verified' and after['pid'] != before['pid']
     for key in ['recovered', 'command_preserved', 'exact_minor']:
         assert after[key] is True
+    if mode == 'rotation':
+        for key in ['outbox_preserved', 'old_generation_blocked', 'unknown_retained']:
+            assert after[key] is True
     counts = json.loads(sql(f"SELECT json_build_object('actions',(SELECT count(*) FROM actions WHERE workspace_id='{workspace}'),'transactions',(SELECT count(*) FROM transactions WHERE workspace_id='{workspace}' AND deleted_at IS NULL),'balance',(SELECT sum(e.amount_minor)::text FROM entries e JOIN transactions t ON (t.workspace_id,t.id)=(e.workspace_id,e.transaction_id) WHERE e.workspace_id='{workspace}' AND t.status='posted' AND t.deleted_at IS NULL));\n"))
     assert counts == {'actions': 2, 'transactions': 2, 'balance': '99000'}
     after['sql_no_duplicate'] = True

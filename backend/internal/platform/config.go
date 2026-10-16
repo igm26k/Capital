@@ -1,6 +1,7 @@
 package platform
 
 import (
+	"accounting/backend/internal/maildelivery"
 	commands "accounting/backend/internal/sync"
 	"encoding/base64"
 	"encoding/json"
@@ -12,6 +13,9 @@ import (
 )
 
 type Config struct {
+	EmailVerification          bool
+	EmailKey                   []byte
+	SMTP                       maildelivery.Config
 	CursorKeys                 *commands.CursorKeys
 	Environment                string
 	DatabaseURL                string
@@ -72,10 +76,24 @@ func loadConfig(lookup func(string) (string, bool)) (Config, error) {
 		return Config{}, errors.New("invalid REGISTRATION_ENABLED")
 	}
 	cfg.RegistrationEnabled = enabled
-	if cfg.Environment == "production" {
-		if cfg.RegistrationEnabled {
-			return Config{}, errors.New("public registration is unavailable")
+	cfg.EmailVerification, err = strconv.ParseBool(value("AUTH_EMAIL_VERIFICATION", "false"))
+	if err != nil {
+		return Config{}, errors.New("invalid AUTH_EMAIL_VERIFICATION")
+	}
+	if cfg.Environment == "production" && cfg.RegistrationEnabled && !cfg.EmailVerification {
+		return Config{}, errors.New("public registration requires email verification")
+	}
+	if cfg.EmailVerification {
+		cfg.EmailKey, err = base64.StdEncoding.DecodeString(value("AUTH_EMAIL_KEY", ""))
+		if err != nil || len(cfg.EmailKey) != 32 {
+			return Config{}, errors.New("invalid AUTH_EMAIL_KEY")
 		}
+		cfg.SMTP = maildelivery.Config{Address: value("SMTP_ADDRESS", ""), Username: value("SMTP_USERNAME", ""), Password: value("SMTP_PASSWORD", ""), From: value("SMTP_FROM", ""), Mode: value("SMTP_MODE", "starttls")}
+		if err = cfg.SMTP.Validate(); err != nil {
+			return Config{}, err
+		}
+	}
+	if cfg.Environment == "production" {
 		if origin.Scheme != "https" || db.Query().Get("sslmode") != "verify-full" {
 			return Config{}, errors.New("production requires verified TLS")
 		}
@@ -97,6 +115,9 @@ func loadConfig(lookup func(string) (string, bool)) (Config, error) {
 		if err != nil {
 			return Config{}, err
 		}
+	}
+	if cfg.Environment == "production" && cfg.CursorKeys == nil {
+		return Config{}, errors.New("production requires persistent sync cursor keys")
 	}
 	return cfg, nil
 }

@@ -5,7 +5,7 @@ import subprocess
 import sys
 from pathlib import Path
 aapt = Path(sys.argv[1]) / 'build-tools/36.0.0/aapt2'
-apk = Path('android/app/build/outputs/apk/release/app-release-unsigned.apk')
+apk = Path(sys.argv[2]) if len(sys.argv)>2 else Path('android/app/build/outputs/apk/release/app-release-unsigned.apk')
 def dump(*args):
     return subprocess.run([str(aapt), 'dump', *args, str(apk)], check=True, capture_output=True, text=True).stdout
 resources = dump('resources')

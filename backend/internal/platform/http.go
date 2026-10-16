@@ -63,6 +63,9 @@ func handler(database Pinger, logger *slog.Logger, auth *identity.Service, optio
 		runner := &commands.Runner{Identity: auth}
 		httpapi.MountActions(mux, runner)
 		httpapi.MountLedger(mux, runner, options)
+		httpapi.MountReports(mux, auth)
+		httpapi.MountPlanning(mux, auth, options)
+		httpapi.MountImports(mux, auth, options)
 		httpapi.MountPull(mux, &commands.PullReader{Identity: auth, Keys: options.CursorKeys})
 		httpapi.MountSnapshots(mux, &commands.SnapshotService{Identity: auth, Keys: options.CursorKeys}, options)
 	}
@@ -136,5 +139,5 @@ func NewAPIHandler(database *pgxpool.Pool, cfg Config, logger *slog.Logger) (htt
 	if err != nil {
 		return nil, err
 	}
-	return handler(database, logger, auth, httpapi.AuthOptions{CursorKeys: cfg.CursorKeys, Origin: cfg.PublicOrigin, Registration: cfg.RegistrationEnabled, IPAttemptsPerMinute: cfg.AuthIPAttemptsPerMinute, EmailAttemptsPerMinute: cfg.AuthEmailAttemptsPerMinute}), nil
+	return handler(database, logger, auth, httpapi.AuthOptions{CursorKeys: cfg.CursorKeys, Origin: cfg.PublicOrigin, Registration: cfg.RegistrationEnabled, Verification: cfg.EmailVerification, EmailKey: cfg.EmailKey, IPAttemptsPerMinute: cfg.AuthIPAttemptsPerMinute, EmailAttemptsPerMinute: cfg.AuthEmailAttemptsPerMinute}), nil
 }

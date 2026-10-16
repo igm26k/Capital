@@ -161,7 +161,12 @@ func accessSchema(method, path string, status int) string {
 	p := accessTemplate(path)
 	switch p {
 	case "/me":
+		if method == "DELETE" {
+			return "Acknowledgement"
+		}
 		return "Profile"
+	case "/me/export":
+		return "UserDataExport"
 	case "/sessions":
 		return "SessionList"
 	case "/sessions/{id}", "/auth/logout":
@@ -172,6 +177,26 @@ func accessSchema(method, path string, status int) string {
 		return "WorkspaceList"
 	case "/currencies":
 		return "CurrencyList"
+	}
+	if strings.Contains(p, "/imports") {
+		return "ImportPreview"
+	}
+	if strings.HasSuffix(p, "/exports") {
+		return "ExportResult"
+	}
+	if strings.HasSuffix(p, "/rules/preview") {
+		return "RulePreview"
+	}
+	for path, model := range map[string]string{"budgets": "Budget", "rules": "Rule"} {
+		if strings.Contains(p, "/"+path) {
+			if method == "GET" {
+				return model + "List"
+			}
+			if method == "DELETE" {
+				return "PlanningDeleted"
+			}
+			return model
+		}
 	}
 	if strings.Contains(p, "/actions/") {
 		return "ActionOutcome"
@@ -184,6 +209,12 @@ func accessSchema(method, path string, status int) string {
 	}
 	if strings.Contains(p, "/sync/snapshots") {
 		return "Snapshot"
+	}
+	if strings.HasSuffix(p, "/reports") {
+		return "Report"
+	}
+	if strings.HasSuffix(p, "/accounts/{id}/opening") {
+		return "Transaction"
 	}
 	if method != "GET" {
 		return "MutationResult"
@@ -360,6 +391,12 @@ func TestAccess(t *testing.T) {
 		return r
 	}
 	own, foreign := seed(a), seed(b)
+	f.call(accessRequest{method: "GET", path: ra + "/reports?from=2026-10-01T00:00:00Z&to=2026-11-01T00:00:00Z", actor: a}, 200, "")
+	opening := f.call(accessRequest{method: "GET", path: ra + "/accounts/" + own.account + "/opening", actor: a}, 200, "")
+	entries := opening.body["entries"].([]any)
+	if opening.body["kind"] != "opening" || len(entries) != 1 || entries[0].(map[string]any)["account_id"] != own.account || entries[0].(map[string]any)["amount_minor"] != "10000" {
+		t.Fatal("account opening route returned a different financial operation")
+	}
 	basicPut := func(body map[string]any, version string) map[string]any {
 		out := accessClone(body)
 		delete(out, "id")
@@ -382,7 +419,9 @@ func TestAccess(t *testing.T) {
 	// Every workspace route has real valid wire input. 401 verifies the route is
 	// mounted (a missing handler would be 404), then 404 tests membership first.
 	routes := []accessRequest{
+		{method: "GET", path: rb + "/reports?from=2026-10-01T00:00:00Z&to=2026-11-01T00:00:00Z"},
 		{method: "GET", path: rb + "/accounts"}, {method: "GET", path: rb + "/accounts/" + foreign.account},
+		{method: "GET", path: rb + "/accounts/" + foreign.account + "/opening"},
 		{method: "POST", path: rb + "/accounts", body: map[string]any{"id": f.id(), "name": "Denied", "type": "bank", "currency": "EUR", "opened_at": "2026-01-01T00:00:00Z", "occurred_timezone": "UTC", "opening_balance_minor": "0"}},
 		{method: "PUT", path: rb + "/accounts/" + foreign.account, body: map[string]any{"name": "Denied", "type": "bank", "archived": false, "expected_version": "999"}},
 		{method: "GET", path: rb + "/categories"}, {method: "GET", path: rb + "/categories/" + foreign.category},
@@ -409,6 +448,31 @@ func TestAccess(t *testing.T) {
 		{method: "GET", path: rb + "/sync/snapshots/" + foreign.snapshot.ID + "/pages?page_token=" + url.QueryEscape(foreign.snapshot.First)},
 		{method: "GET", path: rb + "/actions/" + foreign.action},
 	}
+	for _, resource := range []struct{ path, kind string }{{"budgets", "budget"}, {"rules", "rule"}} {
+		body := map[string]any{"id": f.id(), "name": "Denied", "category_id": foreign.category}
+		if resource.kind == "budget" {
+			body["currency"] = "EUR"
+			body["month"] = "2026-10"
+			body["timezone"] = "UTC"
+			body["limit_minor"] = "100"
+		} else {
+			body["priority"] = 1
+			body["enabled"] = true
+			body["transaction_kind"] = "expense"
+			body["payee_contains"] = "shop"
+			body["note_contains"] = ""
+		}
+		id := body["id"].(string)
+		update := accessClone(body)
+		delete(update, "id")
+		update["expected_version"] = "1"
+		routes = append(routes, accessRequest{method: "GET", path: rb + "/" + resource.path}, accessRequest{method: "POST", path: rb + "/" + resource.path, body: body}, accessRequest{method: "PUT", path: rb + "/" + resource.path + "/" + id, body: update}, accessRequest{method: "DELETE", path: rb + "/" + resource.path + "/" + id, body: map[string]any{"expected_version": "1"}})
+	}
+	routes = append(routes, accessRequest{method: "GET", path: rb + "/rules/preview?from=2026-10-01T00:00:00Z&to=2026-11-01T00:00:00Z"})
+
+	csvBody := map[string]any{"id": f.id(), "format": "csv", "content_base64": "ZGF0ZSxhbW91bnQK", "mapping": map[string]any{"account_id": foreign.account, "date_column": "date", "amount_column": "amount", "payee_column": nil, "date_format": "YYYY-MM-DD", "timezone": "UTC", "delimiter": ",", "encoding": "UTF-8", "decimal_separator": ".", "amount_convention": "signed_income_positive"}}
+	routes = append(routes, accessRequest{method: "POST", path: rb + "/imports", body: csvBody}, accessRequest{method: "GET", path: rb + "/imports/" + f.id()}, accessRequest{method: "POST", path: rb + "/imports/" + f.id() + "/confirm", body: map[string]any{"expected_version": "1", "decisions": []any{}}}, accessRequest{method: "GET", path: rb + "/exports?from=2026-10-01T00:00:00Z&to=2026-11-01T00:00:00Z"})
+
 	before := f.digest()
 	for _, q := range routes {
 		q.actor = identity.Auth{}
@@ -588,6 +652,7 @@ func TestAccess(t *testing.T) {
 	}
 	f.call(accessRequest{method: "GET", path: rb + "/accounts?limit=1&cursor=" + url.QueryEscape(cursor), actor: a}, 400, "cursor_invalid")
 	f.call(accessRequest{method: "GET", path: rb + "/accounts", actor: a}, 200, "")
+	f.call(accessRequest{method: "GET", path: rb + "/accounts/" + foreign.account + "/opening", actor: a}, 200, "")
 
 	before = f.digest()
 	for _, q := range nested {
@@ -629,7 +694,7 @@ func TestAccess(t *testing.T) {
 		q.cookie = a.Credential
 		f.call(q, 400, "bad_request")
 	}
-	private := []accessRequest{{method: "GET", path: "/api/v1/me"}, {method: "PUT", path: "/api/v1/me", body: map[string]any{"timezone": "UTC"}}, {method: "GET", path: "/api/v1/sessions"}, {method: "DELETE", path: "/api/v1/sessions/" + b.Session.ID}, {method: "GET", path: "/api/v1/workspaces"}, {method: "GET", path: "/api/v1/currencies"}, {method: "GET", path: "/api/v1/auth/session"}, {method: "POST", path: "/api/v1/auth/renew"}, {method: "POST", path: "/api/v1/auth/logout"}}
+	private := []accessRequest{{method: "GET", path: "/api/v1/me/export"}, {method: "DELETE", path: "/api/v1/me", body: map[string]any{"password": "invalid-password", "confirmation": "DELETE"}}, {method: "GET", path: "/api/v1/me"}, {method: "PUT", path: "/api/v1/me", body: map[string]any{"timezone": "UTC"}}, {method: "GET", path: "/api/v1/sessions"}, {method: "DELETE", path: "/api/v1/sessions/" + b.Session.ID}, {method: "GET", path: "/api/v1/workspaces"}, {method: "GET", path: "/api/v1/currencies"}, {method: "GET", path: "/api/v1/auth/session"}, {method: "POST", path: "/api/v1/auth/renew"}, {method: "POST", path: "/api/v1/auth/logout"}}
 	for _, q := range private {
 		f.call(q, 401, "unauthenticated")
 	}
@@ -637,6 +702,9 @@ func TestAccess(t *testing.T) {
 		f.call(accessRequest{method: "GET", path: path, actor: a}, 200, "")
 	}
 	f.call(accessRequest{method: "POST", path: "/api/v1/auth/register", body: map[string]any{"email": "disabled-access@example.test", "password": "synthetic disabled password", "transport": "bearer", "device_name": "Access", "timezone": "UTC"}}, 403, "registration_disabled")
+	for _, path := range []string{"/auth/registration/confirm", "/auth/recovery/request", "/auth/recovery/confirm"} {
+		f.call(accessRequest{method: "POST", path: "/api/v1" + path, body: map[string]any{}}, 403, "registration_disabled")
+	}
 	for _, email := range []string{"absent-access@example.test", a.Profile.Email} {
 		f.call(accessRequest{method: "POST", path: "/api/v1/auth/login", body: map[string]any{"email": email, "password": "synthetic wrong password", "transport": "bearer", "device_name": "Access"}}, 401, "unauthenticated")
 	}

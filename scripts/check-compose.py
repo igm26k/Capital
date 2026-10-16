@@ -6,7 +6,7 @@ import subprocess
 import sys
 
 cli = sys.argv[1:] or ['docker', 'compose']
-env = dict(os.environ, REGISTRATION_ENABLED='false', POSTGRES_PASSWORD='synthetic_validation_only',
+env = dict(os.environ, REGISTRATION_ENABLED='false', SYNC_CURSOR_ACTIVE_KEY='test', SYNC_CURSOR_KEYS='{"test":"AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE="}', POSTGRES_PASSWORD='synthetic_validation_only',
            ACCOUNTING_DEV_SUBNET='192.168.242.0/24', ACCOUNTING_TEST_SUBNET='192.168.243.0/24',
            PRODUCTION_DATABASE_URL='postgres://accounting:synthetic@db:5432/accounting?sslmode=verify-full&sslrootcert=/etc/accounting/db-tls/ca.crt',
            PRODUCTION_PUBLIC_ORIGIN='https://accounting.example',

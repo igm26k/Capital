@@ -63,6 +63,56 @@ object WorkspaceChangeSerializer : JsonContentPolymorphicSerializer<WorkspaceCha
 }
 
 @Serializable
+data class EmailChallenge(
+    val status: String,
+) {
+    init {
+        require(status == "confirmation_required") { "Invalid EmailChallenge.status" }
+    }
+    override fun toString() = "EmailChallenge([redacted])"
+}
+
+@Serializable
+data class PasswordChanged(
+    val status: String,
+) {
+    init {
+        require(status == "password_changed") { "Invalid PasswordChanged.status" }
+    }
+    override fun toString() = "PasswordChanged([redacted])"
+}
+
+@Serializable
+data class RegistrationConfirm(
+    val email: String,
+    val password: String,
+    val device_name: String,
+    val transport: String,
+    val code: String,
+) {
+    init {
+        require(transport in setOf("cookie", "bearer")) { "Invalid RegistrationConfirm.transport" }
+    }
+    override fun toString() = "RegistrationConfirm([redacted])"
+}
+
+@Serializable
+data class RecoveryRequest(
+    val email: String,
+) {
+    override fun toString() = "RecoveryRequest([redacted])"
+}
+
+@Serializable
+data class RecoveryConfirm(
+    val email: String,
+    val code: String,
+    val password: String,
+) {
+    override fun toString() = "RecoveryConfirm([redacted])"
+}
+
+@Serializable
 data class Profile(
     val id: String,
     val email: String,
@@ -982,7 +1032,7 @@ data class Error(
     val retry_after_seconds: Int?,
 ) : ActionResponse {
     init {
-        require(code in setOf("bad_request", "validation_error", "unauthenticated", "forbidden", "csrf_invalid", "not_found", "version_conflict", "idempotency_conflict", "dependent_transactions", "account_archived", "amount_out_of_range", "no_change", "rate_limited", "service_unavailable", "internal_error", "cursor_expired", "cursor_invalid", "snapshot_expired", "snapshot_too_large", "action_result_expired", "sync_group_too_large", "sync_generation_conflict", "registration_disabled")) { "Invalid Error.code" }
+        require(code in setOf("bad_request", "validation_error", "unauthenticated", "forbidden", "csrf_invalid", "not_found", "version_conflict", "idempotency_conflict", "dependent_transactions", "account_archived", "amount_out_of_range", "no_change", "rate_limited", "service_unavailable", "internal_error", "cursor_expired", "cursor_invalid", "snapshot_expired", "snapshot_too_large", "action_result_expired", "sync_group_too_large", "sync_generation_conflict", "registration_disabled", "planning_limit_exceeded", "password_invalid", "shared_workspace", "export_too_large", "import_not_ready", "import_source_pending", "import_row_changed", "resource_conflict", "confirmation_invalid")) { "Invalid Error.code" }
     }
     override fun toString() = "Error([redacted])"
 }
@@ -1004,4 +1054,337 @@ data class ActionOutcome(
         require(state in setOf("applied", "rejected")) { "Invalid ActionOutcome.state" }
     }
     override fun toString() = "ActionOutcome([redacted])"
+}
+
+@Serializable
+data class Report(
+    val from: String,
+    val to: String,
+    val status: String,
+    val currencies: List<ReportTotals>,
+    val categories: List<ReportCategory>,
+    val balances: List<ReportBalance>,
+    val daily_balances: List<ReportDailyBalance>,
+) {
+    init {
+        require(status in setOf("all", "posted", "pending")) { "Invalid Report.status" }
+    }
+    override fun toString() = "Report([redacted])"
+}
+
+@Serializable
+data class ReportTotals(
+    val currency: String,
+    val income_minor: String,
+    val expense_minor: String,
+    val posted_income_minor: String,
+    val pending_income_minor: String,
+    val posted_expense_minor: String,
+    val pending_expense_minor: String,
+) {
+    override fun toString() = "ReportTotals([redacted])"
+}
+
+@Serializable
+data class ReportCategory(
+    val currency: String,
+    val category_id: String?,
+    val expense_minor: String,
+    val posted_expense_minor: String,
+    val pending_expense_minor: String,
+) {
+    override fun toString() = "ReportCategory([redacted])"
+}
+
+@Serializable
+data class ReportBalance(
+    val currency: String,
+    val opening_minor: String,
+    val closing_minor: String,
+    val projected_closing_minor: String,
+) {
+    override fun toString() = "ReportBalance([redacted])"
+}
+
+@Serializable
+data class ReportDailyBalance(
+    val currency: String,
+    val date: String,
+    val closing_minor: String,
+    val projected_closing_minor: String,
+) {
+    override fun toString() = "ReportDailyBalance([redacted])"
+}
+
+@Serializable
+data class Budget(
+    val id: String,
+    val workspace_id: String,
+    val version: String,
+    val name: String,
+    val category_id: String,
+    val currency: String,
+    val month: String,
+    val timezone: String,
+    val limit_minor: String,
+) {
+    override fun toString() = "Budget([redacted])"
+}
+
+@Serializable
+data class BudgetCreate(
+    val id: String,
+    val name: String,
+    val category_id: String,
+    val currency: String,
+    val month: String,
+    val timezone: String,
+    val limit_minor: String,
+) {
+    override fun toString() = "BudgetCreate([redacted])"
+}
+
+@Serializable
+data class BudgetUpdate(
+    val expected_version: String,
+    val name: String,
+    val category_id: String,
+    val currency: String,
+    val month: String,
+    val timezone: String,
+    val limit_minor: String,
+) {
+    override fun toString() = "BudgetUpdate([redacted])"
+}
+
+@Serializable
+data class BudgetView(
+    val budget: Budget,
+    val from: String,
+    val to: String,
+    val spent_minor: String,
+    val posted_spent_minor: String,
+    val pending_spent_minor: String,
+    val remaining_minor: String,
+    val overspent_minor: String,
+    val warning: String,
+) {
+    init {
+        require(warning in setOf("normal", "approaching", "exceeded")) { "Invalid BudgetView.warning" }
+    }
+    override fun toString() = "BudgetView([redacted])"
+}
+
+@Serializable
+data class BudgetList(
+    val items: List<BudgetView>,
+    val next_cursor: String?,
+) {
+    override fun toString() = "BudgetList([redacted])"
+}
+
+@Serializable
+data class PlanningDeleted(
+    val id: String,
+    val workspace_id: String,
+    val version: String,
+    val deleted: Boolean,
+) {
+    init {
+        require(deleted == true) { "Invalid PlanningDeleted.deleted" }
+    }
+    override fun toString() = "PlanningDeleted([redacted])"
+}
+
+@Serializable
+data class PlanningDelete(
+    val expected_version: String,
+) {
+    override fun toString() = "PlanningDelete([redacted])"
+}
+
+@Serializable
+data class Rule(
+    val id: String,
+    val workspace_id: String,
+    val version: String,
+    val name: String,
+    val category_id: String,
+    val priority: Int,
+    val enabled: Boolean,
+    val transaction_kind: String,
+    val payee_contains: String,
+    val note_contains: String,
+) {
+    init {
+        require(transaction_kind in setOf("expense", "income")) { "Invalid Rule.transaction_kind" }
+    }
+    override fun toString() = "Rule([redacted])"
+}
+
+@Serializable
+data class RuleCreate(
+    val id: String,
+    val name: String,
+    val category_id: String,
+    val priority: Int,
+    val enabled: Boolean,
+    val transaction_kind: String,
+    val payee_contains: String,
+    val note_contains: String,
+) {
+    init {
+        require(transaction_kind in setOf("expense", "income")) { "Invalid RuleCreate.transaction_kind" }
+    }
+    override fun toString() = "RuleCreate([redacted])"
+}
+
+@Serializable
+data class RuleUpdate(
+    val expected_version: String,
+    val name: String,
+    val category_id: String,
+    val priority: Int,
+    val enabled: Boolean,
+    val transaction_kind: String,
+    val payee_contains: String,
+    val note_contains: String,
+) {
+    init {
+        require(transaction_kind in setOf("expense", "income")) { "Invalid RuleUpdate.transaction_kind" }
+    }
+    override fun toString() = "RuleUpdate([redacted])"
+}
+
+@Serializable
+data class RuleList(
+    val items: List<Rule>,
+    val next_cursor: String?,
+) {
+    override fun toString() = "RuleList([redacted])"
+}
+
+@Serializable
+data class RulePreview(
+    val batches: List<BulkClassification>,
+    val has_more: Boolean,
+) {
+    override fun toString() = "RulePreview([redacted])"
+}
+
+@Serializable
+data class ImportMapping(
+    val account_id: String,
+    val date_column: String,
+    val amount_column: String,
+    val payee_column: String?,
+    val date_format: String,
+    val timezone: String,
+    val delimiter: String,
+    val encoding: String,
+    val decimal_separator: String,
+    val amount_convention: String,
+) {
+    init {
+        require(delimiter in setOf(",", ";", "\t")) { "Invalid ImportMapping.delimiter" }
+        require(encoding in setOf("UTF-8")) { "Invalid ImportMapping.encoding" }
+        require(decimal_separator in setOf(".", ",")) { "Invalid ImportMapping.decimal_separator" }
+        require(amount_convention in setOf("signed_income_positive")) { "Invalid ImportMapping.amount_convention" }
+    }
+    override fun toString() = "ImportMapping([redacted])"
+}
+
+@Serializable
+data class ImportCreate(
+    val id: String,
+    val format: String,
+    val content_base64: String,
+    val mapping: ImportMapping,
+) {
+    init {
+        require(format == "csv") { "Invalid ImportCreate.format" }
+    }
+    override fun toString() = "ImportCreate([redacted])"
+}
+
+@Serializable
+data class ImportRow(
+    val row_number: Int,
+    val status: String,
+    val errors: List<FieldError>,
+    val candidate_transaction_ids: List<String>,
+    val amount_minor: String?,
+    val occurred_at: String?,
+    val payee: String,
+    val source_transaction_id: String?,
+) {
+    init {
+        require(status in setOf("valid", "invalid", "ambiguous")) { "Invalid ImportRow.status" }
+    }
+    override fun toString() = "ImportRow([redacted])"
+}
+
+@Serializable
+data class ImportPreview(
+    val id: String,
+    val workspace_id: String,
+    val version: String,
+    val state: String,
+    val rows: List<ImportRow>,
+    val expires_at: String,
+    val error_code: String?,
+    val processing: List<ImportProgress>,
+    val account_id: String,
+    val currency: String,
+) {
+    init {
+        require(state in setOf("ready", "queued", "committed", "failed", "expired")) { "Invalid ImportPreview.state" }
+    }
+    override fun toString() = "ImportPreview([redacted])"
+}
+
+@Serializable
+data class ImportProgress(
+    val row_number: Int,
+    val state: String,
+    val transaction_id: String?,
+) {
+    init {
+        require(state in setOf("prepared", "invalid", "queued", "applied", "linked", "skipped")) { "Invalid ImportProgress.state" }
+    }
+    override fun toString() = "ImportProgress([redacted])"
+}
+
+@Serializable
+data class ImportConfirm(
+    val expected_version: String,
+    val decisions: List<ImportDecision>,
+) {
+    override fun toString() = "ImportConfirm([redacted])"
+}
+
+@Serializable
+data class ImportDecision(
+    val row_number: Int,
+    val action: String,
+    val transaction_id: String?,
+    val expected_transaction_version: String?,
+) {
+    init {
+        require(action in setOf("create", "skip", "link")) { "Invalid ImportDecision.action" }
+    }
+    override fun toString() = "ImportDecision([redacted])"
+}
+
+@Serializable
+data class ExportResult(
+    val format: String,
+    val content_base64: String,
+    val filename: String,
+    val row_count: Int,
+) {
+    init {
+        require(format == "csv") { "Invalid ExportResult.format" }
+    }
+    override fun toString() = "ExportResult([redacted])"
 }

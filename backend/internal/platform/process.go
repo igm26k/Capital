@@ -1,6 +1,9 @@
 package platform
 
 import (
+	"accounting/backend/internal/identity"
+	"accounting/backend/internal/ledger"
+	"accounting/backend/internal/maildelivery"
 	commands "accounting/backend/internal/sync"
 	"context"
 	"errors"
@@ -59,23 +62,51 @@ func RunWorker(ctx context.Context, cfg Config, logger *slog.Logger) error {
 	if err != nil {
 		return errors.New("database unavailable")
 	}
-	logger.Info("worker_started", "jobs", []string{"receipt_compaction", "sync_retention"})
-	ticker := time.NewTicker(time.Minute)
+	auth, err := identity.New(database, cfg.AuthHashConcurrency)
+	if err != nil {
+		return err
+	}
+	logger.Info("worker_started", "jobs", []string{"receipt_compaction", "sync_retention", "csv_import"})
+	ticker := time.NewTicker(2 * time.Second)
+	lastMaintenance := time.Time{}
 	defer ticker.Stop()
 	for {
-		count, err := commands.CompactReceipts(ctx, database, 1000)
-		if err != nil && ctx.Err() == nil {
-			logger.Error("receipt_compaction_failed")
-		} else if count > 0 {
-			logger.Info("receipts_compacted", "count", count)
+		if cfg.EmailVerification {
+			for i := 0; i < 2; i++ {
+				processed, mailErr := auth.DispatchEmail(ctx, cfg.EmailKey, maildelivery.Sender{Config: cfg.SMTP})
+				if mailErr != nil && ctx.Err() == nil {
+					logger.Error("auth_email_delivery_failed")
+				}
+				if !processed {
+					break
+				}
+			}
 		}
-		cleaned, cleanupErr := commands.CleanupSync(ctx, database, 100)
-		if cleanupErr != nil && ctx.Err() == nil {
-			logger.Error("sync_cleanup_failed")
-		} else if cleaned.Snapshots > 0 || cleaned.Groups > 0 {
-			logger.Info("sync_cleaned", "snapshots", cleaned.Snapshots, "groups", cleaned.Groups)
+		processed, importErr := ledger.ProcessImports(ctx, auth, 20)
+		if importErr != nil && ctx.Err() == nil {
+			logger.Error("csv_import_failed")
+		} else if processed > 0 {
+			logger.Info("csv_import_processed", "count", processed)
 		}
+		if time.Since(lastMaintenance) >= time.Minute {
+			lastMaintenance = time.Now()
+			if _, emailCleanupErr := database.Exec(ctx, `DELETE FROM auth_challenges WHERE expires_at<=clock_timestamp()`); emailCleanupErr != nil && ctx.Err() == nil {
+				logger.Error("auth_email_cleanup_failed")
+			}
+			count, err := commands.CompactReceipts(ctx, database, 1000)
+			if err != nil && ctx.Err() == nil {
+				logger.Error("receipt_compaction_failed")
+			} else if count > 0 {
+				logger.Info("receipts_compacted", "count", count)
+			}
+			cleaned, cleanupErr := commands.CleanupSync(ctx, database, 100)
+			if cleanupErr != nil && ctx.Err() == nil {
+				logger.Error("sync_cleanup_failed")
+			} else if cleaned.Snapshots > 0 || cleaned.Groups > 0 {
+				logger.Info("sync_cleaned", "snapshots", cleaned.Snapshots, "groups", cleaned.Groups)
+			}
 
+		}
 		select {
 		case <-ctx.Done():
 			logger.Info("worker_stopped")

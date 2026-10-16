@@ -32,6 +32,9 @@ import com.capital.accounting.finance.AdjustmentPanel
 import com.capital.accounting.finance.RefundPanel
 import com.capital.accounting.finance.TransferPanel
 import com.capital.accounting.finance.TransactionPanel
+import com.capital.accounting.finance.PrivacyPanel
+import com.capital.accounting.finance.CsvPanel
+import com.capital.accounting.finance.AnalyticsPanel
 import com.capital.accounting.finance.CatalogPanel
 
 class MainActivity : ComponentActivity() {
@@ -44,6 +47,7 @@ class MainActivity : ComponentActivity() {
             var origin by remember(state.origin) { mutableStateOf(state.origin) }
             var email by remember { mutableStateOf("") }
             var password by remember { mutableStateOf("") }
+            var emailCode by remember { mutableStateOf("") }
             var device by remember { mutableStateOf("Android") }
             val section = rememberSaveable(state.origin, state.auth?.profile?.id, state.auth?.workspace?.id) { mutableStateOf("accounts") }
             val createRouter = remember(state.origin, state.auth?.profile?.id, state.auth?.workspace?.id) { FinancialCreateRouter() }
@@ -57,6 +61,7 @@ class MainActivity : ComponentActivity() {
                             Column(Modifier.weight(1f).safeDrawingPadding().imePadding().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                                 Text("Capital", style = MaterialTheme.typography.headlineLarge)
                                 Text("Ручной учет финансов")
+                                Text("Доступны ручной ввод и CSV. Банковские подключения пока недоступны.")
                                 if (state.message.isNotEmpty()) Text(state.message)
                                 if (state.busy) CircularProgressIndicator()
                                 if (state.revokePendingId != null) {
@@ -91,6 +96,9 @@ class MainActivity : ComponentActivity() {
                                     Button(enabled = !state.busy && !state.financeBlocked, onClick = model::renew) { Text("Продлить сессию") }
                                     Button(enabled = !state.busy && (!state.financeBlocked || (state.offline && state.financialCommand == null && state.localPending == 0 && state.localBlocked == 0)), onClick = model::logout) { Text("Выйти") }
                                     if (section.value == "more") {
+                                        AnalyticsPanel(model)
+                                        CsvPanel(model)
+                                        PrivacyPanel(model)
                                         Text("Профиль: ${state.auth.profile.email}")
                                         Text("Часовой пояс профиля: ${state.auth.profile.timezone}")
                                         Text("Устройства", style = MaterialTheme.typography.titleLarge)
@@ -125,6 +133,11 @@ class MainActivity : ComponentActivity() {
                                         OutlinedTextField(device, { device = it }, label = { Text("Название устройства") }, singleLine = true, modifier = Modifier.fillMaxWidth(), enabled = !state.busy)
                                         Button(enabled = !state.busy && origin == state.origin && email.isNotBlank() && password.isNotEmpty() && device.isNotBlank(), onClick = { model.authenticate(email, password, device, false); password = "" }) { Text("Войти") }
                                         Button(enabled = !state.busy && origin == state.origin && email.isNotBlank() && password.isNotEmpty() && device.isNotBlank(), onClick = { model.authenticate(email, password, device, true); password = "" }) { Text("Зарегистрироваться") }
+                                        Button(enabled = !state.busy && origin == state.origin && email.isNotBlank(), onClick = { model.requestPasswordRecovery(email); password = ""; emailCode = "" }) { Text("Забыли пароль?") }
+                                        if (state.emailStep.isNotEmpty()) {
+                                            OutlinedTextField(emailCode, { emailCode = it }, label = { Text("Код из письма") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii, autoCorrectEnabled = false), singleLine = true, modifier = Modifier.fillMaxWidth(), enabled = !state.busy)
+                                            Button(enabled = !state.busy && origin == state.origin && emailCode.length == 43 && password.length >= 12 && device.isNotBlank(), onClick = { model.confirmEmail(email, emailCode, password, device); password = ""; emailCode = "" }) { Text(if (state.emailStep == "registration") "Подтвердить регистрацию" else "Сохранить новый пароль") }
+                                        }
                                     }
                                 }
                             }

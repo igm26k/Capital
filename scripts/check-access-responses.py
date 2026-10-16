@@ -11,7 +11,7 @@ expected = {(method.upper(), path) for path, operations in contract['paths'].ite
 seen = {(item['method'], item['path']) for item in responses}
 missing = expected - seen
 assert not missing, f'Untested API operations: {sorted(missing)}'
-public = {('POST', '/auth/register'), ('POST', '/auth/login')}
+public = {('POST', '/auth/register'), ('POST', '/auth/login'), ('POST', '/auth/registration/confirm'), ('POST', '/auth/recovery/request'), ('POST', '/auth/recovery/confirm')}
 unauthenticated = {(item['method'], item['path']) for item in responses
                    if item['status'] == 401 and item['body'].get('code') == 'unauthenticated'}
 missing_guards = (expected - public) - unauthenticated

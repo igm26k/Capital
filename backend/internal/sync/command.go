@@ -57,6 +57,18 @@ func newUUID() string {
 
 // The callback may only change this PostgreSQL transaction: retries must not repeat external effects.
 func (r *Runner) Execute(ctx context.Context, request Request, command Command) (Result, error) {
+	return r.execute(ctx, request, command, func(callback func(pgx.Tx, identity.Principal) error) error {
+		return r.Identity.WithSession(ctx, request.Credential, false, callback)
+	})
+}
+
+// ExecuteForWorker uses a session recorded by an authenticated job submission, never a client-selected identity.
+func (r *Runner) ExecuteForWorker(ctx context.Context, request Request, sessionID string, command Command) (Result, error) {
+	return r.execute(ctx, request, command, func(callback func(pgx.Tx, identity.Principal) error) error {
+		return r.Identity.WithWorkerSession(ctx, sessionID, callback)
+	})
+}
+func (r *Runner) execute(ctx context.Context, request Request, command Command, authorized func(func(pgx.Tx, identity.Principal) error) error) (Result, error) {
 	if !uuidPattern.MatchString(request.RequestID) || !uuidPattern.MatchString(request.WorkspaceID) || !uuidPattern.MatchString(request.ActionID) || !uuidPattern.MatchString(request.GenerationID) || command == nil {
 		return Result{}, problem(400, "bad_request")
 	}
@@ -74,7 +86,7 @@ func (r *Runner) Execute(ctx context.Context, request Request, command Command) 
 	}
 	for attempt := 0; attempt < 3; attempt++ {
 		var result Result
-		err := r.Identity.WithSession(ctx, request.Credential, false, func(tx pgx.Tx, p identity.Principal) error {
+		err := authorized(func(tx pgx.Tx, p identity.Principal) error {
 			if request.Authorize != nil {
 				if e := request.Authorize(p); e != nil {
 					return e

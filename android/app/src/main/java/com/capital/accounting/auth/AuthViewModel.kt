@@ -59,7 +59,7 @@ data class ClassificationReceipt(val commandId: String, val ids: Set<String>)
 
 data class AuthState(
     val origin: String = "", val busy: Boolean = true, val message: String = "",
-    val auth: BearerAuth? = null, val restorePending: Boolean = false,
+    val auth: BearerAuth? = null, val restorePending: Boolean = false, val emailStep: String = "",
     val logoutPending: Boolean = false, val persisted: Boolean = true,
     val sessions: List<Session> = emptyList(), val revokePendingId: String? = null,
     val accounts: List<Account> = emptyList(), val transactions: List<Transaction> = emptyList(), val categories: List<Category> = emptyList(), val tags: List<Tag> = emptyList(), val financialCommand: FinancialCommand? = null,
@@ -116,10 +116,44 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val body = if (register) ApiClient.json.encodeToString(Register(email, password, device, "bearer", TimeZone.getDefault().id))
                     else ApiClient.json.encodeToString(Login(email, password, device, "bearer"))
-                val result = decodeResponse<BearerAuth>(ApiClient(origin).request(if (register) "/auth/register" else "/auth/login", "POST", body))
-                accept(result, origin)
+                val response = ApiClient(origin).request(if (register) "/auth/register" else "/auth/login", "POST", body)
+                if (register && ApiClient.json.parseToJsonElement(response).jsonObject["status"]?.jsonPrimitive?.content == "confirmation_required") {
+                    decodeResponse<EmailChallenge>(response)
+                    state = AuthState(origin, busy = false, emailStep = "registration", message = "Если запрос можно подтвердить, письмо с кодом будет отправлено. Повторите исходный пароль и введите код. Код действует 30 минут.")
+                } else accept(decodeResponse<BearerAuth>(response), origin)
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) { state = AuthState(origin, busy = false, message = errorMessage(e, authAttempt = true)) }
+        }
+    }
+
+    fun requestPasswordRecovery(email: String) {
+        if (state.busy || state.auth != null || state.origin.isEmpty()) return
+        val origin = state.origin
+        state = AuthState(origin)
+        viewModelScope.launch {
+            try {
+                decodeResponse<EmailChallenge>(ApiClient(origin).request("/auth/recovery/request", "POST", ApiClient.json.encodeToString(RecoveryRequest(email))))
+                state = AuthState(origin, busy = false, emailStep = "recovery", message = "Если запрос можно подтвердить, письмо с кодом будет отправлено. Введите код и новый пароль длиной от 12 символов.")
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { state = AuthState(origin, busy = false, message = errorMessage(e)) }
+        }
+    }
+    fun confirmEmail(email: String, code: String, password: String, device: String) {
+        if (state.busy || state.auth != null || state.emailStep.isEmpty()) return
+        val origin = state.origin
+        val step = state.emailStep
+        state = AuthState(origin, emailStep = step)
+        viewModelScope.launch {
+            try {
+                if (step == "registration") {
+                    val result = decodeResponse<BearerAuth>(ApiClient(origin).request("/auth/registration/confirm", "POST", ApiClient.json.encodeToString(RegistrationConfirm(email, password, device, "bearer", code))))
+                    accept(result, origin)
+                } else {
+                    decodeResponse<PasswordChanged>(ApiClient(origin).request("/auth/recovery/confirm", "POST", ApiClient.json.encodeToString(RecoveryConfirm(email, code, password))))
+                    expireSession(origin, "Пароль изменён, прежние сессии отозваны. Войдите с новым паролем.")
+                }
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { state = AuthState(origin, busy = false, emailStep = step, message = if (e is ApiFailure && e.code == "confirmation_invalid") "Код недействителен, истёк или пароль регистрации не совпадает. После потерянного ответа попробуйте обычный вход." else errorMessage(e)) }
         }
     }
 
@@ -387,6 +421,64 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         app.credentialVault.clear()
         candidate = null
         state = AuthState(origin, busy = false, message = message)
+    }
+
+
+
+    /** Actual401 from auxiliary screens must hide the same cached financial scope. */
+    fun sessionUnauthorized(sessionId: String) {
+        val auth = state.auth ?: return
+        if (auth.session.id != sessionId) return
+        val origin = state.origin
+        candidate = null
+        state = AuthState(origin,busy=true,message="Сессия завершена. Войдите снова.")
+        viewModelScope.launch {
+            try {
+                try {
+                    val scope = com.capital.accounting.data.MirrorScope(origin,auth.profile.id,auth.workspace.id)
+                    app.database.identities().remove(scope.key)
+                } catch (e: CancellationException) { throw e }
+                catch (_: Exception) { /* Vault cleanup below remains independent. */ }
+                val current = (app.credentialVault.load(origin) as? VaultRead.Available)?.session
+                if (current?.sessionId == sessionId) app.credentialVault.clear()
+            } catch (e: CancellationException) { throw e }
+            catch (_: Exception) { /* Financial data stays hidden in this process. */ }
+            finally { state = AuthState(origin,busy=false,message="Сессия завершена. Войдите снова.") }
+        }
+    }
+
+    fun deleteUserData(password: String, confirmation: String) {
+        val saved = candidate ?: return
+        if (state.busy || !state.persisted || confirmation != "DELETE") return
+        state = state.copy(busy = true, message = "")
+        viewModelScope.launch {
+            try {
+                val body = org.json.JSONObject().put("password", password).put("confirmation", confirmation).toString()
+                ApiClient(saved.origin).request("/me", "DELETE", body, saved)
+                app.credentialVault.clear()
+                candidate = null
+                state = AuthState(saved.origin,busy=true,message="Профиль удалён. Очистка данных устройства…")
+                com.capital.accounting.sync.SyncGate.serialized(com.capital.accounting.data.MirrorScope(saved.origin, saved.ownerId, saved.workspaceId)) {
+                    val scope = com.capital.accounting.data.MirrorScope(saved.origin, saved.ownerId, saved.workspaceId)
+                    app.database.withTransaction {
+                        val db = app.database.openHelper.writableDatabase
+                        for (table in listOf("outbox_commands", "cached_identities", "opening_links", "snapshot_records", "snapshot_tokens", "snapshot_stages", "snapshot_attempts", "mirror_changes", "mirror_tombstones", "mirror_records", "mirror_heads")) db.execSQL("DELETE FROM $table WHERE scope=?", arrayOf(scope.key))
+                        db.execSQL("DELETE FROM financial_commands WHERE origin=? AND ownerId=? AND workspaceId=?", arrayOf(saved.origin,saved.ownerId,saved.workspaceId))
+                    }
+                }
+                app.financialDrafts.erase(saved.origin,saved.ownerId,saved.workspaceId)
+                com.capital.accounting.finance.PlanningStore(app).eraseAfterAccountDeletion(saved)
+                com.capital.accounting.finance.PlanningStore(app,"csv").eraseAfterAccountDeletion(saved)
+                app.getSharedPreferences("csv_jobs",0).edit().remove(com.capital.accounting.finance.csvJobKey(saved)).apply()
+                candidate = null
+                state = AuthState(saved.origin,busy=false,message="Профиль и личные данные удалены.")
+            } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+            catch (e: Exception) {
+                if (e is ApiFailure && e.status == 401) { sessionUnauthorized(saved.sessionId); return@launch }
+                state = if (candidate == null) AuthState(saved.origin,busy=false,message="Профиль удалён; очистка локальных данных требует проверки.")
+                else state.copy(busy=false,message="Не удалось подтвердить удаление. Проверьте соединение и пароль; при необходимости войдите снова.")
+            }
+        }
     }
 
     fun revokeSession(id: String) {
@@ -789,7 +881,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
 
 private fun errorMessage(error: Exception, authAttempt: Boolean = false): String = when {
     error is ApiFailure && error.status == 401 -> "Неверный email или пароль либо сессия завершена."
-    error is ApiFailure && error.code == "registration_disabled" -> "Регистрация на этом сервере выключена."
+    error is ApiFailure && error.code == "registration_disabled" -> "Эта возможность на сервере выключена. Обратитесь к владельцу сервера."
     error is ApiFailure && error.status == 429 -> "Слишком много попыток. Попробуйте позже."
     error is ApiFailure && error.status in 400..499 -> "Сервер отклонил запрос. Проверьте введенные данные."
     authAttempt -> "Ответ не получен. Вход мог выполниться. Повторите вход после восстановления связи."

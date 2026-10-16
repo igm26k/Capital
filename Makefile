@@ -4,6 +4,7 @@ TEST_COMPOSE = docker compose --project-name accounting-test -f compose.yaml -f 
 check-contracts:
 	python3 contracts/check_contracts.py
 	python3 contracts/fixtures/check_financial_model.py
+	python3 scripts/check-report-fixtures.py
 backend-check:
 	cd backend && test -z "$$(gofmt -l .)" && go vet ./... && go test ./... && go build ./cmd/api ./cmd/worker ./cmd/migrate
 web-check:
@@ -96,3 +97,27 @@ android-auth-e2e:
 .PHONY: android-web-e2e
 android-web-e2e:
 	./scripts/android-web-e2e.sh
+
+.PHONY: android-offline-web-e2e
+android-offline-web-e2e:
+	ANDROID_WEB_SCENARIO=offline ./scripts/android-web-e2e.sh
+
+.PHONY: reports-check
+reports-check:
+	mkdir -p ops/.runtime/checks
+	$(TEST_COMPOSE) --profile checks run --build --rm --user "$$(id -u):$$(id -g)" reports-check
+	python3 scripts/check-ledger-responses.py ops/.runtime/checks/report-responses.json
+	python3 scripts/check-ledger-responses.py ops/.runtime/checks/planning-responses.json
+	python3 scripts/check-ledger-responses.py ops/.runtime/checks/csv-responses.json
+	python3 scripts/check-ledger-responses.py ops/.runtime/checks/user-data-responses.json
+	python3 scripts/check-ledger-responses.py ops/.runtime/checks/email-responses.json
+
+.PHONY: email-auth-e2e
+email-auth-e2e:
+	./scripts/email-auth-e2e.sh
+
+.PHONY: ops-unit ops-check
+ops-unit:
+	python3 -m unittest discover -s tests/ops -v
+ops-check: ops-unit
+	python3 tests/ops/check_real_backup.py

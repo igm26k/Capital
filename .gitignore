@@ -10,3 +10,12 @@ android/.gradle/
 android/.kotlin/
 android/**/build/
 android/local.properties
+
+# Release signing material must never enter source control.
+*.jks
+*.keystore
+*.p12
+*.pfx
+
+__pycache__/
+*.py[cod]

@@ -57,7 +57,7 @@ test('real cookie session, ledger, lost-response retry, container restart and te
   await page.getByRole('button', { name: 'Повторить ту же команду', exact: true }).click();
   await expect(page.getByText('987,66 EUR', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Повторить ту же команду', exact: true })).toHaveCount(0);
-  expect(requests).toHaveLength(2); expect(requests[1]).toEqual(requests[0]); expect(replayed).toBe(true);
+  expect(requests).toHaveLength(2); expect(requests[1]).toEqual(requests[0]); await expect.poll(() => replayed).toBe(true);
   await expect(page.getByText(note, { exact: true })).toBeVisible();
   await expect(page.locator('img')).toHaveCount(0);
   expect(await page.evaluate(() => Reflect.get(window, 'accountingXss'))).toBeUndefined();

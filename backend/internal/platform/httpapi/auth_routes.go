@@ -26,6 +26,8 @@ import (
 type AuthOptions struct {
 	CursorKeys             *commands.CursorKeys
 	Origin                 string
+	Verification           bool
+	EmailKey               []byte
 	Registration           bool
 	IPAttemptsPerMinute    int
 	EmailAttemptsPerMinute int
@@ -77,7 +79,10 @@ func MountAuth(mux *http.ServeMux, service *identity.Service, options AuthOption
 	a := &authRoutes{service: service, options: options}
 	mux.HandleFunc("POST /api/v1/auth/register", a.register)
 	mux.HandleFunc("POST /api/v1/auth/login", a.login)
-	for _, route := range []string{"GET /api/v1/auth/session", "POST /api/v1/auth/renew", "POST /api/v1/auth/logout", "GET /api/v1/me", "PUT /api/v1/me", "DELETE /api/v1/sessions/{id}", "GET /api/v1/sessions", "GET /api/v1/workspaces"} {
+	mux.HandleFunc("POST /api/v1/auth/registration/confirm", a.confirmRegistration)
+	mux.HandleFunc("POST /api/v1/auth/recovery/request", a.requestRecovery)
+	mux.HandleFunc("POST /api/v1/auth/recovery/confirm", a.confirmRecovery)
+	for _, route := range []string{"GET /api/v1/auth/session", "POST /api/v1/auth/renew", "POST /api/v1/auth/logout", "GET /api/v1/me", "GET /api/v1/me/export", "DELETE /api/v1/me", "PUT /api/v1/me", "DELETE /api/v1/sessions/{id}", "GET /api/v1/sessions", "GET /api/v1/workspaces"} {
 		mux.HandleFunc(route, a.private)
 	}
 }
@@ -281,6 +286,15 @@ func (a *authRoutes) public(w http.ResponseWriter, r *http.Request, registration
 	}
 	var result identity.Auth
 	if registration {
+		if a.options.Verification {
+			e = a.service.StartEmailAuth(r.Context(), a.options.EmailKey, v["email"], "registration", v["password"], v["timezone"])
+			if e != nil {
+				reject(w, e)
+				return
+			}
+			respond(w, 202, map[string]string{"status": "confirmation_required"})
+			return
+		}
 		result, e = a.service.Register(r.Context(), v["email"], v["password"], v["device_name"], v["timezone"])
 	} else {
 		result, e = a.service.Login(r.Context(), v["email"], v["password"], v["device_name"])
@@ -350,7 +364,13 @@ func (a *authRoutes) private(w http.ResponseWriter, r *http.Request) {
 	var result any
 	var auth *identity.Auth
 	clear := false
-	e = a.service.WithSession(r.Context(), token, write, func(tx pgx.Tx, p identity.Principal) error {
+	authorize := func(callback func(pgx.Tx, identity.Principal) error) error {
+		if r.URL.Path == "/api/v1/me/export" {
+			return a.service.WithSessionIsolation(r.Context(), token, pgx.RepeatableRead, callback)
+		}
+		return a.service.WithSession(r.Context(), token, write, callback)
+	}
+	e = authorize(func(tx pgx.Tx, p identity.Principal) error {
 		if transport == "cookie" && write {
 			sum := sha256.Sum256([]byte(r.Header.Get("X-CSRF-Token")))
 			if len(r.Header.Values("Origin")) != 1 || r.Header.Get("Origin") != a.options.Origin || len(r.Header.Values("X-CSRF-Token")) != 1 || subtle.ConstantTimeCompare(sum[:], p.CSRFHash) != 1 {
@@ -373,6 +393,29 @@ func (a *authRoutes) private(w http.ResponseWriter, r *http.Request) {
 			auth = &a
 		case r.URL.Path == "/api/v1/auth/logout":
 			if err := identity.Revoke(r.Context(), tx, p.Profile.ID, p.Session.ID); err != nil {
+				return err
+			}
+			result = map[string]bool{"ok": true}
+			clear = transport == "cookie"
+
+		case r.URL.Path == "/api/v1/me/export":
+			value, err := identity.ExportUserData(r.Context(), tx, p)
+			if err != nil {
+				return err
+			}
+			result = value
+		case r.URL.Path == "/api/v1/me" && r.Method == "DELETE":
+			if !a.limiter.allow("delete:"+p.Profile.ID, 5) {
+				return fail(429, "rate_limited")
+			}
+			v, err := fields(w, r, "password", "confirmation")
+			if err != nil {
+				return err
+			}
+			if len(v["password"]) > 128 || v["confirmation"] != "DELETE" {
+				return fail(422, "validation_error")
+			}
+			if err := a.service.DeleteUserData(r.Context(), tx, p, v["password"]); err != nil {
 				return err
 			}
 			result = map[string]bool{"ok": true}

@@ -31,7 +31,9 @@ class ApiClient(origin: String) {
         require(maxResponseBytes in 1..65 * 1024 * 1024)
         require(maxResponseBytes <= 2 * 1024 * 1024 ||
             (maxResponseBytes <= 4 * 1024 * 1024 && Regex("/workspaces/[0-9a-f-]{36}/sync/changes").matches(path.substringBefore('?'))) ||
-            Regex("/workspaces/[0-9a-f-]{36}/sync/snapshots/[0-9a-f-]{36}/pages").matches(path.substringBefore('?')))
+            Regex("/workspaces/[0-9a-f-]{36}/sync/snapshots/[0-9a-f-]{36}/pages").matches(path.substringBefore('?')) ||
+            (maxResponseBytes <= 16 * 1024 * 1024 && path.substringBefore('?') == "/me/export") ||
+            (maxResponseBytes <= 16 * 1024 * 1024 && Regex("/workspaces/[0-9a-f-]{36}/exports").matches(path.substringBefore('?'))))
         require(session == null || session.origin == origin)
         require((commandId == null) == (generationId == null))
         if (commandId != null) {

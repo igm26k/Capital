@@ -55,7 +55,7 @@ services:
     environment:
       <<: *test-env
       VERTICAL_RESPONSE_FILE: /output/vertical-backend.json
-    volumes: ["./ops/.runtime/checks:/output"]
+    volumes: ["./ops/.runtime/checks:/output", "go-check-cache:/tmp/accounting-go-check-build"]
     networks: [private]
     depends_on:
       db: {condition: service_healthy}
@@ -68,7 +68,7 @@ services:
       GOCACHE: /tmp/accounting-go-check-build
       HOME: /tmp
       ADVANCED_RESPONSE_FILE: /output/ledger-advanced-responses.json
-    volumes: ["./ops/.runtime/checks:/output"]
+    volumes: ["./ops/.runtime/checks:/output", "go-check-cache:/tmp/accounting-go-check-build"]
     networks: [private]
     depends_on:
       db: {condition: service_healthy}
@@ -82,7 +82,7 @@ services:
       HOME: /tmp
       ACCESS_RESPONSE_ARTIFACT: /output/access-responses.json
       SESSION_RACE_RESPONSE_ARTIFACT: /output/session-race-responses.json
-    volumes: ["./ops/.runtime/checks:/output"]
+    volumes: ["./ops/.runtime/checks:/output", "go-check-cache:/tmp/accounting-go-check-build"]
     networks: [private]
     depends_on:
       db: {condition: service_healthy}
@@ -95,7 +95,7 @@ services:
       GOCACHE: /tmp/accounting-go-check-build
       HOME: /tmp
       SNAPSHOT_RESPONSE_ARTIFACT: /output/snapshot-responses.json
-    volumes: ["./ops/.runtime/checks:/output"]
+    volumes: ["./ops/.runtime/checks:/output", "go-check-cache:/tmp/accounting-go-check-build"]
     networks: [private]
     depends_on:
       db: {condition: service_healthy}
@@ -108,7 +108,7 @@ services:
       GOCACHE: /tmp/accounting-go-check-build
       HOME: /tmp
       PULL_RESPONSE_ARTIFACT: /output/pull-responses.json
-    volumes: ["./ops/.runtime/checks:/output"]
+    volumes: ["./ops/.runtime/checks:/output", "go-check-cache:/tmp/accounting-go-check-build"]
     networks: [private]
     depends_on:
       db: {condition: service_healthy}
@@ -119,11 +119,31 @@ services:
     environment:
       <<: *test-env
       LEDGER_RESPONSE_FILE: /output/ledger-responses.json
-    volumes: ["./ops/.runtime/checks:/output"]
+    volumes: ["./ops/.runtime/checks:/output", "go-check-cache:/tmp/accounting-go-check-build"]
     networks: [private]
     depends_on:
       db: {condition: service_healthy}
     profiles: [checks]
+  reports-check:
+    build: {context: ./backend, target: build}
+    command: [go, test, ./tests/integration, -run, '^Test(Reports|Planning|CSV|UserData|EmailAuth)$', -v, -count=1]
+    environment:
+      <<: *test-env
+      GOCACHE: /tmp/accounting-go-check-build
+      HOME: /tmp
+      REPORT_RESPONSE_ARTIFACT: /output/report-responses.json
+      PLANNING_RESPONSE_ARTIFACT: /output/planning-responses.json
+      CSV_RESPONSE_ARTIFACT: /output/csv-responses.json
+      USER_DATA_RESPONSE_ARTIFACT: /output/user-data-responses.json
+      EMAIL_RESPONSE_ARTIFACT: /output/email-responses.json
+    volumes: ["./ops/.runtime/checks:/output", "go-check-cache:/tmp/accounting-go-check-build"]
+    networks: [private]
+    depends_on:
+      db: {condition: service_healthy}
+    profiles: [checks]
+
+volumes:
+  go-check-cache: {}
 networks:
   private:
     ipam:

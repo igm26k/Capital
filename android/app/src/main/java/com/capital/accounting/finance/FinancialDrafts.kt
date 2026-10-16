@@ -44,6 +44,7 @@ class FinancialDrafts(context: Context) {
     private val executor = Executors.newSingleThreadExecutor()
     private val main = android.os.Handler(android.os.Looper.getMainLooper())
     private val scopes = ConcurrentHashMap<String, FinancialDraftScope>()
+    private val erased = java.util.Collections.newSetFromMap(ConcurrentHashMap<String, Boolean>())
 
     suspend fun open(origin: String, owner: String, workspace: String): FinancialDraftScope = withContext(Dispatchers.IO) {
         val identity = ApiClient.json.encodeToString(listOf(origin, owner, workspace))
@@ -70,6 +71,7 @@ class FinancialDrafts(context: Context) {
             } else emptyMap()
             val loaded = FinancialDraftScope(fields) { snapshot, complete ->
                 executor.execute {
+                    if (scope in erased) { main.post { complete(true) }; return@execute }
                     var stream: java.io.FileOutputStream? = null
                     try {
                         require(snapshot.size <= 256)
@@ -89,6 +91,18 @@ class FinancialDrafts(context: Context) {
                 }
             }
             scopes.putIfAbsent(scope, loaded) ?: loaded
+        }
+    }
+    suspend fun erase(origin: String, owner: String, workspace: String) = withContext(Dispatchers.IO) {
+        val identity = ApiClient.json.encodeToString(listOf(origin, owner, workspace))
+        val scope = MessageDigest.getInstance("SHA-256").digest(identity.toByteArray()).joinToString("") { "%02x".format(it) }
+        erased.add(scope)
+        kotlinx.coroutines.suspendCancellableCoroutine<Unit> { continuation ->
+            executor.execute {
+                scopes.remove(scope)
+                AtomicFile(File(directory, "$scope.json")).delete()
+                if (continuation.isActive) continuation.resumeWith(Result.success(Unit))
+            }
         }
     }
 }

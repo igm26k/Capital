@@ -459,6 +459,87 @@
       "id": "min_money",
       "schema": "Money",
       "data": "-9000000000000000"
+    },
+    {
+      "id": "budget_create",
+      "schema": "BudgetCreate",
+      "data": {
+        "id": "00000000-0000-4000-8000-000000000110",
+        "category_id": "00000000-0000-4000-8000-000000000003",
+        "currency": "EUR",
+        "month": "2026-10",
+        "limit_minor": "50000",
+        "name": "Food",
+        "timezone": "UTC"
+      }
+    },
+    {
+      "id": "import_preview_request",
+      "schema": "ImportCreate",
+      "data": {
+        "id": "00000000-0000-4000-8000-000000000111",
+        "format": "csv",
+        "content_base64": "ZGF0ZSxhbW91bnQK",
+        "mapping": {
+          "account_id": "00000000-0000-4000-8000-000000000002",
+          "date_column": "date",
+          "amount_column": "amount",
+          "payee_column": null,
+          "date_format": "YYYY-MM-DD",
+          "timezone": "Asia/Nicosia",
+          "delimiter": ",",
+          "encoding": "UTF-8",
+          "decimal_separator": ".",
+          "amount_convention": "signed_income_positive"
+        }
+      }
+    },
+    {
+      "id": "import_confirm",
+      "schema": "ImportConfirm",
+      "data": {
+        "expected_version": "1",
+        "decisions": [
+          {
+            "row_number": 2,
+            "action": "create",
+            "transaction_id": null,
+            "expected_transaction_version": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "verified-registration-confirm",
+      "schema": "RegistrationConfirm",
+      "data": {
+        "email": "owner@example.test",
+        "password": "synthetic verification password",
+        "device_name": "Synthetic phone",
+        "transport": "bearer",
+        "code": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+      }
+    },
+    {
+      "id": "verification-accepted",
+      "schema": "EmailChallenge",
+      "data": {
+        "status": "confirmation_required"
+      }
+    },
+    {
+      "id": "password-recovery-request",
+      "schema": "RecoveryRequest",
+      "data": {
+        "email": "owner@example.test"
+      }
+    },
+    {
+      "id": "password-changed",
+      "schema": "PasswordChanged",
+      "data": {
+        "status": "password_changed"
+      }
     }
   ],
   "invalid": [
@@ -780,6 +861,26 @@
       "id": "negative_zero",
       "schema": "Money",
       "data": "-0"
+    },
+    {
+      "id": "short-email-proof",
+      "schema": "RegistrationConfirm",
+      "data": {
+        "email": "owner@example.test",
+        "password": "synthetic verification password",
+        "device_name": "Synthetic phone",
+        "transport": "bearer",
+        "code": "123456"
+      }
+    },
+    {
+      "id": "weak-reset-password",
+      "schema": "RecoveryConfirm",
+      "data": {
+        "email": "owner@example.test",
+        "code": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "password": "short"
+      }
     }
   ],
   "events": [
@@ -930,53 +1031,5 @@
       "generation_id": "00000000-0000-4000-8000-000000000900"
     }
   ],
-  "future_valid": [
-    {
-      "id": "budget_create",
-      "schema": "BudgetCreate",
-      "data": {
-        "id": "00000000-0000-4000-8000-000000000110",
-        "category_id": null,
-        "currency": "EUR",
-        "month": "2026-10",
-        "limit_minor": "50000"
-      }
-    },
-    {
-      "id": "import_preview_request",
-      "schema": "ImportCreate",
-      "data": {
-        "id": "00000000-0000-4000-8000-000000000111",
-        "format": "csv",
-        "content_base64": "ZGF0ZSxhbW91bnQK",
-        "mapping": {
-          "account_id": "00000000-0000-4000-8000-000000000002",
-          "date_column": "date",
-          "amount_column": "amount",
-          "payee_column": null,
-          "date_format": "YYYY-MM-DD",
-          "timezone": "Asia/Nicosia",
-          "delimiter": ",",
-          "encoding": "UTF-8",
-          "decimal_separator": ".",
-          "amount_convention": "signed_income_positive"
-        }
-      }
-    },
-    {
-      "id": "import_confirm",
-      "schema": "ImportConfirm",
-      "data": {
-        "expected_version": "1",
-        "decisions": [
-          {
-            "row_number": 2,
-            "action": "create",
-            "transaction_id": null,
-            "expected_transaction_version": null
-          }
-        ]
-      }
-    }
-  ]
+  "future_valid": []
 }

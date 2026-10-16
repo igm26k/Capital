@@ -4,6 +4,9 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization")
     id("com.google.devtools.ksp")
 }
+val releaseSecrets = listOf("ACCOUNTING_RELEASE_STORE_FILE", "ACCOUNTING_RELEASE_STORE_PASSWORD", "ACCOUNTING_RELEASE_KEY_ALIAS", "ACCOUNTING_RELEASE_KEY_PASSWORD")
+    .map { providers.environmentVariable(it).orNull }
+require(releaseSecrets.all { it.isNullOrEmpty() } || releaseSecrets.all { !it.isNullOrEmpty() }) { "Provide all four ACCOUNTING_RELEASE signing variables, or none for an unsigned candidate." }
 android {
     namespace = "com.capital.accounting"
     compileSdk = 36
@@ -14,6 +17,17 @@ android {
         versionCode = 1
         versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+    if (releaseSecrets.all { !it.isNullOrEmpty() }) {
+        val providedStore = file(releaseSecrets[0]!!)
+        require(providedStore.isFile && providedStore.canRead()) { "Provided Android release keystore is unavailable." }
+        val providedSigning = signingConfigs.create("providedRelease") {
+            storeFile = providedStore
+            storePassword = releaseSecrets[1]
+            keyAlias = releaseSecrets[2]
+            keyPassword = releaseSecrets[3]
+        }
+        buildTypes.getByName("release").signingConfig = providedSigning
     }
     buildFeatures { compose = true }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }

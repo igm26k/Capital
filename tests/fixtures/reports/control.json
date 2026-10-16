@@ -1,0 +1,20 @@
+{
+  "period": {"from": "2026-09-01T00:00:00Z", "to": "2026-10-01T00:00:00Z"},
+  "rows": [
+    {"date":"2026-01-01T00:00:00Z","kind":"opening","status":"posted","currency":"EUR","entries":[10000]},
+    {"date":"2026-01-01T00:00:00Z","kind":"opening","status":"posted","currency":"EUR","entries":[10000]},
+    {"date":"2026-08-31T23:59:59.999999Z","kind":"expense","status":"posted","currency":"EUR","entries":[-99]},
+    {"date":"2026-09-01T00:00:00Z","kind":"expense","status":"posted","currency":"EUR","entries":[-1200],"parts":[500,700]},
+    {"date":"2026-09-15T00:00:00Z","kind":"income","status":"posted","currency":"EUR","entries":[3000]},
+    {"date":"2026-09-01T00:00:00Z","kind":"transfer","status":"posted","currency":"EUR","entries":[-100,100]},
+    {"date":"2026-09-01T00:00:00Z","kind":"refund","status":"posted","currency":"EUR","entries":[100]},
+    {"date":"2026-09-30T23:59:59.999999Z","kind":"expense","status":"pending","currency":"EUR","entries":[-200]},
+    {"date":"2026-10-01T00:00:00Z","kind":"expense","status":"posted","currency":"EUR","entries":[-500]},
+    {"date":"2026-01-01T00:00:00Z","kind":"opening","status":"posted","currency":"KWD","entries":[1234]},
+    {"date":"2026-09-16T00:00:00Z","kind":"expense","status":"posted","currency":"KWD","entries":[-22]}
+  ],
+  "expected": {
+    "EUR": {"income":3000,"expense":1300,"posted_expense":1100,"pending_expense":200,"opening":19901,"closing":21801,"projected":21601},
+    "KWD": {"income":0,"expense":22,"posted_expense":22,"pending_expense":0,"opening":1234,"closing":1212,"projected":1212}
+  }
+}

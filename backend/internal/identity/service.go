@@ -227,10 +227,40 @@ func (s *Service) WithSession(ctx context.Context, credential string, exclusive 
 
 // WithSessionIsolation holds the same access locks in a single consistent snapshot.
 func (s *Service) WithSessionIsolation(ctx context.Context, credential string, isolation pgx.TxIsoLevel, callback func(pgx.Tx, Principal) error) error {
-	return s.withSession(ctx, credential, false, isolation, callback)
+	var err error
+	for attempt := 0; attempt < 3; attempt++ {
+		err = s.withSession(ctx, credential, false, isolation, callback)
+		if err == nil {
+			return nil
+		}
+		var databaseError *pgconn.PgError
+		var serviceError *Error
+		retryable := errors.As(err, &databaseError) && (databaseError.Code == "40001" || databaseError.Code == "40P01") || errors.As(err, &serviceError) && serviceError.Status == 503
+		if !retryable || ctx.Err() != nil {
+			return err
+		}
+	}
+	return err
 }
 func (s *Service) withSession(ctx context.Context, credential string, exclusive bool, isolation pgx.TxIsoLevel, callback func(pgx.Tx, Principal) error) error {
-	hash := digest(credential)
+	return s.withSessionHash(ctx, digest(credential), exclusive, isolation, callback)
+}
+
+// WithWorkerSession authorizes a durable job by its server-recorded issuing session.
+// It accepts no bearer secret and is never exposed through HTTP request parameters.
+func (s *Service) WithWorkerSession(ctx context.Context, id string, callback func(pgx.Tx, Principal) error) error {
+	var hash []byte
+	if err := s.DB.QueryRow(ctx, `SELECT token_hash FROM sessions WHERE id=$1`, id).Scan(&hash); err != nil {
+		return failure(401, "unauthenticated")
+	}
+	return s.withSessionHash(ctx, hash, false, pgx.ReadCommitted, func(tx pgx.Tx, p Principal) error {
+		if p.Session.ID != id {
+			return failure(401, "unauthenticated")
+		}
+		return callback(tx, p)
+	})
+}
+func (s *Service) withSessionHash(ctx context.Context, hash []byte, exclusive bool, isolation pgx.TxIsoLevel, callback func(pgx.Tx, Principal) error) error {
 	var candidate string
 	err := s.DB.QueryRow(ctx, `SELECT user_id::text FROM sessions WHERE token_hash=$1`, hash).Scan(&candidate)
 	if errors.Is(err, pgx.ErrNoRows) {

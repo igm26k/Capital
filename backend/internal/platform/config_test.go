@@ -46,6 +46,8 @@ func TestProductionRequiresVerifiedTLS(t *testing.T) {
 		t.Fatal("unverified database transport accepted")
 	}
 	values["DATABASE_URL"] = "postgres://app:example@database/accounting?sslmode=verify-full"
+	values["SYNC_CURSOR_ACTIVE_KEY"] = "v1"
+	values["SYNC_CURSOR_KEYS"] = `{"v1":"AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE="}`
 	if _, err := configFrom(values); err != nil {
 		t.Fatal(err)
 	}
@@ -76,5 +78,29 @@ func TestCursorKeyConfiguration(t *testing.T) {
 		if _, e = configFrom(values); e == nil || strings.Contains(e.Error(), "secret") {
 			t.Fatal("invalid key configuration accepted or disclosed")
 		}
+	}
+}
+
+func TestPublicRegistrationNeedsEmailConfiguration(t *testing.T) {
+	values := map[string]string{"DATABASE_URL": "postgres://app:example@database/accounting?sslmode=verify-full", "APP_ENV": "production", "PUBLIC_ORIGIN": "https://accounting.example.test", "REGISTRATION_ENABLED": "true", "AUTH_EMAIL_VERIFICATION": "true", "AUTH_EMAIL_KEY": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=", "SMTP_ADDRESS": "smtp.example.test:587", "SMTP_FROM": "support@example.test", "SMTP_MODE": "starttls"}
+	values["SYNC_CURSOR_ACTIVE_KEY"] = "v1"
+	values["SYNC_CURSOR_KEYS"] = `{"v1":"AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE="}`
+	if cfg, err := configFrom(values); err != nil || !cfg.EmailVerification || !cfg.RegistrationEnabled {
+		t.Fatal("verified production registration unavailable", err)
+	}
+	for _, field := range []string{"AUTH_EMAIL_KEY", "SMTP_ADDRESS", "SMTP_FROM", "SMTP_MODE"} {
+		saved := values[field]
+		values[field] = "invalid"
+		if _, err := configFrom(values); err == nil {
+			t.Fatal("invalid email configuration accepted", field)
+		}
+		values[field] = saved
+	}
+}
+
+func TestProductionRejectsMissingCursorKeys(t *testing.T) {
+	_, err := configFrom(map[string]string{"APP_ENV": "production", "DATABASE_URL": "postgres://app:example@database/accounting?sslmode=verify-full", "PUBLIC_ORIGIN": "https://accounting.example.test"})
+	if err == nil {
+		t.Fatal("production started with unavailable sync")
 	}
 }

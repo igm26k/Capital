@@ -9,6 +9,8 @@ import java.io.IOException
 import java.net.URLEncoder
 import java.util.UUID
 
+private class SnapshotGenerationChanged : IOException("Sync generation changed")
+
 /** Read-only bootstrap; it never sends, rebinds or acknowledges financial commands. */
 class SnapshotBootstrap(private val db: CapitalDatabase) {
     suspend fun load(session: StoredSession): ConfirmedMirror = SyncGate.serialized(MirrorScope(session.origin, session.ownerId, session.workspaceId)) { loadLocked(session) }
@@ -20,7 +22,7 @@ class SnapshotBootstrap(private val db: CapitalDatabase) {
             val root = "/workspaces/${session.workspaceId}/sync/snapshots"
             suspend fun generation(): String {
                 val auth = decodeResponse<BearerAuth>(api.request("/auth/session", session = session))
-                require(auth.profile.id == session.ownerId && auth.workspace.id == session.workspaceId && auth.session.id == session.sessionId)
+                require(auth.profile.id == session.ownerId && auth.workspace.id == session.workspaceId && auth.session.id == session.sessionId && auth.session.is_current)
                 return auth.workspace.sync_generation_id
             }
             repeat(2) {
@@ -34,7 +36,7 @@ class SnapshotBootstrap(private val db: CapitalDatabase) {
                         ApiClient.json.encodeToString(SnapshotCreate(attempt.snapshot)), session, attempt.snapshot, liveGeneration))
                     else decodeResponse(api.request("$root/${attempt.snapshot}", session = session))
                     require(metadata.id == attempt.snapshot && metadata.workspace_id == scope.workspace)
-                    if (metadata.generation_id != liveGeneration) throw IOException("Sync generation changed")
+                    if (metadata.generation_id != liveGeneration) throw SnapshotGenerationChanged()
                     SnapshotStore(db).begin(scope, metadata)
                     while (true) {
                         val progress = requireNotNull(db.snapshots().stage(scope.key))
@@ -45,7 +47,7 @@ class SnapshotBootstrap(private val db: CapitalDatabase) {
                             session = session, maxResponseBytes = 65 * 1024 * 1024))
                         SnapshotStore(db).append(scope, token, page)
                     }
-                    if (generation() != metadata.generation_id) throw IOException("Sync generation changed")
+                    if (generation() != metadata.generation_id) throw SnapshotGenerationChanged()
                     db.withTransaction {
                         SnapshotStore(db).install(scope)
                         require(db.snapshots().finish(scope.key, attempt.snapshot) == 1)
@@ -59,8 +61,14 @@ class SnapshotBootstrap(private val db: CapitalDatabase) {
                         require(db.snapshots().finish(scope.key, attempt.snapshot) == 1)
                         newer
                     }
+                } catch (e: SnapshotGenerationChanged) {
+                    db.withTransaction {
+                        SnapshotStore(db).discard(scope, attempt.snapshot)
+                        db.snapshots().finish(scope.key, attempt.snapshot)
+                    }
                 } catch (e: ApiFailure) {
-                    if (e.status != 410 || e.code != "snapshot_expired") throw e
+                    if (!(e.status == 410 && e.code == "snapshot_expired") &&
+                        !(e.status == 409 && e.code == "sync_generation_conflict")) throw e
                     db.withTransaction {
                         SnapshotStore(db).discard(scope, attempt.snapshot)
                         db.snapshots().finish(scope.key, attempt.snapshot)

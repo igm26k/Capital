@@ -1,0 +1,16 @@
+[Unit]
+Description=Accounting PostgreSQL backup and retention
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=accounting
+Group=accounting
+WorkingDirectory=/opt/accounting
+EnvironmentFile=/etc/accounting/backup.env
+UMask=0077
+ExecStart=/usr/bin/python3 /opt/accounting/ops/backup_cycle.py prod --directory ${ACCOUNTING_BACKUP_DIR} --offsite ${ACCOUNTING_OFFSITE_DIR} --recipients ${ACCOUNTING_AGE_RECIPIENTS} --signing-key ${ACCOUNTING_BACKUP_SIGNING_KEY} --trusted-signing-keys ${ACCOUNTING_BACKUP_VERIFICATION_KEYS}
+NoNewPrivileges=true
+PrivateTmp=true

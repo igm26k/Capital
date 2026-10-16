@@ -4,7 +4,16 @@ x-prod-env: &prod-env
   DATABASE_URL: ${PRODUCTION_DATABASE_URL:?Provide URL with sslmode=verify-full and sslrootcert=/etc/accounting/db-tls/ca.crt}
   HTTP_ADDR: 0.0.0.0:8080
   PUBLIC_ORIGIN: ${PRODUCTION_PUBLIC_ORIGIN:?Provide public HTTPS origin}
-  REGISTRATION_ENABLED: 'false'
+  SYNC_CURSOR_ACTIVE_KEY: ${SYNC_CURSOR_ACTIVE_KEY:?Provide active persistent sync signing key id}
+  SYNC_CURSOR_KEYS: ${SYNC_CURSOR_KEYS:?Provide persistent sync signing keys JSON}
+  REGISTRATION_ENABLED: ${PRODUCTION_REGISTRATION_ENABLED:-false}
+  AUTH_EMAIL_VERIFICATION: ${AUTH_EMAIL_VERIFICATION:-false}
+  AUTH_EMAIL_KEY: ${AUTH_EMAIL_KEY:-}
+  SMTP_ADDRESS: ${SMTP_ADDRESS:-}
+  SMTP_USERNAME: ${SMTP_USERNAME:-}
+  SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+  SMTP_FROM: ${SMTP_FROM:-}
+  SMTP_MODE: ${SMTP_MODE:-starttls}
 services:
   db:
     command: [postgres, -c, ssl=on, -c, ssl_cert_file=/etc/postgresql/tls/server.crt, -c, ssl_key_file=/etc/postgresql/tls/server.key]

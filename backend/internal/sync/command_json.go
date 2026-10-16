@@ -164,7 +164,12 @@ func canonicalValue(d *json.Decoder, depth int) (string, error) {
 	return "", errors.New("invalid JSON value")
 }
 func CanonicalJSON(body []byte) ([]byte, error) {
-	if len(body) > 1048576 || !json.Valid(body) || !validUnicode(body) {
+	return CanonicalJSONLimit(body, 1048576)
+}
+
+// CanonicalJSONLimit preserves strict wire validation for bounded auxiliary uploads.
+func CanonicalJSONLimit(body []byte, limit int64) ([]byte, error) {
+	if int64(len(body)) > limit || !json.Valid(body) || !validUnicode(body) {
 		return nil, errors.New("invalid command JSON")
 	}
 	d := json.NewDecoder(bytes.NewReader(body))
@@ -182,13 +187,17 @@ func CanonicalJSON(body []byte) ([]byte, error) {
 	return []byte(v), nil
 }
 func RequestHash(method, path, generation string, body []byte) ([32]byte, error) {
+	return RequestHashLimit(method, path, generation, body, 1048576)
+}
+
+func RequestHashLimit(method, path, generation string, body []byte, limit int64) ([32]byte, error) {
 	if method != "POST" && method != "PUT" && method != "DELETE" {
 		return [32]byte{}, errors.New("invalid command method")
 	}
 	if !strings.HasPrefix(path, "/api/v1/") || strings.ContainsAny(path, "?#%\r\n") || !uuidPattern.MatchString(generation) {
 		return [32]byte{}, errors.New("invalid command path or generation")
 	}
-	canonical, e := CanonicalJSON(body)
+	canonical, e := CanonicalJSONLimit(body, limit)
 	if e != nil {
 		return [32]byte{}, e
 	}

@@ -29,6 +29,10 @@ object Money {
         }
         return format(total, currency)
     }
+    fun displayAggregate(minor: String, currency: String): String {
+        require(minor.length <= 100 && minor.matches(Regex("-?(0|[1-9][0-9]*)")))
+        return format(BigInteger(minor), currency)
+    }
     private fun format(amount: BigInteger, currency: String): String {
         val scale = requireNotNull(scales[currency]) { "Валюта недоступна." }
         val digits = amount.abs().toString().padStart(scale + 1, '0')

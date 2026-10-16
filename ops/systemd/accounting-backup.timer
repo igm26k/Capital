@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily Accounting backup
+
+[Timer]
+OnCalendar=*-*-* 02:00:00 UTC
+Persistent=true
+RandomizedDelaySec=300
+Unit=accounting-backup.service
+
+[Install]
+WantedBy=timers.target

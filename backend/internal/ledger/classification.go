@@ -25,7 +25,11 @@ type ClassificationInput struct {
 
 // decodeObject enforces exact field spelling, presence and nullability, including nested inputs.
 func decodeObject(body []byte, out any, required, nullable []string) error {
-	if _, e := commands.CanonicalJSON(body); e != nil {
+	return decodeObjectLimit(body, out, required, nullable, 1048576)
+}
+
+func decodeObjectLimit(body []byte, out any, required, nullable []string, limit int64) error {
+	if _, e := commands.CanonicalJSONLimit(body, limit); e != nil {
 		return invalid()
 	}
 	var fields map[string]json.RawMessage

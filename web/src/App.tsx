@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { request, listAll, RequestError, type Category, type Tag, type Auth, type Account, type Transaction, type List, type Workspace } from './api/client';
+import { PrivacyPanel } from './features/auth/PrivacyPanel';
 import { SessionManager } from './features/auth/SessionManager';
 import { AuthForm } from './features/auth/AuthForm';
 import { AccountManager } from './features/accounts/AccountManager';
@@ -13,6 +14,9 @@ import { DeleteTransaction, type Deletion } from './features/transactions/Delete
 import { AdjustmentForm } from './features/transactions/AdjustmentForm';
 import { RefundForm } from './features/transactions/RefundForm';
 import { TransactionConflict, type ProposedTransaction, type TransactionComparison } from './features/transactions/TransactionConflict';
+import { clearCSVCommandsForOwner } from './features/imports/commandStorage';
+import { CSVPanel } from './features/imports/CSVPanel';
+import { AnalyticsPanel } from './features/analytics/AnalyticsPanel';
 import { TransactionHistory } from './features/transactions/TransactionHistory';
 // A single unfinished command survives reload in this tab. No credentials are persisted.
 type Command = { owner: string; session: string; workspace: string; generation: string; key: string; path: string; body: string; method?: 'POST' | 'PUT' | 'DELETE' };
@@ -28,6 +32,9 @@ function restore(auth: Auth): Command | null {
 function persist(command: Command | null) { try { command ? sessionStorage.setItem(storageKey, JSON.stringify(command)) : sessionStorage.removeItem(storageKey); } catch { /* In-memory fallback. */ } }
 export function App() {
   const activeSession = useRef<string | null>(null);
+ const [analyticsOpen,setAnalyticsOpen]=useState(false);
+ const [csvOpen,setCSVOpen]=useState(false);
+ const [reportHistoryQuery,setReportHistoryQuery]=useState<string>();
   const [needsRefresh, setNeedsRefresh] = useState(false);
   const [auth, setAuth] = useState<Auth | null>(null), [starting, setStarting] = useState(true), [startupError, setStartupError] = useState('');
   const [accounts, setAccounts] = useState<Account[]>([]), [historyRevision, setHistoryRevision] = useState(0);
@@ -40,7 +47,7 @@ export function App() {
   const [editing, setEditing] = useState<Transaction | null>(null);
   const [categories, setCategories] = useState<Category[]>([]), [tags, setTags] = useState<Tag[]>([]);
   const [pending, setPending] = useState<Command | null>(null), [busy, setBusy] = useState(false), [loading, setLoading] = useState(false), [message, setMessage] = useState(''), [error, setError] = useState(''), [online, setOnline] = useState(navigator.onLine), [formVersion, setFormVersion] = useState(0);
-  function authenticated(value: Auth) { activeSession.current = value.session.id; setAccounts([]); setCategories([]); setTags([]); setEditing(null); setRefundParent(null); setDeleting(null); setBulkConflict(null); setResourceConflict(null); setConflict(null); setAuth(value); setPending(restore(value)); setError(''); setMessage(''); }
+  function authenticated(value: Auth) { setReportHistoryQuery(undefined); activeSession.current = value.session.id; setAccounts([]); setCategories([]); setTags([]); setEditing(null); setRefundParent(null); setDeleting(null); setBulkConflict(null); setResourceConflict(null); setConflict(null); setAuth(value); setPending(restore(value)); setError(''); setMessage(''); }
   async function session() {
     setStarting(true); setStartupError('');
     try { authenticated(await request<Auth>('/auth/session')); }
@@ -184,7 +191,15 @@ export function App() {
     <AdjustmentForm key={`adjustment-${formVersion}`} accounts={accounts.filter(a => !a.archived_at)} disabled={busy || loading || !!pending || needsRefresh || !online} submit={create} fail={setError} />
     {editing?.kind === 'adjustment' && <AdjustmentForm key={`edit-adjustment-${editing.id}-${editing.version}`} accounts={accounts} initial={editing} disabled={busy || loading || !!pending || needsRefresh || !online} submit={create} fail={setError} cancel={() => setEditing(null)} />}
     <ClassificationManager key={`classification-${formVersion}-${resourceRevision}`} categories={categories} tags={tags} disabled={busy || loading || !!pending || needsRefresh || !online} submit={create} fail={setError} />
-    <TransactionHistory key={`${auth.session.id}-${auth.workspace.id}`} workspace={auth.workspace.id} revision={historyRevision} accounts={accounts} categories={categories} tags={tags} disabled={busy || loading || !!pending || needsRefresh || !online} edit={id => void editTransaction(id)} refund={id => void newRefund(id)} remove={id => void deleteTransaction(id)} classify={body => create('transactions/classification', body)} fail={showError} />
+    <TransactionHistory filterQuery={reportHistoryQuery} key={`${auth.session.id}-${auth.workspace.id}`} workspace={auth.workspace.id} revision={historyRevision} accounts={accounts} categories={categories} tags={tags} disabled={busy || loading || !!pending || needsRefresh || !online} edit={id => void editTransaction(id)} refund={id => void newRefund(id)} remove={id => void deleteTransaction(id)} classify={body => create('transactions/classification', body)} fail={showError} />
+    <details onToggle={e => setAnalyticsOpen(e.currentTarget.open)}><summary>Бюджеты, отчеты и правила</summary>{analyticsOpen && <AnalyticsPanel key={`${auth.session.id}:${auth.workspace.sync_generation_id}`} auth={auth} accounts={accounts} categories={categories} tags={tags} revision={historyRevision} classify={body => create('transactions/classification',body)} fail={showError} drill={query => {setReportHistoryQuery(`${query}&limit=25`);document.querySelector('.history')?.scrollIntoView();}} />}</details>
+    <details onToggle={e=>setCSVOpen(e.currentTarget.open)}><summary>Импорт и экспорт CSV</summary>{csvOpen && <CSVPanel key={`${auth.session.id}:${auth.workspace.sync_generation_id}`} auth={auth} accounts={accounts} changed={()=>{void refresh(auth).catch(showError);}} fail={showError}/>}</details>
+    <p className="hint">Ручной учет и CSV. Банковские подключения пока недоступны.</p>
+    <PrivacyPanel auth={auth} fail={showError} deleted={async()=>{
+      let localCleared=true;try{await clearCSVCommandsForOwner(auth.profile.id);}catch{localCleared=false;}
+      try {for(const key of Object.keys(sessionStorage)){if([`accounting.planning.pending.v1:${auth.profile.id}:`,`accounting.csv.pending.v1:${auth.profile.id}:`,`accounting.csv.last:${auth.profile.id}:`].some(prefix=>key.startsWith(prefix)))sessionStorage.removeItem(key);}}catch{/* In-memory state is cleared below. */}
+      if(activeSession.current!==auth.session.id)return;
+      persist(null);setPending(null);activeSession.current=null;setAuth(null);setAccounts([]);setCategories([]);setTags([]);setReportHistoryQuery(undefined);setError(localCleared?'Профиль и личные данные удалены.':'Профиль удалён. Очистите данные этого сайта в настройках браузера: локальное хранилище недоступно.');}}/>
     <SessionManager key={auth.session.id} disabled={busy || loading || !!pending || !online} revoke={revokeSession} fail={showError} />
     </>}
   </main>;

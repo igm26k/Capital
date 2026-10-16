@@ -287,6 +287,9 @@ func CreateBasic(workspace string, input BasicInput) commands.Command {
 		if e != nil {
 			return commands.Mutation{}, e
 		}
+		if e = applyCreateRule(ctx, tx, workspace, &input); e != nil {
+			return commands.Mutation{}, e
+		}
 		accounts, e := lockAccounts(ctx, tx, workspace, input.AccountID)
 		if e != nil {
 			return commands.Mutation{}, e

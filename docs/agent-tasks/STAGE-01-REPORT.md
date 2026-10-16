@@ -389,3 +389,11 @@ Account/category/tag PUT conflicts показывают обе стороны и
 Сервер и веб приняты по критериям [плана](../implementation/03_PRODUCT_FOUNDATION_PLAN.md). Контракты, Compose, Go vet/unit/build, TestVertical PostgreSQL и web build — PASS. Все 10 integration suites выполнены на PostgreSQL/TLS; basic/vertical повторены успешно после отказа записи старых root-owned артефактов, новые outputs сохранены отдельно. Проверены 2142 actual responses по OpenAPI и покрытие 35 маршрутов/33 guards. Штатный `DOCKER_BUILD_NETWORK=host make e2e` с Node24 — **14/14 PASS** после реальных Docker builds. Исправлен backend build network override.
 
 Это приемка сервера и online веба. Клиентский DR-S03 (неполная группа → unchanged mirror/cursor), Android Room/outbox/staging/WorkManager переданы S3-05/APP-03; production/DR-S10/public registration/recovery не приняты. Исходные design-review fixtures с not_run не переписывались и не выдаются за журнал выполненных тестов. Следующий пакет — APP-01 по плану приложений.
+
+
+## Сверка карточек каркаса — 2026-10-14
+
+Статусы S3-01B, S3-01C и их агрегата S3-01 приведены к done по последующим S3-06/S3-07B и текущим реальным Docker/Chrome проверкам. Старые записи not_run относятся к исходному окружению и сохраняются как история. Текущие contracts/financial fixtures/Compose config, Docker build/API/worker/migrate/PostgreSQL/HTTPS и 14/14 Chrome e2e PASS; итоговая Android/offline приёмка остаётся в STAGE-02-REPORT, production release — в S6.
+
+
+Проверка 2026-10-15 завершила ожидавшийся повтор access-check после добавления GET accounts/{id}/opening: TestAccess/TestSessionRace PASS, 209 HTTP ответов/11 схем и 28/3; validator подтвердил36 API operations и34 private guards. Общая веб-регрессия `make e2e` —14/14 PASS. Состояние этапа1 остается done.

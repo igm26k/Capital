@@ -31,6 +31,8 @@ before = proof(); assert before['stage'] == 'prepared'
 for key in ['owner', 'workspace', 'generation', 'tag']:
     assert re.fullmatch(r'[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}', before[key])
 w = before['workspace']
+chrome_result = checks / 'android-offline-web-result.json'
+chrome_result.unlink(missing_ok=True)
 try:
     run(compose + ['stop', 'api']); run([adb, '-s', serial, 'shell', 'am', 'force-stop', 'com.capital.accounting'])
     native('com.capital.accounting.OfflineTagRuntimeTest#offlineCreateEditArchive', 'android-offline-tags-offline-instrumentation.txt')
@@ -51,3 +53,14 @@ assert counts == {'actions': 37, 'groups': 37, 'tags': 3, 'archived': 2, 'catego
 after['sql_no_duplicate'] = True
 (checks / 'android-offline-tags-runtime.json').write_text(json.dumps(after))
 print('PASS offline catalog, ledger CRUD and bulk classification UI, cold sync, original commands and SQL no duplicate')
+
+if '--chrome' in sys.argv[3:]:
+    env = dict(os.environ, ANDROID_OFFLINE_WEB_PROOF=str(checks / 'android-offline-tags-runtime.json'),
+               ANDROID_OFFLINE_WEB_RESULT=str(chrome_result))
+    subprocess.run(['npm', 'exec', 'playwright', 'test', '--', '--config', 'playwright.android.config.ts', 'offline.spec.ts'],
+                   cwd=root / 'web', env=env, check=True, timeout=180)
+    result = json.loads(chrome_result.read_text())
+    assert result['workspace'] == w
+    for key in ['chrome_ui', 'reload', 'exact_minor', 'sql_unchanged', 'deleted_absent']:
+        assert result[key] is True
+    print('PASS offline Android -> cold recovery -> Chrome UI, classification, deletions and readonly reload')

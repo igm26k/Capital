@@ -39,7 +39,7 @@ class OfflineTagPrepareTest {
         app.database.settings().save(ConnectionSettings(origin = origin)); app.credentialVault.save(saved); IdentityStore(app.database).save(auth, origin)
         SnapshotBootstrap(app.database).load(saved)
         File(app.filesDir, "offline-tag-runtime.json").writeText(JSONObject().put("stage", "prepared").put("pid", Process.myPid())
-            .put("owner", saved.ownerId).put("workspace", saved.workspaceId).put("generation", saved.generationId).put("tag", tag.id).toString())
+            .put("email", auth.profile.email).put("owner", saved.ownerId).put("workspace", saved.workspaceId).put("generation", saved.generationId).put("tag", tag.id).toString())
     }
 }
 @RunWith(AndroidJUnit4::class)
@@ -287,7 +287,8 @@ class OfflineTagRuntimeTest {
             val fee = result.transactions.single { it.id == transfer.fee_transaction_id }
             assertEquals(transfer.id, fee.parent_transaction_id); assertEquals("-111", fee.entries.single().amount_minor)
             assertEquals(2, mirror.items.filterIsInstance<SnapshotItemTransaction>().count { it.data.kind == "opening" })
-            before.put("stage", "verified").put("pid", Process.myPid()).put("cold_recovered", true).put("command_preserved", true).put("pull_covered", true)
+            before.put("account", account.id).put("income", income.id).put("income_action", commands.single { it.path.endsWith("/transactions") && JSONObject(it.body).optString("kind") == "income" && JSONObject(it.body).optString("note") == "Income after adjustment" }.actionId)
+                .put("stage", "verified").put("pid", Process.myPid()).put("cold_recovered", true).put("command_preserved", true).put("pull_covered", true)
             proof.writeText(before.toString())
             val saved = (app.credentialVault.load(scope.origin) as VaultRead.Available).session
             ApiClient(scope.origin).request("/auth/logout", "POST", session = saved); app.credentialVault.clear()

@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": [
+      "node"
+    ]
+  },
+  "include": [
+    "tests",
+    "playwright.config.ts",
+    "playwright.android.config.ts",
+    "playwright.email.config.ts"
+  ]
+}
