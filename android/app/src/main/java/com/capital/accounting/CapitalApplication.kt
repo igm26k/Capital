@@ -6,6 +6,7 @@ import androidx.room.Room
 import com.capital.accounting.data.CapitalDatabase
 
 class CapitalApplication : Application() {
+    val notificationInbox by lazy { com.capital.accounting.imports.NotificationInboxStore(this) }
     val financialDrafts: com.capital.accounting.finance.FinancialDrafts by lazy { com.capital.accounting.finance.FinancialDrafts(this) }
     val credentialVault: CredentialVault by lazy { CredentialVault(this) }
     val database: CapitalDatabase by lazy {

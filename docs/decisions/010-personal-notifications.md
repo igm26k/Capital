@@ -1,0 +1,12 @@
+# 010. Локальные уведомления для личного использования
+Дата2026-10-16. Статус: прототип capture/review; создание финансовых операций и source pipeline далее.
+
+Основание: этап6А, личное использование без магазина. Реальные банки/страна/образцы неизвестны. Не включать угаданные bank-specific regex или API credentials. Формат определяется владельцем в виде anchored template; все литералы escaped, только четыре ограниченных токена. Parser v1 считает minor units и отвергает неожиданные валюты/точность, скрытый/групповой текст, OTP и полные номера карт.
+
+Listener основан на [официальном NotificationListenerService](https://developer.android.com/reference/android/service/notification/NotificationListenerService); системный доступ требует отдельного явного включения. Service защищен BIND_NOTIFICATION_LISTENER_SERVICE. Приложение не запрашивает SMS permission и не публикуется. Extras читаются только для выбранного package; существующие уведомления bulk scan не выполняется. По умолчанию прием выключен. Перед сохранением проверяются защищенная vault session и cached identity expiry/revoke/generation. Разрешение Android само по себе не включает импорт.
+
+Typed candidate содержит digest event identity, parser version, account/kind/amount/currency, merchant, last4 и наблюдаемое время. SBN key и raw text не сохраняются/не отправляются. Session-scoped AtomicFile в noBackupFilesDir сохраняет максимум1000предложений/квитанций; bounded memory channel64. Overflow/ошибки показываются счетчиком (in-memory capture errors сбрасывается с процессом); доставка Android не гарантируется. Нельзя трактовать системное удаление уведомления как отмену платежа.
+
+Replay по package/key/postTime возвращает прежний результат. Изменение typed payload при той же identity создает conflict и сохраняет исходный candidate. Одинаковые покупки с различной identity сохраняются раздельно. Dismiss удаляет typed candidate, сохраняет digest receipt и исключает воскрешение. Привязка к счету/шаблону не меняется при существующих receipts. Новая сессия не переиздает старые предложения. Удаление профиля очищает локальные inbox соответствующего владельца.
+
+В этом прототипе события только review: не создают posted или pending транзакций и не меняют остатки. Source-events API, durable financial linkage, pending→posted и сверка должны быть внедрены отдельным проверенным шагом. Реальные форматы/приемка устройства не подтверждены; сборка/unit/lint не заменяют runtime. Эмуляторы исключены поручением владельца.

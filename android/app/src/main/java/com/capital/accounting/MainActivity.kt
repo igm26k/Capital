@@ -96,6 +96,7 @@ class MainActivity : ComponentActivity() {
                                     Button(enabled = !state.busy && !state.financeBlocked, onClick = model::renew) { Text("Продлить сессию") }
                                     Button(enabled = !state.busy && (!state.financeBlocked || (state.offline && state.financialCommand == null && state.localPending == 0 && state.localBlocked == 0)), onClick = model::logout) { Text("Выйти") }
                                     if (section.value == "more") {
+                                        com.capital.accounting.imports.NotificationPanel(model)
                                         AnalyticsPanel(model)
                                         CsvPanel(model)
                                         PrivacyPanel(model)

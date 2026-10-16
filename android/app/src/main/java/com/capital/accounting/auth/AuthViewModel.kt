@@ -418,6 +418,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private suspend fun expireSession(origin: String, message: String = "Сессия завершена. Войдите снова.") {
+        app.notificationInbox.pauseCapture()
         app.credentialVault.clear()
         candidate = null
         state = AuthState(origin, busy = false, message = message)
@@ -429,6 +430,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     fun sessionUnauthorized(sessionId: String) {
         val auth = state.auth ?: return
         if (auth.session.id != sessionId) return
+        app.notificationInbox.pauseCapture()
         val origin = state.origin
         candidate = null
         state = AuthState(origin,busy=true,message="Сессия завершена. Войдите снова.")
@@ -440,7 +442,10 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                 } catch (e: CancellationException) { throw e }
                 catch (_: Exception) { /* Vault cleanup below remains independent. */ }
                 val current = (app.credentialVault.load(origin) as? VaultRead.Available)?.session
-                if (current?.sessionId == sessionId) app.credentialVault.clear()
+                if (current?.sessionId == sessionId) {
+                    app.notificationInbox.pauseCapture()
+                    app.credentialVault.clear()
+                }
             } catch (e: CancellationException) { throw e }
             catch (_: Exception) { /* Financial data stays hidden in this process. */ }
             finally { state = AuthState(origin,busy=false,message="Сессия завершена. Войдите снова.") }
@@ -455,6 +460,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val body = org.json.JSONObject().put("password", password).put("confirmation", confirmation).toString()
                 ApiClient(saved.origin).request("/me", "DELETE", body, saved)
+                app.notificationInbox.pauseCapture()
                 app.credentialVault.clear()
                 candidate = null
                 state = AuthState(saved.origin,busy=true,message="Профиль удалён. Очистка данных устройства…")
@@ -466,6 +472,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                         db.execSQL("DELETE FROM financial_commands WHERE origin=? AND ownerId=? AND workspaceId=?", arrayOf(saved.origin,saved.ownerId,saved.workspaceId))
                     }
                 }
+                app.notificationInbox.eraseAfterAccountDeletion(saved)
                 app.financialDrafts.erase(saved.origin,saved.ownerId,saved.workspaceId)
                 com.capital.accounting.finance.PlanningStore(app).eraseAfterAccountDeletion(saved)
                 com.capital.accounting.finance.PlanningStore(app,"csv").eraseAfterAccountDeletion(saved)
@@ -863,6 +870,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         state = AuthState(saved.origin, auth = state.auth, logoutPending = true)
         viewModelScope.launch {
             try {
+                app.notificationInbox.pauseCapture()
                 val pending = StoredSession(saved.origin, saved.token, saved.ownerId, saved.workspaceId, saved.generationId, saved.sessionId, true)
                 app.credentialVault.save(pending)
                 candidate = pending
@@ -870,6 +878,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                     val acknowledgement = decodeResponse<Acknowledgement>(ApiClient(saved.origin).request("/auth/logout", "POST", session = pending))
                     require(acknowledgement.ok)
                 } catch (e: ApiFailure) { if (e.status != 401) throw e }
+                app.notificationInbox.pauseCapture()
                 app.credentialVault.clear()
                 candidate = null
                 state = AuthState(saved.origin, busy = false, message = "Вы вышли из аккаунта")
