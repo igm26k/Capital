@@ -118,6 +118,8 @@ reports-check:
 	python3 scripts/check-ledger-responses.py ops/.runtime/checks/source-correction-responses.json
 	python3 scripts/check-ledger-responses.py ops/.runtime/checks/source-pages-responses.json
 	python3 scripts/check-ledger-responses.py ops/.runtime/checks/source-auto-responses.json
+	python3 scripts/check-ledger-responses.py ops/.runtime/checks/source-relink-responses.json
+	python3 scripts/check-ledger-responses.py ops/.runtime/checks/bank-csv-responses.json
 
 .PHONY: email-auth-e2e
 email-auth-e2e:

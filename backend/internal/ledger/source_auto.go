@@ -24,7 +24,7 @@ func CreateAutomaticSourceEvent(workspace, generation string, input SourceEventI
    OR EXISTS(SELECT 1 FROM transactions t JOIN entries e ON (e.workspace_id,e.transaction_id)=(t.workspace_id,t.id)
      WHERE t.workspace_id=$1 AND e.account_id=$2 AND e.amount_minor=$3::bigint*CASE WHEN $4='expense' THEN -1 ELSE 1 END
        AND t.occurred_at BETWEEN $5::timestamptz-interval '72 hours' AND $5::timestamptz+interval '72 hours')
-   OR EXISTS(SELECT 1 FROM csv_imports c WHERE c.workspace_id=$1 AND c.account_id=$2 AND c.state='queued')
+   OR EXISTS(SELECT 1 FROM csv_imports c WHERE c.workspace_id=$1 AND c.account_id=$2 AND (c.state='queued' OR (c.state='failed' AND EXISTS(SELECT 1 FROM csv_rows r WHERE r.workspace_id=c.workspace_id AND r.import_id=c.id AND r.state='queued'))))
    OR EXISTS(SELECT 1 FROM source_events s WHERE s.workspace_id=$1 AND s.id<>$6 AND s.account_id=$2
        AND s.payload->>'amount_minor'=$3::text AND s.payload->>'kind'=$4 AND s.payload->>'currency'=$7
        AND (s.payload->>'observed_at')::timestamptz BETWEEN $5::timestamptz-interval '72 hours' AND $5::timestamptz+interval '72 hours')`, workspace, input.AccountID, input.Amount, input.Kind, input.ObservedAt, input.ID, input.Currency, input.PackageName, *input.NotificationKeyHash).Scan(&possible)

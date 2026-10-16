@@ -126,7 +126,7 @@ services:
     profiles: [checks]
   reports-check:
     build: {context: ./backend, target: build}
-    command: [go, test, ./tests/integration, -run, '^Test(Reports|Planning|CSV|UserData|EmailAuth|SourceEvents|SourceDecisions|SourceIdentityCompatibility|SourceMovementLinks|SourceUserCorrections|SourcePages|AutomaticSources)$', -v, -count=1]
+    command: [go, test, ./tests/integration, -run, '^Test(Reports|Planning|CSV|UserData|EmailAuth|SourceEvents|SourceDecisions|SourceIdentityCompatibility|SourceMovementLinks|SourceUserCorrections|SourcePages|AutomaticSources|SourceRelink|BankCSV)$', -v, -count=1]
     environment:
       <<: *test-env
       GOCACHE: /tmp/accounting-go-check-build
@@ -143,6 +143,8 @@ services:
       SOURCE_CORRECTION_RESPONSE_ARTIFACT: /output/source-correction-responses.json
       SOURCE_PAGES_RESPONSE_ARTIFACT: /output/source-pages-responses.json
       SOURCE_AUTO_RESPONSE_ARTIFACT: /output/source-auto-responses.json
+      SOURCE_RELINK_RESPONSE_ARTIFACT: /output/source-relink-responses.json
+      BANK_CSV_RESPONSE_ARTIFACT: /output/bank-csv-responses.json
     volumes: ["./ops/.runtime/checks:/output", "go-check-cache:/tmp/accounting-go-check-build"]
     networks: [private]
     depends_on:

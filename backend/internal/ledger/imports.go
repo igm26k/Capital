@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -185,22 +186,8 @@ func CreateImport(workspace, generation string, input ImportInput) importSetting
 					invalidRow("source_transaction_id")
 				}
 			}
-			if row.Status == "valid" && row.Payee != "" {
-				candidates, err := tx.Query(ctx, `SELECT t.id::text FROM transactions t JOIN entries e ON (e.workspace_id,e.transaction_id)=(t.workspace_id,t.id)
-   WHERE t.workspace_id=$1 AND e.account_id=$2 AND t.deleted_at IS NULL AND t.kind IN ('expense','income') AND e.amount_minor=$3::bigint AND t.occurred_at=$4::timestamptz AND lower(t.payee)=lower($5) ORDER BY t.id LIMIT 20`, workspace, input.Mapping.Account, *row.Amount, *row.Occurred, row.Payee)
-				if err != nil {
-					return nil, 0, err
-				}
-				for candidates.Next() {
-					var id string
-					if err := candidates.Scan(&id); err != nil {
-						candidates.Close()
-						return nil, 0, err
-					}
-					row.Candidates = append(row.Candidates, id)
-				}
-				err = candidates.Err()
-				candidates.Close()
+			if row.Status == "valid" {
+				row.Candidates, err = csvCandidates(ctx, tx, workspace, input.Mapping.Account, row)
 				if err != nil {
 					return nil, 0, err
 				}
@@ -208,6 +195,7 @@ func CreateImport(workspace, generation string, input ImportInput) importSetting
 					row.Status = "ambiguous"
 				}
 			}
+
 			state := "prepared"
 			var body []byte
 			transaction := newID()
@@ -322,6 +310,10 @@ func ConfirmImport(workspace, id, generation string, input ImportConfirm) import
 		if preview.Version != input.Version {
 			return nil, 0, &identity.Error{Status: 409, Code: "version_conflict"}
 		}
+		currentVersion, _ := version(preview.Version)
+		if currentVersion == math.MaxInt64 {
+			return nil, 0, &identity.Error{Status: 503, Code: "service_unavailable"}
+		}
 		if preview.State != "ready" && preview.State != "failed" {
 			return nil, 0, &identity.Error{Status: 409, Code: "import_not_ready"}
 		}
@@ -336,6 +328,14 @@ func ConfirmImport(workspace, id, generation string, input ImportConfirm) import
 		} else {
 			if len(input.Decisions) != len(preview.Rows) {
 				return nil, 0, invalid()
+			}
+			refreshed, refreshErr := refreshBankPreview(ctx, tx, workspace, preview, input)
+			if refreshErr != nil {
+				return nil, 0, refreshErr
+			}
+			if refreshed {
+				value, readErr := ReadImport(ctx, tx, workspace, id, p.Profile.ID)
+				return value, 200, readErr
 			}
 			sourceIDs := map[int]*string{}
 			for _, row := range preview.Rows {
@@ -401,7 +401,7 @@ func ConfirmImport(workspace, id, generation string, input ImportConfirm) import
 									matches = true
 								}
 							}
-							if !matches || sourceID == nil && (len(selected.Entries) != 1 || selected.Kind != original.Kind) {
+							if !matches || sourceID == nil && (selected.Kind != "expense" && selected.Kind != "income" && selected.Kind != "transfer" && selected.Kind != "refund") {
 								return nil, 0, invalid()
 							}
 							targetState = "linked"

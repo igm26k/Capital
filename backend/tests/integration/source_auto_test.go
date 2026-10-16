@@ -3,6 +3,7 @@ package integration
 import (
 	"accounting/backend/internal/ledger"
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"os"
 	"testing"
@@ -92,11 +93,24 @@ func TestAutomaticSources(t *testing.T) {
 	}
 	// In-flight CSV must finish before a notification can be considered safe.
 	csvAccount := f.account(a)
-	if _, err := f.db.Exec(f.ctx, `INSERT INTO csv_imports(workspace_id,id,actor_user_id,session_id,generation_id,account_id,state,preview,expires_at) VALUES($1,$2,$3,$4,$5,$6,'queued','{}',clock_timestamp()+interval '1 day')`, a.Workspace.ID, f.id(), a.Profile.ID, a.Session.ID, a.Workspace.Generation, csvAccount); err != nil {
+	csvImportID := f.id()
+	if _, err := f.db.Exec(f.ctx, `INSERT INTO csv_imports(workspace_id,id,actor_user_id,session_id,generation_id,account_id,state,preview,expires_at) VALUES($1,$2,$3,$4,$5,$6,'queued','{}',clock_timestamp()+interval '1 day')`, a.Workspace.ID, csvImportID, a.Profile.ID, a.Session.ID, a.Workspace.Generation, csvAccount); err != nil {
 		t.Fatal(err)
 	}
 	if got := auto(makeInput(csvAccount), 201); got["state"] != "review" {
 		t.Fatal("in-flight CSV was ignored")
+	}
+	rowBody, _ := json.Marshal(f.basic(csvAccount, "expense"))
+	if _, err := f.db.Exec(f.ctx, `UPDATE csv_imports SET state='failed' WHERE workspace_id=$1 AND id=$2`, a.Workspace.ID, csvImportID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.db.Exec(f.ctx, `INSERT INTO csv_rows(workspace_id,import_id,row_number,action_id,transaction_id,fingerprint,payload,state) VALUES($1,$2,2,$3,$4,$5,$6,'queued')`, a.Workspace.ID, csvImportID, f.id(), f.id(), make([]byte, 32), rowBody); err != nil {
+		t.Fatal(err)
+	}
+	blocked := makeInput(csvAccount)
+	blocked["amount_minor"] = "200"
+	if got := auto(blocked, 201); got["state"] != "review" {
+		t.Fatal("unresolved failed CSV was ignored")
 	}
 	stopped := auto(makeInput(f.account(a)), 201)
 	if stopped["state"] != "queued" {

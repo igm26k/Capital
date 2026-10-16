@@ -8,3 +8,5 @@
 Проверки: parser unit, PostgreSQL/TLS jobs/retries/access, Chrome; Android build/unit/lint без emulator.
 
 Итоговая приемка2026-10-15: Go/PostgreSQL и captured OpenAPI bodies PASS; Chrome21/21 PASS (общий suite). Android53 unit PASS; окончательная сборка/lint и ограничения device приемки — STAGE-05-REPORT.md.
+
+Банковская совместимость 2026-10-16: ±72ч предложения для bank-linked операций, направленные transfer/refund links, повторное подтверждение обновлённого preview при новых совпадениях, блокировка in-flight bank create и приоритет точного CSV fingerprint. Две устаревшие вкладки не могут перезаписать неизвестную отправку (IndexedDB CAS). Full Go/vet PASS69.728s, Chrome29/29 PASS2.9m, bankCSV30capturedresponses/5schemas PASS. Реальные банковские форматы остаются отдельной внешней проверкой.

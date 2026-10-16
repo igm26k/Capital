@@ -99,7 +99,15 @@ test('explicit source link preserves one pending operation and cancellation cann
   await secondCard.getByRole('button',{name:'Проверить связанную операцию',exact:true}).click();
   await expect(secondCard.getByText('Связанная операция удалена или недоступна.',{exact:false})).toBeVisible();
   await expect(secondCard.getByRole('button',{name:'Создать предварительную операцию',exact:true})).toHaveCount(0);
-  const repeated=await admit({...secondInput,id:crypto.randomUUID()},200);expect(repeated.id).toBe(second.id);expect(repeated.transaction_id).toBe(linkedTransaction);
+  const targetID=crypto.randomUUID(),transferID=crypto.randomUUID();
+  let created=await context.request.post(`${root}/accounts`,{headers:{...headers,'Idempotency-Key':crypto.randomUUID()},data:{id:targetID,name:'Transfer target',type:'bank',currency:'EUR',opened_at:'2026-01-01T00:00:00Z',occurred_timezone:'UTC',opening_balance_minor:'10000'}});expect(created.status()).toBe(201);
+  created=await context.request.post(`${root}/transactions`,{headers:{...headers,'Idempotency-Key':crypto.randomUUID()},data:{id:transferID,kind:'transfer',source_account_id:account.id,target_account_id:targetID,source_amount_minor:'100',target_amount_minor:'100',occurred_at:new Date().toISOString(),occurred_timezone:'UTC',note:'',payee:'Reconciled transfer',tag_ids:[],rate:null,fee:null}});expect(created.status()).toBe(201);
+  await secondCard.getByRole('button',{name:'Связать с другой существующей операцией',exact:true}).click();
+  await panel.getByRole('dialog',{name:'Выбор операции для связи',exact:true}).getByRole('button',{name:/Reconciled transfer/}).click();
+  await panel.getByRole('button',{name:'Подтвердить действие предложения',exact:true}).click();
+  await expect.poll(async()=>{return(await(await context.request.get(`${root}/source-events/${second.id}`)).json()).transaction_id;}).toBe(transferID);
+  balances=await(await context.request.get(`${root}/accounts/${account.id}`)).json();expect(balances.posted_balance_minor).toBe('9900');expect(balances.pending_delta_minor).toBe('0');
+  const repeated=await admit({...secondInput,id:crypto.randomUUID()},200);expect(repeated.id).toBe(second.id);expect(repeated.transaction_id).toBe(transferID);
 });
 
 test('source confirmation displays and preserves a manually corrected amount', async ({ page, context }) => {

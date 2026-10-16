@@ -2,7 +2,7 @@
   "openapi": "3.1.1",
   "info": {
     "title": "Accounting API",
-    "version": "0.7.1",
+    "version": "0.7.2",
     "description": "Manual accounting, synchronization and exact reporting API. Bank integrations remain a final stage."
   },
   "servers": [
@@ -3827,7 +3827,8 @@
               }
             }
           }
-        }
+        },
+        "description": "A newly discovered matching transaction refreshes the ready preview and increments its version without queuing money. Review and confirm again with the new version. An in-flight bank create returns import_source_pending. Known weak candidates may be explicitly treated as independent purchases."
       }
     },
     "/workspaces/{workspace_id}/exports": {
@@ -4488,7 +4489,8 @@
               }
             }
           }
-        }
+        },
+        "description": "Link is metadata only. An applied event may be explicitly relinked only after its previous target has a financial tombstone; the prior link is retained in private history. Live targets cannot be silently replaced. Source version and current target transaction version are required."
       }
     },
     "/workspaces/{workspace_id}/source-events/auto": {

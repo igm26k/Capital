@@ -71,6 +71,12 @@ func ConfirmSourceEvent(workspace, id, generation string, input SourceDecision) 
 		if current == math.MaxInt64 {
 			return nil, 0, &identity.Error{Status: 503, Code: "service_unavailable"}
 		}
+		relink := false
+		if input.Decision == "link" && event.State == "applied" && event.TransactionID != nil {
+			if err = tx.QueryRow(ctx, `SELECT deleted_at IS NOT NULL FROM transactions WHERE workspace_id=$1 AND id=$2`, workspace, *event.TransactionID).Scan(&relink); err != nil {
+				return nil, 0, err
+			}
+		}
 		retryable := false
 		if event.State == "failed" {
 			if event.ErrorCode == nil || *event.ErrorCode == "action_result_expired" || *event.ErrorCode == "idempotency_conflict" || *event.ErrorCode == "sync_generation_conflict" {
@@ -106,7 +112,7 @@ func ConfirmSourceEvent(workspace, id, generation string, input SourceDecision) 
 			_, err = tx.Exec(ctx, `UPDATE source_events SET state='dismissed',job=NULL,error_code=NULL,version=version+1 WHERE workspace_id=$1 AND id=$2`, workspace, id)
 		} else {
 			if input.Decision == "create_pending" || input.Decision == "link" {
-				if event.State != "review" && !retryable || event.TransactionID != nil {
+				if !relink && (event.State != "review" && !retryable || event.TransactionID != nil) {
 					return nil, 0, &identity.Error{Status: 409, Code: "source_event_not_ready"}
 				}
 			} else if event.State != "applied" && !retryable || event.TransactionID == nil || *event.TransactionID != *input.TransactionID {
@@ -122,7 +128,11 @@ func ConfirmSourceEvent(workspace, id, generation string, input SourceDecision) 
 				if !valid {
 					return nil, 0, &identity.Error{Status: 409, Code: "version_conflict"}
 				}
-				_, err = tx.Exec(ctx, `INSERT INTO transaction_sources(workspace_id,event_id,transaction_id) VALUES($1,$2,$3)`, workspace, id, *input.TransactionID)
+				if relink {
+					err = relinkDeletedSource(ctx, tx, workspace, event, *input.TransactionID, *input.TransactionVersion, p)
+				} else {
+					_, err = tx.Exec(ctx, `INSERT INTO transaction_sources(workspace_id,event_id,transaction_id) VALUES($1,$2,$3)`, workspace, id, *input.TransactionID)
+				}
 				if err == nil {
 					_, err = tx.Exec(ctx, `UPDATE source_events SET state='applied',version=version+1 WHERE workspace_id=$1 AND id=$2`, workspace, id)
 				}
