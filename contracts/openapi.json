@@ -2,7 +2,7 @@
   "openapi": "3.1.1",
   "info": {
     "title": "Accounting API",
-    "version": "0.6.0",
+    "version": "0.6.1",
     "description": "Manual accounting, synchronization and exact reporting API. Bank integrations remain a final stage."
   },
   "servers": [
@@ -4183,11 +4183,32 @@
     "/workspaces/{workspace_id}/source-events": {
       "get": {
         "operationId": "source_events_list",
-        "summary": "Newest 100 own events; older events remain readable by ID",
+        "summary": "Page private source events by immutable receipt time and ID",
         "x-implementation-stage": 6,
         "parameters": [
           {
             "$ref": "#/components/parameters/WorkspaceId"
+          },
+          {
+            "name": "before_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Exclusive last ID from the previous page; must belong to this actor and workspace."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 100
+            }
           }
         ],
         "security": [
@@ -9060,6 +9081,14 @@
           },
           "has_more": {
             "type": "boolean"
+          },
+          "next_before_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Present for paginated requests (limit or before_id). Null on the last page; omitted for legacy requests without query."
           }
         },
         "required": [

@@ -6,6 +6,8 @@ import (
 	commands "accounting/backend/internal/sync"
 	"github.com/jackc/pgx/v5"
 	"net/http"
+	"net/url"
+	"strconv"
 )
 
 func MountSources(mux *http.ServeMux, auth *identity.Service, options AuthOptions) {
@@ -27,7 +29,31 @@ func MountSources(mux *http.ServeMux, auth *identity.Service, options AuthOption
 			return
 		}
 		workspace := r.PathValue("workspace_id")
-		if !validUUID(workspace) || r.URL.RawQuery != "" {
+		if !validUUID(workspace) {
+			reject(w, fail(400, "bad_request"))
+			return
+		}
+		query, queryError := url.ParseQuery(r.URL.RawQuery)
+		before := query.Get("before_id")
+		limit := 100
+		invalidQuery := queryError != nil
+		for key, values := range query {
+			if (key != "before_id" && key != "limit") || len(values) != 1 || values[0] == "" {
+				invalidQuery = true
+			}
+		}
+		if value := query.Get("limit"); value != "" {
+			parsed, e := strconv.Atoi(value)
+			if e != nil || parsed < 1 || parsed > 100 {
+				invalidQuery = true
+			} else {
+				limit = parsed
+			}
+		}
+		if before != "" && !validUUID(before) {
+			invalidQuery = true
+		}
+		if invalidQuery || (r.PathValue("id") != "" && r.URL.RawQuery != "") {
 			reject(w, fail(400, "bad_request"))
 			return
 		}
@@ -41,8 +67,12 @@ func MountSources(mux *http.ServeMux, auth *identity.Service, options AuthOption
 				result, err = ledger.ReadSourceEvent(r.Context(), tx, workspace, id, p.Profile.ID)
 				return err
 			}
-			items, more, err := ledger.ListSourceEvents(r.Context(), tx, workspace, p.Profile.ID)
-			result = map[string]any{"items": items, "has_more": more}
+			items, next, err := ledger.SourceEventPage(r.Context(), tx, workspace, p.Profile.ID, before, limit)
+			page := map[string]any{"items": items, "has_more": next != nil}
+			if query.Has("limit") || query.Has("before_id") {
+				page["next_before_id"] = next
+			}
+			result = page
 			return err
 		})
 		if err != nil {

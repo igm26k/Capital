@@ -1448,6 +1448,7 @@ data class SourceEvent(
 data class SourceEventList(
     val items: List<SourceEvent>,
     val has_more: Boolean,
+    val next_before_id: String? = null,
 ) {
     override fun toString() = "SourceEventList([redacted])"
 }

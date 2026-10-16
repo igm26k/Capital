@@ -68,9 +68,10 @@ for name in names:
         models.append((variant_name, variant, (name, common_fields)))
     lines += [f'            else -> throw SerializationException("Invalid {name} type")', '        }', '}', '']
 for name, schema, parent in models:
-    assert set(schema['required']) == set(schema['properties'])
+    optional = set(schema['properties']) - set(schema['required'])
+    assert all(kotlin_type(schema['properties'][field]).endswith('?') for field in optional), 'Only nullable optional fields have a safe generated default'
     lines += ['@Serializable', f'data class {name}(']
-    lines += [f'    {"override " if parent and field in parent[1] else ""}val {field}: {kotlin_type(value)},' for field, value in schema['properties'].items()]
+    lines += [f'    {"override " if parent and field in parent[1] else ""}val {field}: {kotlin_type(value)}{" = null" if field in optional else ""},' for field, value in schema['properties'].items()]
     lines += [(') : ' + parent[0] + ' {') if parent else ') : ActionResponse {' if name in ('MutationResult', 'Error') else ') {']
     checks = []
     for field, value in schema['properties'].items():

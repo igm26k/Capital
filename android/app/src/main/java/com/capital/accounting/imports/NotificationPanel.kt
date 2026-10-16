@@ -67,7 +67,7 @@ private fun NotificationPanelContent(model:AuthViewModel,binding:NotificationBin
     DisposableEffect(binding.key){onDispose{sources.clear()}}
     LaunchedEffect(sources.unauthorized){if(sources.unauthorized)model.sessionUnauthorized(auth.session.id)}
     LaunchedEffect(sources.delivered){if(sources.delivered?.first==binding)refresh()}
-    LaunchedEffect(sources.items.any {it.state=="queued"},sources.busy){if(!sources.busy&&sources.items.any {it.state=="queued"}){delay(2000);sources.load()}}
+    LaunchedEffect(sources.items.any {it.state=="queued"},sources.busy){if(!sources.busy&&sources.items.any {it.state=="queued"}){delay(2000);sources.poll()}}
     var refreshed by remember {mutableStateOf<List<Pair<String,String>>>(emptyList())}
     val completed=sources.items.filter {it.state=="applied"}.map {it.id to it.version}
     LaunchedEffect(completed,model.state.busy){if(completed.isNotEmpty()&&completed!=refreshed&&!model.state.busy){refreshed=completed;model.loadOverview()}}

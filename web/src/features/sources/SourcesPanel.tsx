@@ -16,16 +16,17 @@ export function SourcesPanel({ auth, accounts, changed, fail }: { auth: Auth; ac
   const root=`/workspaces/${auth.workspace.id}/source-events`;
   const storage=`accounting.sources.pending.v1:${auth.profile.id}:${auth.workspace.id}:${auth.session.id}`;
   const active=useRef(true), running=useRef(false);
+  const [before,setBefore]=useState<string|null>(null);
   const [items,setItems]=useState<SourceEvent[]>([]), [more,setMore]=useState(false), [busy,setBusy]=useState(false), [error,setError]=useState('');
   const [pending,setPending]=useState<Command|null>(null), [ready,setReady]=useState(false), [choice,setChoice]=useState<Choice|null>(null);
   const [targets,setTargets]=useState<Record<string,Transaction|null>>({});
   const [linking,setLinking]=useState<SourceEvent|null>(null), [candidates,setCandidates]=useState<Transaction[]>([]), [cursor,setCursor]=useState<string|null>(null);
   function show(e: unknown) { if(!active.current)return;setError(e instanceof AuxiliaryCommandConflict ? e.message : e instanceof RequestError ? reason(e.code) : 'Ответ не получен. Сохраненный запрос можно повторить с прежним ключом.');fail(e); }
   function valid(v: Command|null): v is Command { return !!v && v.owner===auth.profile.id && v.session===auth.session.id && v.workspace===auth.workspace.id && typeof v.body==='string' && typeof v.key==='string' && typeof v.generation==='string' && typeof v.rejected==='boolean' && new RegExp(`^${root}/[0-9a-f-]{36}/confirm$`).test(v.path); }
-  async function refresh() {
+  async function refresh(older=false) {
     try {
-      const page=await request<{items:SourceEvent[];has_more:boolean}>(root);
-      if(!active.current)return;setItems(page.items);setMore(page.has_more);setTargets({});
+      const page=await request<{items:SourceEvent[];has_more:boolean;next_before_id:string|null}>(root+(older&&before?`?limit=100&before_id=${encodeURIComponent(before)}`:'?limit=100'));
+      if(!active.current)return;setItems(old=>older?[...old,...page.items.filter(i=>!old.some(o=>o.id===i.id))]:page.items);setMore(page.has_more);setBefore(page.next_before_id);if(!older)setTargets({});
       if(page.items.some(item=>item.state==='applied'))changed();
     }catch(e){show(e);}
   }
@@ -34,7 +35,7 @@ export function SourcesPanel({ auth, accounts, changed, fail }: { auth: Auth; ac
     void (async()=>{const saved=await readCommand<Command>(storage);if(saved&&!valid(saved))throw new Error('Invalid saved source command');if(active.current){setPending(saved);setReady(true);}await refresh();})().catch(show);
     return()=>{active.current=false;};
   },[storage]);
-  useEffect(()=>{if(!items.some(i=>i.state==='queued'))return;const timer=setTimeout(()=>void refresh(),2000);return()=>clearTimeout(timer);},[items]);
+  useEffect(()=>{const queued=items.filter(i=>i.state==='queued').slice(0,20);if(!queued.length)return;let cancelled=false;const timer=setTimeout(()=>void (async()=>{try{const values:SourceEvent[]=[];for(const item of queued)values.push(await request<SourceEvent>(`${root}/${item.id}`));if(cancelled||!active.current)return;setItems(old=>old.map(i=>values.find(v=>v.id===i.id&&BigInt(v.version)>=BigInt(i.version))??i));if(values.some(i=>i.state==='applied'))changed();}catch(e){if(!cancelled)show(e);}})(),2000);return()=>{cancelled=true;clearTimeout(timer);};},[items]);
   async function persist(value:Command|null,expectedKey:string|null) {
     try{await compareAuxiliaryCommand(storage,expectedKey,value);}catch(e){if(e instanceof AuxiliaryCommandConflict&&active.current){const latest=await readCommand<Command>(storage);if(latest===null||valid(latest))setPending(latest);else setReady(false);}throw e;}
     if(active.current)setPending(value);
@@ -43,7 +44,7 @@ export function SourcesPanel({ auth, accounts, changed, fail }: { auth: Auth; ac
     try {
       const result=await request<SourceEvent>(value.path,{method:'POST',body:value.body,headers:{'Content-Type':'application/json','X-CSRF-Token':auth.csrf_token,'Idempotency-Key':value.key,'X-Sync-Generation':value.generation}});
       if(result.workspace_id!==auth.workspace.id||result.id!==value.path.split('/').at(-2))throw new Error('Unexpected source receipt');
-      if(!active.current)return;await persist(null,value.key);setTargets({});await refresh();
+      if(!active.current)return;await persist(null,value.key);setTargets({});setItems(old=>old.map(i=>i.id===result.id?result:i));if(result.state==='applied')changed();
     }catch(e){if(e instanceof RequestError&&[400,404,409,422].includes(e.status)&&!uncertain.has(e.code)&&active.current){try{await persist({...value,rejected:true},value.key);}catch(storageError){show(storageError);return;}}show(e);}
   }
   async function submit(selected:Choice) {
@@ -73,7 +74,7 @@ export function SourcesPanel({ auth, accounts, changed, fail }: { auth: Auth; ac
     <button disabled={busy} onClick={()=>void refresh()}>Обновить банковские предложения</button>
     {error&&<p role="alert">{error}</p>}
     {pending&&<div role="status"><p>Сохранен запрос банковского предложения. Новый запрос не создается до выяснения результата.</p>{pending.rejected?<button disabled={busy} onClick={()=>void persist(null,pending.key).catch(show)}>Закрыть отклоненный запрос предложения</button>:<button disabled={busy} onClick={()=>void retry()}>Повторить сохраненный запрос предложения</button>}</div>}
-    {more&&<p>Показаны 100 последних предложений. Ранее отправленные события сохраняются на сервере.</p>}
+    {more&&<button disabled={busy||!before} onClick={()=>{setBusy(true);void refresh(true).finally(()=>{if(active.current)setBusy(false);});}}>Загрузить более ранние предложения</button>}
     {!items.length&&<p>Банковских предложений пока нет.</p>}
     {items.filter(event=>event.state!=='dismissed').map(event=>{
       const transaction=targets[event.id], unknown=uncertain.has(event.error_code??'');

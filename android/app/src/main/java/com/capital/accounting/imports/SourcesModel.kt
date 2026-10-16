@@ -19,6 +19,7 @@ class SourcesModel(application:Application):AndroidViewModel(application) {
     private var session:StoredSession?=null
     var items by mutableStateOf<List<SourceEvent>>(emptyList());private set
     var hasMore by mutableStateOf(false);private set
+    var before by mutableStateOf<String?>(null);private set
     var linking by mutableStateOf<SourceEvent?>(null);private set
     var candidates by mutableStateOf<List<Transaction>>(emptyList());private set
     var candidateCursor by mutableStateOf<String?>(null);private set
@@ -30,9 +31,9 @@ class SourcesModel(application:Application):AndroidViewModel(application) {
     var delivered by mutableStateOf<Triple<NotificationBinding,String,String>?>(null);private set
     private fun same(s:StoredSession)=session?.let {it.notificationBinding()==s.notificationBinding()&&it.token==s.token}==true
     fun bind(s:StoredSession) {
-        if(same(s)){session=s;return};session=s;items=emptyList();hasMore=false;pending=null;busy=false;message="";targets=emptyMap();delivered=null;unauthorized=false;linking=null;candidates=emptyList();candidateCursor=null
+        if(same(s)){session=s;return};session=s;items=emptyList();hasMore=false;before=null;pending=null;busy=false;message="";targets=emptyMap();delivered=null;unauthorized=false;linking=null;candidates=emptyList();candidateCursor=null
     }
-    fun clear(){session=null;items=emptyList();hasMore=false;pending=null;busy=false;message="";targets=emptyMap();delivered=null;unauthorized=false;linking=null;candidates=emptyList();candidateCursor=null}
+    fun clear(){session=null;items=emptyList();hasMore=false;before=null;pending=null;busy=false;message="";targets=emptyMap();delivered=null;unauthorized=false;linking=null;candidates=emptyList();candidateCursor=null}
     private fun work(block:suspend(StoredSession)->Unit) {
         val saved=session?:return;if(busy)return;busy=true;message=""
         viewModelScope.launch {
@@ -42,12 +43,18 @@ class SourcesModel(application:Application):AndroidViewModel(application) {
             finally {if(same(saved))busy=false}
         }
     }
-    private suspend fun refresh(saved:StoredSession) {
-        val result=decodeResponse<SourceEventList>(ApiClient(saved.origin).request("/workspaces/${saved.workspaceId}/source-events",session=saved))
+    private suspend fun refresh(saved:StoredSession,older:Boolean=false) {
+        val suffix=if(older)"?limit=100&before_id="+requireNotNull(before) else "?limit=100"
+        val result=decodeResponse<SourceEventList>(ApiClient(saved.origin).request("/workspaces/${saved.workspaceId}/source-events$suffix",session=saved))
         require(result.items.all {it.workspace_id==saved.workspaceId})
-        if(same(saved)){items=result.items;hasMore=result.has_more;targets=emptyMap()}
+        if(same(saved)){items=if(older)(items+result.items).distinctBy {it.id} else result.items;hasMore=result.has_more;before=result.next_before_id;if(!older)targets=emptyMap()}
     }
     fun load()=work {s->val value=store.pending(s);if(same(s))pending=value;refresh(s)}
+    fun loadOlder()=work {s->require(hasMore&&before!=null);refresh(s,true)}
+    fun poll()=work {s->
+        val values=items.filter {it.state=="queued"}.take(20).map {event->decodeResponse<SourceEvent>(ApiClient(s.origin).request("/workspaces/${s.workspaceId}/source-events/${event.id}",session=s)).also {require(it.workspace_id==s.workspaceId&&it.id==event.id)}}
+        if(same(s))items=items.map {old->values.find {it.id==old.id&&java.math.BigInteger(it.version)>=java.math.BigInteger(old.version)}?:old}
+    }
     private suspend fun send(saved:StoredSession) {
         val command=requireNotNull(store.pending(saved))
         if(same(saved))pending=command
@@ -59,7 +66,8 @@ class SourcesModel(application:Application):AndroidViewModel(application) {
         }
         if(!same(saved))return
         pending=null
-        refresh(saved)
+        items=if(items.any {it.id==result.id})items.map {if(it.id==result.id)result else it} else listOf(result)+items
+        targets=emptyMap()
         if(same(saved))message="Сохранено. Финансовые задания обрабатываются сервером; обновите данные после обработки."
     }
     fun upload(binding:NotificationBinding,candidate:NotificationCandidate)=work {s->

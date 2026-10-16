@@ -171,33 +171,6 @@ func ReadSourceEvent(ctx context.Context, tx pgx.Tx, workspace, id, owner string
 	err = json.Unmarshal(raw, &value.SourceEventInput)
 	return value, err
 }
-func ListSourceEvents(ctx context.Context, tx pgx.Tx, workspace, owner string) ([]SourceEvent, bool, error) {
-	rows, err := tx.Query(ctx, `SELECT payload,workspace_id::text,version::text,state,received_at,(SELECT transaction_id::text FROM transaction_sources s WHERE s.workspace_id=source_events.workspace_id AND s.event_id=source_events.id),error_code FROM source_events WHERE workspace_id=$1 AND actor_user_id=$2 ORDER BY received_at DESC,id DESC LIMIT 101`, workspace, owner)
-	if err != nil {
-		return nil, false, err
-	}
-	defer rows.Close()
-	items := []SourceEvent{}
-	for rows.Next() {
-		var value SourceEvent
-		var raw []byte
-		if err := rows.Scan(&raw, &value.Workspace, &value.Version, &value.State, &value.ReceivedAt, &value.TransactionID, &value.ErrorCode); err != nil {
-			return nil, false, err
-		}
-		if err := json.Unmarshal(raw, &value.SourceEventInput); err != nil {
-			return nil, false, err
-		}
-		items = append(items, value)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, false, err
-	}
-	more := len(items) > 100
-	if more {
-		items = items[:100]
-	}
-	return items, more, nil
-}
 
 // Provenance stays immutable on the original row, but changing a parser identifier cannot mint money.
 func sourceFactsHash(input SourceEventInput) [32]byte {

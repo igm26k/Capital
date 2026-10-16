@@ -116,6 +116,7 @@ reports-check:
 	python3 scripts/check-ledger-responses.py ops/.runtime/checks/source-identity-responses.json
 	python3 scripts/check-ledger-responses.py ops/.runtime/checks/source-movement-responses.json
 	python3 scripts/check-ledger-responses.py ops/.runtime/checks/source-correction-responses.json
+	python3 scripts/check-ledger-responses.py ops/.runtime/checks/source-pages-responses.json
 
 .PHONY: email-auth-e2e
 email-auth-e2e:

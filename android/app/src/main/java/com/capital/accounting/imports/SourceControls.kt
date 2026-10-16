@@ -24,7 +24,7 @@ fun SourceControls(source:SourcesModel,model:AuthViewModel) {
         if(pending.rejected)TextButton(enabled=!source.busy,onClick=source::dismissRejected){Text("Закрыть отклоненный запрос предложения")}
         else Button(enabled=!source.busy&&!state.offline,onClick=source::retry){Text("Повторить сохраненный запрос предложения")}
     }
-    if(source.hasMore)Text("Показаны 100 последних серверных предложений. Ранее отправленные события сохраняются на сервере.")
+    if(source.hasMore)TextButton(enabled=!source.busy&&!state.offline&&source.before!=null,onClick=source::loadOlder){Text("Загрузить более ранние предложения")}
     source.items.filter {it.state!="dismissed"}.forEach {event->
         Text("${event.merchant.ifEmpty {"Без продавца"}} · ${Money.display(event.amount_minor,event.currency)}")
         Text("${state.accounts.find {it.id==event.account_id}?.name?:"Счет недоступен"} · ${if(event.kind=="expense")"Расход" else "Доход"} · ${event.observed_at}")

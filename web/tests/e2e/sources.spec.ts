@@ -168,3 +168,31 @@ test('source confirmation displays and preserves a manually corrected amount', a
   expect(transaction.entries).toHaveLength(1);expect(transaction.entries[0].amount_minor).toBe('-200');
   await page.reload();await expect(page.locator('.accounts strong')).toHaveText('98,00 EUR');
 });
+
+test('older source pages stay visible while their financial job completes', async ({ page, context }) => {
+  await page.goto('/');await page.getByRole('button',{name:'Создать профиль',exact:true}).click();
+  await page.getByLabel('Электронная почта').fill(`source-link-${crypto.randomUUID()}@example.test`);
+  await page.getByLabel('Пароль',{exact:true}).fill('synthetic-browser-password-2026');
+  await page.getByRole('button',{name:'Зарегистрироваться',exact:true}).click();
+  await expect(page.getByRole('button',{name:'Выйти',exact:true})).toBeVisible();
+  await page.getByLabel('Название счета').fill('Source link cash');await page.getByLabel('Начальный остаток, EUR').fill('100,00');
+  await page.getByRole('button',{name:'Создать счет',exact:true}).click();await expect(page.locator('.accounts strong')).toHaveText('100,00 EUR');
+  const auth=await(await context.request.get('/api/v1/auth/session')).json(),root=`/api/v1/workspaces/${auth.workspace.id}`;
+  const account=(await(await context.request.get(`${root}/accounts`)).json()).items[0];
+  const headers={Origin:new URL(page.url()).origin,'X-CSRF-Token':auth.csrf_token,'X-Sync-Generation':auth.workspace.sync_generation_id};
+  for(let i=0;i<103;i++){
+    const response=await context.request.post(`${root}/source-events`,{headers:{...headers,'Idempotency-Key':crypto.randomUUID()},data:{id:crypto.randomUUID(),connection_id:crypto.randomUUID(),external_id:i.toString(16).padStart(64,'0'),account_id:account.id,package_name:'example.bank',profile_id:'paging',parser_version:1,kind:'expense',amount_minor:'100',currency:'EUR',observed_at:new Date().toISOString(),observed_timezone:'UTC',merchant:`Page ${i}`,card_last_four:null}});
+    expect(response.status()).toBe(201);
+  }
+  await page.locator('summary').filter({hasText:/^Банковские предложения$/}).click();
+  const panel=page.getByRole('region',{name:'Банковские предложения',exact:true}),older=panel.getByRole('article',{name:'Предложение Page 0',exact:true});
+  await expect(older).toHaveCount(0);
+  await panel.getByRole('button',{name:'Загрузить более ранние предложения',exact:true}).click();
+  await expect(older).toBeVisible();
+  await older.getByRole('button',{name:'Создать предварительную операцию',exact:true}).click();
+  await panel.getByRole('button',{name:'Подтвердить действие предложения',exact:true}).click();
+  await expect(older.getByRole('button',{name:'Проверить связанную операцию',exact:true})).toBeVisible();
+  await expect(panel.getByRole('button',{name:'Загрузить более ранние предложения',exact:true})).toHaveCount(0);
+  const balance=await(await context.request.get(`${root}/accounts/${account.id}`)).json();
+  expect(balance.pending_delta_minor).toBe('-100');expect(balance.projected_balance_minor).toBe('9900');
+});

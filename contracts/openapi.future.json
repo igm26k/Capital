@@ -4723,6 +4723,14 @@
           },
           "has_more": {
             "type": "boolean"
+          },
+          "next_before_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Present for paginated requests (limit or before_id). Null on the last page; omitted for legacy requests without query."
           }
         },
         "required": [
