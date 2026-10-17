@@ -48,13 +48,16 @@ export async function parseWallet(text: string): Promise<WalletFile> {
     try {
       if (fields.length !== header.length) throw new Error('Число полей не совпадает с заголовком.');
       const r = Object.fromEntries(header.map((c, i) => [c, fields[i]]));
-      const kind = ({ 'Расход': 'expense', 'Доход': 'income', 'Expense': 'expense', 'Income': 'income', 'expense': 'expense', 'income': 'income' } as const)[r.type as 'Расход'];
+      const kind = ({ 'Расход': 'expense', 'Доход': 'income', 'Expense': 'expense', 'Income': 'income', 'expense': 'expense', 'income': 'income' } as Record<string, WalletRow['kind'] | undefined>)[r.type];
       if (!kind) throw new Error('Неизвестный тип операции.');
       if (!r.account.trim() || r.account.length > 100 || r.category.length > 100 || (r.payee ?? '').length > 200) throw new Error('Проверьте название счета, категории или получателя.');
       if (!/^\d+(?:[.,]\d+)?$/.test(r.amount)) throw new Error('Сумма Wallet должна быть положительным десятичным числом.');
       const amount = minor(r.amount, r.currency);
       if (BigInt(amount) <= 0n) throw new Error('Сумма должна быть больше нуля.');
       if (!/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,3})?(?:Z|[+-]\d\d:\d\d)$/.test(r.date) || !Number.isFinite(Date.parse(r.date))) throw new Error('Ожидается дата Wallet с часовым поясом ISO 8601.');
+      const [year, month, day] = r.date.slice(0, 10).split('-').map(Number);
+      const calendar = new Date(Date.UTC(year, month - 1, day));
+      if (calendar.getUTCFullYear() !== year || calendar.getUTCMonth() !== month - 1 || calendar.getUTCDate() !== day) throw new Error('Несуществующая календарная дата.');
       const date = new Date(r.date).toISOString();
       if (date.slice(0, 10) < '1900-01-01' || Date.parse(date) > Date.now()) throw new Error('Дата вне допустимого диапазона.');
       if (!['true', 'false'].includes(r.transfer.toLowerCase())) throw new Error('Признак перевода должен быть true или false.');
@@ -73,7 +76,7 @@ export function validWalletPair(debit: WalletRow, credit: WalletRow): boolean {
 }
 export function walletPairs(rows: WalletRow[]): WalletPair[] {
   const groups = new Map<string, WalletRow[]>();
-  for (const r of rows.filter(r => r.transfer)) groups.set(r.date, [...(groups.get(r.date) ?? []), r]);
+  for (const r of rows.filter(r => r.transfer)) { if (!groups.has(r.date)) groups.set(r.date, []); groups.get(r.date)!.push(r); }
   const pairs: WalletPair[] = [];
   for (const group of groups.values()) if (group.length === 2) {
     const debit = group.find(r => r.kind === 'expense'), credit = group.find(r => r.kind === 'income');
@@ -87,14 +90,14 @@ export async function planWallet(file: WalletFile, pairs: WalletPair[], mapping:
   const root = `wallet:v1:${owner}:${workspace}`;
   const append = (path: WalletCommand['path'], body: { id: string } & Record<string, unknown>, label: string) => commands.push({ path, key: body.id, body: JSON.stringify(body), label });
   const groups = new Map<string, WalletRow[]>();
-  for (const row of file.rows) { const key = walletAccountKey(row); groups.set(key, [...(groups.get(key) ?? []), row]); }
+  for (const row of file.rows) { const key = walletAccountKey(row); if (!groups.has(key)) groups.set(key, []); groups.get(key)!.push(row); }
   for (const [key, rows] of groups) {
     const first = rows[0], selection = mapping[key];
     if (!selection) throw new Error(`Выберите счет для ${first.account}.`);
     let accountID = selection;
     if (selection === 'new') {
       accountID = await id(`${root}:account:${key}`);
-      const opened = rows.reduce((a, r) => r.date < a ? r.date : a, first.date);
+      const opened = file.rows.reduce((a, r) => r.date < a ? r.date : a, first.date);
       append('accounts', { id: accountID, name: first.account, currency: first.currency, type: /cash|наличн/i.test(first.account) ? 'cash' : /card|карт/i.test(first.account) ? 'card' : 'bank', opened_at: opened, occurred_timezone: 'UTC', opening_balance_minor: '0' }, `Счет: ${first.account}`);
     } else {
       const account = accounts.find(a => a.id === selection && !a.archived_at && a.currency === first.currency);
@@ -117,9 +120,9 @@ export async function planWallet(file: WalletFile, pairs: WalletPair[], mapping:
     if (!debit || !credit || !validWalletPair(debit, credit) || used.has(pair.debit) || used.has(pair.credit)) throw new Error('Некорректная или повторяющаяся пара перевода.');
     const source = mapped.get(walletAccountKey(debit))!, target = mapped.get(walletAccountKey(credit))!;
     if (source === target) throw new Error('Для перевода нужны два разных счета.');
-    const note = `${walletNote(debit)}\nЗачисление Wallet · строка ${credit.number} · ${credit.date}${credit.note ? `\n${credit.note}` : ''}${credit.labels ? `\nМетки зачисления: ${credit.labels}` : ''}`;
+    const note = `${walletNote(debit)}\nЗачисление Wallet · строка ${credit.number} · ${credit.date}\n${walletNote(credit)}`;
     if (note.length > 2000) throw new Error(`Слишком длинное примечание перевода ${debit.number}/${credit.number}.`);
-    const transactionID = await id(`${root}:${file.digest}:transfer:${debit.number}:${credit.number}`);
+    const transactionID = await id(`${root}:${file.digest}:transfer:${debit.number}`);
     append('transactions', { id: transactionID, kind: 'transfer', source_account_id: source, target_account_id: target, source_amount_minor: debit.amount, target_amount_minor: credit.amount, occurred_at: debit.date, occurred_timezone: 'UTC', note, payee: debit.payee || credit.payee, tag_ids: [], rate: null, fee: null }, `Перевод: строки ${debit.number} → ${credit.number}`);
     used.add(debit.number); used.add(credit.number); transactions++;
   }
@@ -130,5 +133,6 @@ export async function planWallet(file: WalletFile, pairs: WalletPair[], mapping:
   }
   const skipped = file.rows.filter(r => r.transfer && !used.has(r.number)).length;
   if (skipped && !allowSkipped) throw new Error('Сопоставьте оставшиеся переводы или явно подтвердите их исключение.');
+  if (!transactions) throw new Error('В плане нет операций для импорта.');
   return { owner, workspace, generation, digest: file.digest, commands, skipped, rows: file.rows.length, createdAccounts: commands.filter(c => c.path === 'accounts').length, createdCategories: commands.filter(c => c.path === 'categories').length, transactions, key: file.digest };
 }

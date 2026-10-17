@@ -19,3 +19,6 @@ android/local.properties
 
 __pycache__/
 *.py[cod]
+
+# Private Wallet export used for import validation.
+/wallet_records.csv

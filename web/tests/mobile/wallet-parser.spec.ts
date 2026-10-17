@@ -38,7 +38,7 @@ test('Wallet only pairs unambiguous transfers, never turns transfers into expens
   expect(walletPairs(mismatch.rows)).toEqual([]);
 });
 test('Wallet rejects invalid currencies, precision, signs, dates and unknown types', async () => {
-  for (const input of [row('Cash', '-1'), row('Cash', '0'), row('Cash', '1.001'), row('Cash', '1e3'), row('Cash', '1', 'Refund'), row('Cash', '1', 'Расход', 'maybe'), row('Cash', '1', 'Расход', 'false', 'XYZ'), row('Cash', '1').replace(date, 'bad-date')]) {
+  for (const input of [row('Cash', '-1'), row('Cash', '0'), row('Cash', '1.001'), row('Cash', '1e3'), row('Cash', '1', 'Refund'), row('Cash', '1', 'Расход', 'maybe'), row('Cash', '1', 'Расход', 'false', 'XYZ'), row('Cash', '1').replace(date, 'bad-date'), row('Cash', '1').replace(date, '2025-02-30T00:00:00.000Z')]) {
     const file = await parseWallet(header + input);
     expect(file.errors).toHaveLength(1);
     await expect(planWallet(file, [], {}, [], [], 'owner', 'workspace', 'generation', true)).rejects.toThrow();

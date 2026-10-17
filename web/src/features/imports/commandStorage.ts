@@ -30,7 +30,7 @@ export async function clearCSVCommandsForOwner(owner: string): Promise<void> {
   try {
     await new Promise<void>((resolve, reject) => {
       const tx = db.transaction('commands', 'readwrite'), request = tx.objectStore('commands').openCursor();
-      request.onsuccess = () => { const cursor = request.result; if (!cursor) return; if ([`accounting.csv.pending.v1:${owner}:`,`accounting.sources.pending.v1:${owner}:`].some(prefix=>String(cursor.key).startsWith(prefix))) cursor.delete(); cursor.continue(); };
+      request.onsuccess = () => { const cursor = request.result; if (!cursor) return; if ([`accounting.csv.pending.v1:${owner}:`,`accounting.sources.pending.v1:${owner}:`,`accounting.wallet.pending.v1:${owner}:`].some(prefix=>String(cursor.key).startsWith(prefix))) cursor.delete(); cursor.continue(); };
       tx.oncomplete = () => resolve(); tx.onabort = () => reject(new Error('Не удалось очистить локальное хранилище CSV.'));
     });
   } finally { db.close(); }
@@ -55,4 +55,24 @@ export async function compareAuxiliaryCommand(key: string, expectedKey: string|n
       tx.onabort=()=>reject(conflict?new AuxiliaryCommandConflict():new Error('Не удалось сохранить запрос. Проверьте доступное место.'));
     });
   }finally{db.close();}
+}
+
+/** Close a completed Wallet journal atomically, including its progress record. */
+export async function closeWalletJournal(planKey: string, digest: string, progressKey: string, expectedProgress: string): Promise<void> {
+  const db = await database();
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction('commands', 'readwrite'), store = tx.objectStore('commands');
+      const plan = store.get(planKey), progress = store.get(progressKey);
+      let checked = 0, conflict = false;
+      const check = () => {
+        if (++checked !== 2) return;
+        if (plan.result?.key !== digest || progress.result?.key !== expectedProgress || progress.result?.cursor !== plan.result?.commands?.length) { conflict = true; tx.abort(); return; }
+        store.delete(planKey); store.delete(progressKey);
+      };
+      plan.onsuccess = check; progress.onsuccess = check;
+      tx.oncomplete = () => resolve();
+      tx.onabort = () => reject(conflict ? new AuxiliaryCommandConflict() : new Error('Не удалось закрыть журнал Wallet.'));
+    });
+  } finally { db.close(); }
 }

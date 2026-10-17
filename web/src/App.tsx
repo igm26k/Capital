@@ -15,6 +15,7 @@ import { RefundForm } from './features/transactions/RefundForm';
 import { TransactionConflict, type ProposedTransaction, type TransactionComparison } from './features/transactions/TransactionConflict';
 import { clearCSVCommandsForOwner } from './features/imports/commandStorage';
 import { SourcesPanel } from './features/sources/SourcesPanel';
+import { WalletImportPanel } from './features/imports/WalletImportPanel';
 import { CSVPanel } from './features/imports/CSVPanel';
 import { AnalyticsPanel } from './features/analytics/AnalyticsPanel';
 import { TransactionHistory } from './features/transactions/TransactionHistory';
@@ -224,6 +225,7 @@ export function App() {
     <ClassificationManager key={`classification-${formVersion}-${resourceRevision}`} categories={categories} tags={tags} disabled={busy || loading || !!pending || needsRefresh || !online} submit={create} fail={setError} />
     </details>
     <details onToggle={e => setAnalyticsOpen(e.currentTarget.open)}><summary>Бюджеты, отчеты и правила</summary>{analyticsOpen && <AnalyticsPanel key={`${auth.session.id}:${auth.workspace.sync_generation_id}`} auth={auth} accounts={accounts} categories={categories} tags={tags} revision={historyRevision} classify={body => create('transactions/classification',body)} fail={showError} drill={query => {setReportHistoryQuery(`${query}&limit=25`);navigate('operations');}} />}</details>
+    <details><summary>Импорт из Wallet</summary><WalletImportPanel key={`${auth.profile.id}:${auth.workspace.id}:${auth.session.id}`} auth={auth} accounts={accounts} categories={categories} blocked={busy || loading || !!pending || needsRefresh || !online} changed={() => { void refresh(auth).catch(showError); }} fail={showError} working={setBusy} /></details>
     <details onToggle={e=>setCSVOpen(e.currentTarget.open)}><summary>Импорт и экспорт CSV</summary>{csvOpen && <CSVPanel key={`${auth.session.id}:${auth.workspace.sync_generation_id}`} auth={auth} accounts={accounts} changed={()=>{void refresh(auth).catch(showError);}} fail={showError}/>}</details>
     <details onToggle={e=>setSourcesOpen(e.currentTarget.open)}><summary>Банковские предложения</summary>{sourcesOpen&&<SourcesPanel key={`${auth.session.id}:${auth.workspace.sync_generation_id}`} auth={auth} accounts={accounts} changed={()=>{void refresh(auth).catch(showError);}} fail={showError}/>}</details>
     <p className="hint">Ручной учет и CSV. Банковские подключения пока недоступны.</p>
