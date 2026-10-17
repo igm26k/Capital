@@ -53,7 +53,7 @@ export function TransactionHistory({ filterQuery, workspace, revision, accounts,
     } catch (error) { setError(error instanceof Error ? error.message : 'Проверьте период.'); }
   }
   const applied = new URLSearchParams(query);
-  return <section><h2>История операций</h2><form key={query} onSubmit={filter}><fieldset disabled={disabled || loading}>
+  return <section><h2>История операций</h2><details className="history-filters"><summary>Фильтры операций</summary><form key={query} onSubmit={filter}><fieldset disabled={disabled || loading}>
     <div className="forms"><label>Счет истории<select aria-label="Счет истории" name="account_id" defaultValue={applied.get('account_id')??''}><option value="">Все счета</option>{accounts.map(a => <option key={a.id} value={a.id}>{a.name}{a.archived_at && ' · В архиве'}</option>)}</select></label>
     <label>Категория истории<select aria-label="Категория истории" name="category_id" defaultValue={applied.get('category_id')??''}><option value="">Все категории</option>{categories.map(c => <option key={c.id} value={c.id}>{categoryLabel(c, categories)}</option>)}</select></label>
     <label>Тег истории<select aria-label="Тег истории" name="tag_id" defaultValue={applied.get('tag_id')??''}><option value="">Все теги</option>{tags.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></label>
@@ -62,7 +62,7 @@ export function TransactionHistory({ filterQuery, workspace, revision, accounts,
     <label>С даты<input type="date" name="from" /></label><label>По дату включительно<input type="date" name="to" /></label>
     <label>Поиск в истории<input name="q" defaultValue={applied.get('q')??''} maxLength={200} placeholder="Получатель или примечание" /></label><label>Операций на странице<select aria-label="Операций на странице" name="limit" defaultValue={applied.get('limit')??'25'}>{[10, 25, 50, 100].map(n => <option key={n}>{n}</option>)}</select></label></div>
     <button>Применить фильтры</button><button className="secondary" type="button" onClick={event => { event.currentTarget.form?.reset(); setQuery('limit=25'); setRetry(v => v + 1); }}>Сбросить фильтры</button>
-  </fieldset></form><p className="hint">Категория фильтруется без потомков. Даты относятся к часовому поясу этого браузера.</p>
+  </fieldset></form><p className="hint">Категория фильтруется без потомков. Даты относятся к часовому поясу этого браузера.</p></details>
     {error && <p role="alert">{error}</p>}<button className="secondary" disabled={disabled || loading} onClick={() => setRetry(v => v + 1)}>Обновить историю</button>
     <p className="hint">Для массовой классификации доступны самостоятельные расходы и доходы с одной частью, без активных возвратов, на активных счетах. Максимум 100 за команду.</p>
     <button className="secondary" disabled={disabled || loading || !items.some(eligible)} onClick={() => setSelected(current => { const ids = new Set(current.map(t => t.id)); return [...current, ...items.filter(t => eligible(t) && !ids.has(t.id))].slice(0, 100); })}>Выбрать видимые операции</button>

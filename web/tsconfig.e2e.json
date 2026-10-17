@@ -9,6 +9,7 @@
     "tests",
     "playwright.config.ts",
     "playwright.android.config.ts",
-    "playwright.email.config.ts"
+    "playwright.email.config.ts",
+    "playwright.mobile.config.ts"
   ]
 }
