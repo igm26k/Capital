@@ -1,9 +1,9 @@
 import type { Account, Category } from '../../api/client';
 import { minor } from '../../shared/money';
 
-export type WalletRow = { number: number; account: string; category: string; currency: string; amount: string; kind: 'expense' | 'income'; date: string; transfer: boolean; payee: string; note: string; payment: string; labels: string };
+export type WalletRow = { number: number; account: string; category: string; currency: string; amount: string; kind: 'expense' | 'income'; date: string; transfer: boolean; payee: string; note: string; payment: string; labels: string; referenceAmount: string | null };
 export type WalletFile = { rows: WalletRow[]; errors: string[]; digest: string };
-export type WalletPair = { debit: number; credit: number };
+export type WalletPair = { debit: number; credit: number; match?: 'timestamp' | 'amount' | 'reference' | 'manual' };
 export type WalletCommand = { path: 'accounts' | 'categories' | 'transactions'; key: string; body: string; label: string };
 export type WalletPlan = { owner: string; workspace: string; generation: string; digest: string; commands: WalletCommand[]; skipped: number; rows: number; createdAccounts: number; createdCategories: number; transactions: number; key: string };
 export const walletAccountKey = (r: Pick<WalletRow, 'account' | 'currency'>) => JSON.stringify([r.account, r.currency]);
@@ -35,6 +35,15 @@ async function id(namespace: string): Promise<string> {
   const s = await hash(namespace);
   return `${s.slice(0, 8)}-${s.slice(8, 12)}-5${s.slice(13, 16)}-a${s.slice(17, 20)}-${s.slice(20, 32)}`;
 }
+// Reference values can have more precision than money. Compare their exact
+// decimal strings; never round them or use them to calculate ledger amounts.
+function referenceKey(value: string): string | null {
+  if (!/^\d+(?:[.,]\d+)?$/.test(value)) return null;
+  const [whole, fraction = ''] = value.replace(',', '.').split('.');
+  const integer = whole.replace(/^0+(?=\d)/, ''), decimal = fraction.replace(/0+$/, '');
+  const key = decimal ? `${integer}.${decimal}` : integer;
+  return key === '0' ? null : key;
+}
 export async function parseWallet(text: string): Promise<WalletFile> {
   if (new TextEncoder().encode(text).length > 10 * 1024 * 1024) throw new Error('Файл Wallet должен быть не больше 10 MiB.');
   const [header, ...records] = walletCSV(text);
@@ -60,7 +69,7 @@ export async function parseWallet(text: string): Promise<WalletFile> {
       const date = new Date(r.date).toISOString();
       if (date.slice(0, 10) < '1900-01-01' || Date.parse(date) > Date.now()) throw new Error('Дата вне допустимого диапазона.');
       if (!['true', 'false'].includes(r.transfer.toLowerCase())) throw new Error('Признак перевода должен быть true или false.');
-      const row: WalletRow = { number, account: r.account, category: r.category, currency: r.currency, amount, kind, date, transfer: r.transfer.toLowerCase() === 'true', payee: r.payee ?? '', note: r.note ?? '', payment: r.payment_type ?? '', labels: r.labels ?? '' };
+      const row: WalletRow = { number, account: r.account, category: r.category, currency: r.currency, amount, kind, date, transfer: r.transfer.toLowerCase() === 'true', payee: r.payee ?? '', note: r.note ?? '', payment: r.payment_type ?? '', labels: r.labels ?? '', referenceAmount: referenceKey(r.ref_currency_amount) };
       if (walletNote(row).length > 1900) throw new Error('Слишком длинное примечание.');
       rows.push(row);
     } catch (e) { errors.push(`Строка ${number}: ${e instanceof Error ? e.message : 'Некорректные данные.'}`); }
@@ -73,13 +82,42 @@ export function walletNote(r: WalletRow): string {
 export function validWalletPair(debit: WalletRow, credit: WalletRow): boolean {
   return debit.transfer && credit.transfer && debit.kind === 'expense' && credit.kind === 'income' && walletAccountKey(debit) !== walletAccountKey(credit) && (debit.currency !== credit.currency || debit.amount === credit.amount);
 }
+export const WALLET_TRANSFER_WINDOW_MS = 5 * 60 * 1000;
 export function walletPairs(rows: WalletRow[]): WalletPair[] {
+  const transfers = rows.filter(r => r.transfer);
   const groups = new Map<string, WalletRow[]>();
-  for (const r of rows.filter(r => r.transfer)) { if (!groups.has(r.date)) groups.set(r.date, []); groups.get(r.date)!.push(r); }
-  const pairs: WalletPair[] = [];
+  for (const r of transfers) { if (!groups.has(r.date)) groups.set(r.date, []); groups.get(r.date)!.push(r); }
+  const pairs: WalletPair[] = [], used = new Set<number>();
+  const pair = (debit: WalletRow, credit: WalletRow, match: WalletPair['match']) => {
+    pairs.push({ debit: debit.number, credit: credit.number, match }); used.add(debit.number); used.add(credit.number);
+  };
+  // Preserve existing unambiguous same-time pairs and their command identities.
   for (const group of groups.values()) if (group.length === 2) {
     const debit = group.find(r => r.kind === 'expense'), credit = group.find(r => r.kind === 'income');
-    if (debit && credit && validWalletPair(debit, credit)) pairs.push({ debit: debit.number, credit: credit.number });
+    if (debit && credit && validWalletPair(debit, credit)) pair(debit, credit, 'timestamp');
+  }
+  // Match exact time first, then allow a small clock difference. A pair must be
+  // the only candidate on BOTH sides; nearest-row or CSV order is never a tie-breaker.
+  for (const window of [0, WALLET_TRANSFER_WINDOW_MS]) {
+    const remaining = transfers.filter(r => !used.has(r.number));
+    const credits = remaining.filter(r => r.kind === 'income').map(r => ({ row: r, time: Date.parse(r.date) })).sort((a, b) => a.time - b.time || a.row.number - b.row.number);
+    const candidates = new Map<number, { count: number; other: WalletRow }>();
+    const add = (row: WalletRow, other: WalletRow) => { const previous = candidates.get(row.number); candidates.set(row.number, { count: Math.min(2, (previous?.count ?? 0) + 1), other }); };
+    for (const debit of remaining.filter(r => r.kind === 'expense')) {
+      const time = Date.parse(debit.date);
+      let low = 0, high = credits.length;
+      while (low < high) { const mid = (low + high) >>> 1; if (credits[mid].time < time - window) low = mid + 1; else high = mid; }
+      for (let i = low; i < credits.length && credits[i].time <= time + window; i++) {
+        const credit = credits[i].row;
+        if (!validWalletPair(debit, credit)) continue;
+        if (debit.currency !== credit.currency && (!debit.referenceAmount || debit.referenceAmount !== credit.referenceAmount)) continue;
+        add(debit, credit); add(credit, debit);
+      }
+    }
+    for (const debit of remaining.filter(r => r.kind === 'expense')) {
+      const candidate = candidates.get(debit.number);
+      if (candidate?.count === 1 && candidates.get(candidate.other.number)?.count === 1) pair(debit, candidate.other, debit.currency === candidate.other.currency ? 'amount' : 'reference');
+    }
   }
   return pairs;
 }

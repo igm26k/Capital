@@ -12,9 +12,10 @@ test('Wallet plans commit to the real test ledger and exact replay does not dupl
     'Wallet Cash;Groceries;EUR;12.34;999;Expense;Cash;Synthetic expense;2025-08-12T15:00:00.000Z;false;;',
     'Wallet Cash;Groceries;EUR;5;999;Income;Cash;Synthetic income;2025-08-12T15:00:00.000Z;false;;',
     'Wallet Bank;Transfer;USD;100;999;Expense;Card;;2025-08-12T15:00:00.000Z;true;;',
-    'Wallet Cash;Transfer;EUR;91;999;Income;Cash;;2025-08-12T15:00:00.000Z;true;;',
+    'Wallet Cash;Transfer;EUR;91;999;Income;Cash;;2025-08-12T15:02:00.000Z;true;;',
   ].join('\n'));
   const plan = await planWallet(file, walletPairs(file.rows), [], [], auth.profile.id, auth.workspace.id, auth.workspace.sync_generation_id, false);
+  expect(walletPairs(file.rows)).toMatchObject([{ debit: 4, credit: 5, match: 'reference' }]);
   expect(plan.transactions).toBe(3);
   for (let pass = 0; pass < 2; pass++) {
     for (const command of plan.commands) {

@@ -32,7 +32,7 @@ test('Wallet only pairs unambiguous transfers, never turns transfers into expens
   expect(plan.skipped).toBe(1); expect(plan.transactions).toBe(1);
   expect(JSON.parse(plan.commands.at(-1)!.body)).toMatchObject({ kind: 'transfer', source_amount_minor: '10000', target_amount_minor: '9100', rate: null, fee: null });
   const paired = await parseWallet(header + row('Bank', '100', 'Расход', 'true') + row('Cash', '100', 'Доход', 'true'));
-  expect(walletPairs(paired.rows)).toEqual([{ debit: 2, credit: 3 }]);
+  expect(walletPairs(paired.rows)).toMatchObject([{ debit: 2, credit: 3 }]);
   const mismatch = await parseWallet(header + row('Bank', '100', 'Расход', 'true') + row('Cash', '99', 'Доход', 'true'));
   expect(walletPairs(mismatch.rows)).toEqual([]);
 });
@@ -63,4 +63,45 @@ test('Wallet accepts only the fixed wallet_records.csv column format', async () 
   await expect(parseWallet('date,amount,payee\n2025-01-01,-1,Store\n')).rejects.toThrow('wallet_records.csv');
   await expect(parseWallet(header.replaceAll(';', ',') + row('Cash', '1').replaceAll(';', ','))).rejects.toThrow('wallet_records.csv');
   await expect(parseWallet(header.replace('ref_currency_amount;', '') + row('Cash', '1'))).rejects.toThrow('wallet_records.csv');
+});
+test('Wallet separates several same-time transfers using exact currency amounts', async () => {
+  const file = await parseWallet(header + row('Bank A', '100', 'Расход', 'true') + row('Bank B', '200', 'Расход', 'true') + row('Cash A', '100', 'Доход', 'true') + row('Cash B', '200', 'Доход', 'true'));
+  expect(walletPairs(file.rows)).toEqual([{ debit: 2, credit: 4, match: 'amount' }, { debit: 3, credit: 5, match: 'amount' }]);
+});
+test('Wallet matches unique nearby amounts in both time directions but never outside five minutes', async () => {
+  for (const offset of ['2025-08-12T14:55:00.000Z', '2025-08-12T15:05:00.000Z']) {
+    const file = await parseWallet(header + row('Bank', '100', 'Расход', 'true') + row('Cash', '100', 'Доход', 'true').replace(date, offset));
+    expect(walletPairs(file.rows)).toEqual([{ debit: 2, credit: 3, match: 'amount' }]);
+    expect(walletPairs([...file.rows].reverse())).toEqual(walletPairs(file.rows));
+  }
+  const file = await parseWallet(header + row('Bank', '100', 'Расход', 'true') + row('Cash', '100', 'Доход', 'true').replace(date, '2025-08-12T15:05:00.001Z'));
+  expect(walletPairs(file.rows)).toEqual([]);
+});
+test('Wallet requires mutual uniqueness and does not choose the nearest or first duplicate', async () => {
+  const file = await parseWallet(header + row('Bank', '100', 'Расход', 'true') + row('Cash A', '100', 'Доход', 'true').replace(date, '2025-08-12T15:01:00.000Z') + row('Cash B', '100', 'Доход', 'true').replace(date, '2025-08-12T15:02:00.000Z'));
+  expect(walletPairs(file.rows)).toEqual([]);
+  for (const r of file.rows) r.kind = r.kind === 'expense' ? 'income' : 'expense';
+  expect(walletPairs(file.rows)).toEqual([]);
+  const duplicate = await parseWallet(header + row('Bank', '100', 'Расход', 'true').repeat(2) + row('Cash', '100', 'Доход', 'true').repeat(2));
+  expect(walletPairs(duplicate.rows)).toEqual([]);
+});
+test('Wallet compares cross-currency references exactly without rounding transaction amounts', async () => {
+  const debit = row('Bank', '100', 'Расход', 'true', 'USD').replace(';999999;', ';00091.230000;');
+  const credit = row('Cash', '91.23', 'Доход', 'true').replace(';999999;', ';91.23;').replace(date, '2025-08-12T15:02:00.000Z');
+  const file = await parseWallet(header + debit + credit);
+  expect(walletPairs(file.rows)).toEqual([{ debit: 2, credit: 3, match: 'reference' }]);
+  const plan = await planWallet(file, walletPairs(file.rows), [], [], 'owner', 'workspace', 'generation', false);
+  expect(JSON.parse(plan.commands.at(-1)!.body)).toMatchObject({ source_amount_minor: '10000', target_amount_minor: '9123' });
+  for (const ref of ['91.2300000000000001', '0', '-91.23', 'NaN', '']) {
+    const other = row('Cash', '91.23', 'Доход', 'true').replace(';999999;', `;${ref};`).replace(date, '2025-08-12T15:02:00.000Z');
+    const mismatch = await parseWallet(header + debit + other);
+    expect(mismatch.errors).toEqual([]);
+    expect(walletPairs(mismatch.rows)).toEqual([]);
+  }
+});
+test('Wallet never matches different same-currency amounts or movements on one account', async () => {
+  const file = await parseWallet(header + row('Bank', '100', 'Расход', 'true') + row('Cash', '99', 'Доход', 'true').replace(date, '2025-08-12T15:02:00.000Z'));
+  expect(walletPairs(file.rows)).toEqual([]);
+  const same = await parseWallet(header + row('Bank', '100', 'Расход', 'true') + row('Bank', '100', 'Доход', 'true').replace(date, '2025-08-12T15:02:00.000Z'));
+  expect(walletPairs(same.rows)).toEqual([]);
 });

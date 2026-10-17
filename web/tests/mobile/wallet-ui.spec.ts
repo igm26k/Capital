@@ -93,3 +93,12 @@ test('Wallet has no account or column mapping and automatically creates only mis
   expect(createdAccounts[0].body).toMatchObject({ name: 'Bank', currency: 'USD' });
   expect(writes.filter(r => r.path.endsWith('/transactions')).map(r => r.body.account_id)).toContain(existing.id);
 });
+test('Wallet resolves grouped transfers and shows why each pair was suggested', async ({ page }) => {
+  await page.getByLabel('Файл Wallet CSV').setInputFiles({ name: 'wallet_records.csv', mimeType: 'text/csv', buffer: Buffer.from(header + row('Bank A', '100', 'Расход', 'true') + row('Bank B', '200', 'Расход', 'true') + row('Cash A', '100', 'Доход', 'true') + row('Cash B', '200', 'Доход', 'true')) });
+  await expect(page.getByText(/Подобрано пар: 2\. Без пары: 0 строк/)).toBeVisible();
+  await expect(page.getByRole('checkbox', { name: /Я проверил строки без пары/ })).toHaveCount(0);
+  await page.getByText('Проверить пары переводов (2)', { exact: true }).click();
+  await expect(page.getByText('Единственное совпадение суммы и валюты', { exact: true })).toHaveCount(2);
+  await page.getByRole('button', { name: 'Подготовить импорт Wallet', exact: true }).click();
+  await expect(page.getByText(/Доходов, расходов и переводов: 2\. Исключено строк: 0/)).toBeVisible();
+});
