@@ -4,7 +4,6 @@ import { PrivacyPanel } from './features/auth/PrivacyPanel';
 import { SessionManager } from './features/auth/SessionManager';
 import { AuthForm } from './features/auth/AuthForm';
 import { AccountManager } from './features/accounts/AccountManager';
-import { AccountForm } from './features/accounts/AccountForm';
 import { TransferForm } from './features/transactions/TransferForm';
 import { TransactionForm } from './features/transactions/TransactionForm';
 import { ClassificationManager } from './features/classification/ClassificationManager';
@@ -31,7 +30,23 @@ function restore(auth: Auth): Command | null {
   return null;
 }
 function persist(command: Command | null) { try { command ? sessionStorage.setItem(storageKey, JSON.stringify(command)) : sessionStorage.removeItem(storageKey); } catch { /* In-memory fallback. */ } }
+type Section = 'accounts' | 'operations' | 'more';
+function currentSection(): Section {
+  const value = window.location.hash.slice(1);
+  return value === 'operations' || value === 'more' ? value : 'accounts';
+}
 export function App() {
+  const [section, setSection] = useState<Section>(currentSection);
+  useEffect(() => {
+    const update = () => { setSection(currentSection()); window.scrollTo(0, 0); };
+    window.addEventListener('hashchange', update);
+    return () => window.removeEventListener('hashchange', update);
+  }, []);
+  function navigate(next: Section) {
+    window.location.hash = next;
+    setSection(next);
+    window.scrollTo(0, 0);
+  }
   const activeSession = useRef<string | null>(null);
  const [analyticsOpen,setAnalyticsOpen]=useState(false);
  const [csvOpen,setCSVOpen]=useState(false);
@@ -174,27 +189,41 @@ export function App() {
     try { await request('/auth/logout', { method: 'POST', headers: { 'X-CSRF-Token': auth.csrf_token } }); activeSession.current = null; setAuth(null); setAccounts([]); setCategories([]); setTags([]); persist(null); }
     catch (error) { showError(error); } finally { setBusy(false); }
   }
-  return <main><header><div><span className="eyebrow">ЛИЧНЫЕ ФИНАНСЫ</span><h1>Accounting</h1></div>{auth && <div className="identity">{auth.profile.email}<button className="secondary" disabled={busy || !!pending} onClick={() => void logout()}>Выйти</button></div>}</header>
+  return <main className={auth ? "app-shell" : "login-shell"}><header className="app-header"><div><span className="eyebrow">ЛИЧНЫЕ ФИНАНСЫ</span><h1>Capital</h1></div>{auth && <div className="identity">{auth.profile.email}<button className="secondary" disabled={busy || !!pending} onClick={() => void logout()}>Выйти</button></div>}</header>
     {!online && <p role="status" className="notice">Нет соединения. Данные на экране могут быть устаревшими; новые операции недоступны.</p>}
     {starting ? <p role="status">Проверяем сессию…</p> : startupError ? <section><p role="alert">{startupError}</p><button onClick={() => void session()}>Повторить проверку сессии</button></section> : !auth ? <><AuthForm onAuth={authenticated} />{error && <p role="alert">{error}</p>}</> : <>
     <div className="workspace"><h2>{auth.workspace.name}</h2><button className="secondary" disabled={busy || loading || !online} onClick={() => { setError(''); void refresh(auth).catch(showError); }}>{loading ? 'Загрузка…' : 'Обновить'}</button></div>
     {message && <p role="status" className="notice success">{message}</p>}{error && <p role="alert" className="notice">{error}</p>}
     {pending && <section className="notice"><h2>Команда ожидает подтверждения</h2><p>Проверьте результат повтором той же команды. Ее данные и ключ сохранены в этой вкладке.</p><button disabled={busy || !online} onClick={() => void execute(pending)}>{busy ? 'Сохраняем…' : 'Повторить ту же команду'}</button></section>}
-    <AccountManager key={`accounts-${formVersion}-${resourceRevision}`} accounts={accounts} disabled={busy || loading || !!pending || needsRefresh || !online} loading={loading} submit={create} fail={setError} />
-    <div className="forms"><AccountForm key={`account-${formVersion}`} disabled={busy || loading || !!pending || needsRefresh || !online} submit={body => create('accounts', body)} fail={setError} /><TransactionForm key={`transaction-${formVersion}`} accounts={accounts.filter(a => !a.archived_at)} categories={categories} tags={tags} disabled={busy || loading || !!pending || needsRefresh || !online} submit={body => create('transactions', body)} fail={setError} /></div>
-    <TransferForm key={`transfer-${formVersion}`} accounts={accounts.filter(a => !a.archived_at)} categories={categories} tags={tags} disabled={busy || loading || !!pending || needsRefresh || !online} submit={body => create('transactions', body)} fail={setError} />
     {resourceConflict && <ResourceConflict value={resourceConflict} categories={categories} disabled={busy || loading || !!pending || !online} reload={() => void reloadResources()} />}
+    <div hidden={section !== "accounts"} className="screen" aria-label="Счета">
+    <AccountManager history={id => { setReportHistoryQuery(`account_id=${encodeURIComponent(id)}&limit=25`); navigate("operations"); }} key={`accounts-${formVersion}-${resourceRevision}`} accounts={accounts} disabled={busy || loading || !!pending || needsRefresh || !online} loading={loading} submit={create} fail={setError} />
+    </div>
+    <div hidden={section !== "operations"} className="screen" aria-label="Операции">
+    <div className="screen-heading"><h2>Операции</h2><p className="hint">Расходы, доходы и переводы</p></div>
+    <details className="editor-disclosure"><summary>Добавить операцию</summary><TransactionForm key={`transaction-${formVersion}`} accounts={accounts.filter(a => !a.archived_at)} categories={categories} tags={tags} disabled={busy || loading || !!pending || needsRefresh || !online} submit={body => create('transactions', body)} fail={setError} />
+    </details>
+    <details className="editor-disclosure"><summary>Перевод между счетами</summary>
+    <TransferForm key={`transfer-${formVersion}`} accounts={accounts.filter(a => !a.archived_at)} categories={categories} tags={tags} disabled={busy || loading || !!pending || needsRefresh || !online} submit={body => create('transactions', body)} fail={setError} />
+    </details>
+
     {bulkConflict && <BulkConflict value={bulkConflict} categories={categories} tags={tags} disabled={busy || loading || !!pending || !online} refresh={() => { setError(''); void refresh(auth).catch(showError); }} />}
     {deleting && <DeleteTransaction value={deleting} accounts={accounts} disabled={busy || loading || !!pending || needsRefresh || !online} confirm={() => create(`transactions/${deleting.transaction.id}`, { expected_version: deleting.transaction.version, related_versions: deleting.related.map(t => ({ id: t.id, version: t.version })) }, 'DELETE')} cancel={() => setDeleting(null)} />}
     {conflict && <TransactionConflict value={conflict} accounts={accounts} categories={categories} tags={tags} disabled={busy || loading || !!pending || !online} reload={() => void editTransaction(conflict.current.id)} dismiss={() => setConflict(null)} />}
     {editing && ['expense', 'income'].includes(editing.kind) && <TransactionForm key={`edit-${editing.id}-${editing.version}`} initial={editing} parentVersion={editingParentVersion} accounts={accounts} categories={categories} tags={tags} disabled={busy || loading || !!pending || needsRefresh || !online} submit={body => create(`transactions/${editing.id}`, body, 'PUT')} fail={setError} cancel={() => setEditing(null)} />}
     {editing?.kind === 'transfer' && <TransferForm key={`edit-transfer-${editing.id}-${editing.version}`} initial={editing} initialFee={editingFee} accounts={accounts} categories={categories} tags={tags} disabled={busy || loading || !!pending || needsRefresh || !online} submit={body => create(`transactions/${editing.id}`, body, 'PUT')} fail={setError} cancel={() => setEditing(null)} />}
     {refundParent && (!editing || editing.kind === 'refund') && <RefundForm key={`refund-${refundParent.id}-${refundParent.version}-${editing?.id ?? 'new'}`} parent={refundParent} transferVersion={refundTransferVersion} initial={editing ?? undefined} accounts={accounts} categories={categories} tags={tags} disabled={busy || loading || !!pending || needsRefresh || !online} submit={body => create(editing ? `transactions/${editing.id}` : 'transactions', body, editing ? 'PUT' : 'POST')} fail={setError} cancel={() => { setRefundParent(null); setEditing(null); }} />}
-    <AdjustmentForm key={`adjustment-${formVersion}`} accounts={accounts.filter(a => !a.archived_at)} disabled={busy || loading || !!pending || needsRefresh || !online} submit={create} fail={setError} />
+    <details className="editor-disclosure"><summary>Корректировка остатка</summary><AdjustmentForm key={`adjustment-${formVersion}`} accounts={accounts.filter(a => !a.archived_at)} disabled={busy || loading || !!pending || needsRefresh || !online} submit={create} fail={setError} />
+    </details>
     {editing?.kind === 'adjustment' && <AdjustmentForm key={`edit-adjustment-${editing.id}-${editing.version}`} accounts={accounts} initial={editing} disabled={busy || loading || !!pending || needsRefresh || !online} submit={create} fail={setError} cancel={() => setEditing(null)} />}
-    <ClassificationManager key={`classification-${formVersion}-${resourceRevision}`} categories={categories} tags={tags} disabled={busy || loading || !!pending || needsRefresh || !online} submit={create} fail={setError} />
     <TransactionHistory filterQuery={reportHistoryQuery} key={`${auth.session.id}-${auth.workspace.id}`} workspace={auth.workspace.id} revision={historyRevision} accounts={accounts} categories={categories} tags={tags} disabled={busy || loading || !!pending || needsRefresh || !online} edit={id => void editTransaction(id)} refund={id => void newRefund(id)} remove={id => void deleteTransaction(id)} classify={body => create('transactions/classification', body)} fail={showError} />
-    <details onToggle={e => setAnalyticsOpen(e.currentTarget.open)}><summary>Бюджеты, отчеты и правила</summary>{analyticsOpen && <AnalyticsPanel key={`${auth.session.id}:${auth.workspace.sync_generation_id}`} auth={auth} accounts={accounts} categories={categories} tags={tags} revision={historyRevision} classify={body => create('transactions/classification',body)} fail={showError} drill={query => {setReportHistoryQuery(`${query}&limit=25`);document.querySelector('.history')?.scrollIntoView();}} />}</details>
+    </div>
+    <div hidden={section !== "more"} className="screen" aria-label="Еще">
+    <div className="screen-heading"><h2>Еще</h2><p className="hint">Отчеты, справочники и настройки</p></div>
+    <details className="editor-disclosure"><summary>Категории и теги</summary>
+    <ClassificationManager key={`classification-${formVersion}-${resourceRevision}`} categories={categories} tags={tags} disabled={busy || loading || !!pending || needsRefresh || !online} submit={create} fail={setError} />
+    </details>
+    <details onToggle={e => setAnalyticsOpen(e.currentTarget.open)}><summary>Бюджеты, отчеты и правила</summary>{analyticsOpen && <AnalyticsPanel key={`${auth.session.id}:${auth.workspace.sync_generation_id}`} auth={auth} accounts={accounts} categories={categories} tags={tags} revision={historyRevision} classify={body => create('transactions/classification',body)} fail={showError} drill={query => {setReportHistoryQuery(`${query}&limit=25`);navigate('operations');}} />}</details>
     <details onToggle={e=>setCSVOpen(e.currentTarget.open)}><summary>Импорт и экспорт CSV</summary>{csvOpen && <CSVPanel key={`${auth.session.id}:${auth.workspace.sync_generation_id}`} auth={auth} accounts={accounts} changed={()=>{void refresh(auth).catch(showError);}} fail={showError}/>}</details>
     <details onToggle={e=>setSourcesOpen(e.currentTarget.open)}><summary>Банковские предложения</summary>{sourcesOpen&&<SourcesPanel key={`${auth.session.id}:${auth.workspace.sync_generation_id}`} auth={auth} accounts={accounts} changed={()=>{void refresh(auth).catch(showError);}} fail={showError}/>}</details>
     <p className="hint">Ручной учет и CSV. Банковские подключения пока недоступны.</p>
@@ -204,6 +233,11 @@ export function App() {
       if(activeSession.current!==auth.session.id)return;
       persist(null);setPending(null);activeSession.current=null;setAuth(null);setAccounts([]);setCategories([]);setTags([]);setReportHistoryQuery(undefined);setError(localCleared?'Профиль и личные данные удалены.':'Профиль удалён. Очистите данные этого сайта в настройках браузера: локальное хранилище недоступно.');}}/>
     <SessionManager key={auth.session.id} disabled={busy || loading || !!pending || !online} revoke={revokeSession} fail={showError} />
+    </div>
+    <nav className="bottom-nav" aria-label="Основная навигация">
+      {([['accounts', 'Счета', '◫'], ['operations', 'Операции', '⇄'], ['more', 'Еще', '⋯']] as const).map(([id, label, symbol]) =>
+        <a key={id} href={`#${id}`} aria-current={section === id ? 'page' : undefined}><span className="nav-symbol" aria-hidden="true">{symbol}</span><span>{label}</span></a>)}
+    </nav>
     </>}
   </main>;
 }

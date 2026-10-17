@@ -9,3 +9,31 @@ table{width:100%;table-layout:fixed;border-collapse:collapse;margin:16px 0}th,td
 section[aria-label="Бюджеты и отчеты"] table, section[aria-label="CSV импорт и экспорт"] table { display: block; max-width: 100%; overflow-x: auto; border-collapse: collapse; }
 section[aria-label="Бюджеты и отчеты"] td, section[aria-label="CSV импорт и экспорт"] td { padding: .5rem; max-width: 24rem; overflow-wrap: anywhere; vertical-align: top; }
 progress { accent-color: #2e7b62; max-width: 100%; }
+
+/* Material 3 layout shared with the Android application. */
+:root{color-scheme:light;--surface:#fffbfe;--surface-container:#f3edf7;--primary:#6750a4;--on-primary:#fff;--primary-container:#eaddff;--on-primary-container:#21005d;--outline:#cac4d0;--muted:#49454f;color:#1d1b20;background:var(--surface);font-family:Roboto,system-ui,sans-serif}
+[hidden]{display:none!important}
+main.app-shell,main.login-shell{max-width:760px;margin:0 auto;padding:20px 20px calc(112px + env(safe-area-inset-bottom))}
+h1{font-size:28px;font-weight:500;letter-spacing:-.5px}h2{font-weight:500}h3{font-size:17px;font-weight:600;margin:0}p{line-height:1.5;overflow-wrap:anywhere}
+.app-header{flex-direction:row;align-items:center;gap:12px;padding-top:env(safe-area-inset-top)}
+.app-header .eyebrow{color:var(--primary);font-size:10px;letter-spacing:1.5px}.app-header .identity{font-size:12px;max-width:50%;gap:4px;align-items:flex-end;flex-direction:column;width:auto}
+.workspace{margin:16px 0 24px;gap:12px;flex-wrap:nowrap}.workspace h2{font-size:14px;overflow-wrap:anywhere;color:var(--muted)}
+button{min-height:48px;border-radius:24px;background:var(--primary);color:var(--on-primary);padding:12px 20px;font-size:14px;font-weight:600;touch-action:manipulation}
+button.secondary{background:var(--surface-container);color:var(--primary)}button:disabled{opacity:.45}
+input,select,textarea{font-size:16px;min-height:52px;border-radius:8px;border-color:#79747e;background:var(--surface);padding:14px;color:inherit}label{color:var(--muted);line-height:1.5}
+section{border-color:var(--outline);border-radius:20px;background:var(--surface);padding:20px;margin-top:16px}section button{margin-top:4px}
+.screen-heading{margin:16px 0 20px}.screen-heading h2{font-size:28px;margin:0 0 6px}.screen-heading p{margin:0;font-size:14px}.hint{color:var(--muted)}
+.primary-action{display:block;width:100%;margin:16px 0}.filter-chips{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0}
+button.chip{border:1px solid #79747e;background:transparent;color:var(--muted);border-radius:10px;padding:8px 12px;font-weight:500;min-height:48px}
+button.chip[aria-pressed=true]{background:var(--primary-container);color:var(--on-primary-container);border-color:var(--primary-container)}
+.balance-summary{background:var(--primary-container);color:var(--on-primary-container);border:0;padding:24px;margin-bottom:20px}
+.balance-summary p{font-size:14px;margin:0 0 12px}.balance-summary strong{display:block;font-size:clamp(22px,5.5vw,30px);font-weight:500;margin:8px 0;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}.balance-summary small{display:block;margin-top:14px;font-size:12px}
+.account-cards{list-style:none;margin:0;padding:0;display:grid;gap:14px}.account-card{padding:20px 16px 8px;border:1px solid var(--outline);border-radius:16px;min-width:0}.account-card h3{overflow-wrap:anywhere}.account-meta{color:var(--muted);font-size:13px;margin:8px 0 16px}.account-balance{display:block;font-size:clamp(24px,6vw,32px);font-weight:500;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}.archive-badge{display:inline-block;font-size:11px;background:var(--surface-container);color:var(--muted);padding:4px 8px;border-radius:8px;margin-left:8px;vertical-align:middle}
+.card-actions{display:flex;gap:8px;border-top:1px solid #e7e0ec;margin-top:16px;padding-top:4px;flex-wrap:wrap}.text-button{background:transparent;color:var(--primary);padding:12px 16px}.empty-state{padding:24px}.empty-state p{color:var(--muted);font-size:14px;margin-bottom:0}.account-editor>section{margin-top:12px}.account-editor>section h2{margin-bottom:24px}
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;z-index:20;display:flex;justify-content:center;background:var(--surface-container);padding:8px max(8px,env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left));border-top:1px solid #e7e0ec}
+.bottom-nav a{flex:1;max-width:240px;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--muted);text-decoration:none;font-size:12px;font-weight:500;min-height:64px;padding:4px;border-radius:16px}.nav-symbol{display:grid;place-items:center;width:64px;height:32px;border-radius:20px;font-size:24px}.bottom-nav a[aria-current=page]{color:var(--on-primary-container);font-weight:700}.bottom-nav a[aria-current=page] .nav-symbol{background:var(--primary-container)}
+.screen>details{border:1px solid var(--outline);border-radius:16px;margin:12px 0;background:var(--surface)}summary{min-height:56px;padding:18px 16px;cursor:pointer;font-size:15px;font-weight:500;touch-action:manipulation}.screen>details>section{margin:0 12px 12px;border:0;padding:12px}.screen>details>form{padding:16px}
+.screen .forms{grid-template-columns:1fr;gap:0}.history li{background:var(--surface-container);border:0;border-radius:16px;padding:16px;margin-top:12px;flex-direction:column}.history li>div:last-child{max-width:100%;text-align:left}.history button{font-size:12px;padding:8px 12px}.notice{border-radius:16px}.auth{margin:32px auto}
+:focus-visible{outline:3px solid var(--primary);outline-offset:3px}html{scroll-padding-bottom:120px}body{min-width:280px}button,input,select,textarea{max-width:100%}.screen{min-width:0}form button+button{margin:8px 0 0 8px}
+@media(min-width:700px){.app-shell{border-inline:1px solid #e7e0ec;min-height:100dvh}.account-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(prefers-color-scheme:dark){:root{color-scheme:dark;--surface:#141218;--surface-container:#211f26;--primary:#d0bcff;--on-primary:#381e72;--primary-container:#4f378b;--on-primary-container:#eaddff;--outline:#49454f;--muted:#cac4d0;color:#e6e0e9}.card-actions,.bottom-nav{border-color:var(--outline)}.notice{background:#493c24}.success{background:#203c2d}.app-shell{border-color:var(--outline)}}
