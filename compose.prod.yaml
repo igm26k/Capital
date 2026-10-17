@@ -16,19 +16,23 @@ x-prod-env: &prod-env
   SMTP_MODE: ${SMTP_MODE:-starttls}
 services:
   db:
+    restart: unless-stopped
     command: [postgres, -c, ssl=on, -c, ssl_cert_file=/etc/postgresql/tls/server.crt, -c, ssl_key_file=/etc/postgresql/tls/server.key]
     volumes:
       - ${PRODUCTION_DB_TLS_DIR:?Provide PostgreSQL TLS directory}:/etc/postgresql/tls:ro
   api:
+    restart: unless-stopped
     environment: *prod-env
     volumes: ["${PRODUCTION_DB_CA_DIR:?Provide database CA directory}:/etc/accounting/db-tls:ro"]
   worker:
+    restart: unless-stopped
     environment: *prod-env
     volumes: ["${PRODUCTION_DB_CA_DIR:?Provide database CA directory}:/etc/accounting/db-tls:ro"]
   migrate:
     environment: *prod-env
     volumes: ["${PRODUCTION_DB_CA_DIR:?Provide database CA directory}:/etc/accounting/db-tls:ro"]
   web:
+    restart: unless-stopped
     ports: !override ["${PRODUCTION_HTTPS_BIND:?Provide public bind address}:443:443"]
     volumes:
       - ${PRODUCTION_WEB_TLS_DIR:?Provide web TLS directory}:/etc/nginx/tls:ro

@@ -92,6 +92,21 @@ class ProductionPreflight(unittest.TestCase):
         self.assertTrue(result['ready'],result);self.assertTrue(result['test_only_web_trust'])
         default=preflight.check_config(copy.deepcopy(self.config))
         self.assertFalse(default['ready']);self.assertIn('web_tls_chain_and_key',default['failed'])
+    def test_short_lived_ip_certificate_requires_one_day_remaining(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            folder=pathlib.Path(temporary);key=folder/'localhost.key';csr=folder/'request.csr';cert=folder/'localhost.crt';ext=folder/'extensions'
+            def run(args):subprocess.run(['openssl']+args,check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+            run(['req','-newkey','rsa:2048','-nodes','-subj','/CN=192.0.2.1','-keyout',str(key),'-out',str(csr)])
+            key.chmod(0o600);ext.write_text('subjectAltName=IP:192.0.2.1\nextendedKeyUsage=serverAuth\n')
+            config=copy.deepcopy(self.config)
+            for name in ('api','worker','migrate'):config['services'][name]['environment']['PUBLIC_ORIGIN']='https://192.0.2.1'
+            config['services']['web']['volumes'][0]['source']=str(folder)
+            def issue(days):run(['x509','-req','-days',str(days),'-in',str(csr),'-CA',str(self.ca),'-CAkey',str(self.ca_key),'-CAcreateserial','-out',str(cert),'-extfile',str(ext)])
+            issue(2)
+            self.assertTrue(preflight.check_config(config,web_test_ca=self.ca)['ready'])
+            issue(0)
+            self.assertIn('web_tls_chain_and_key',preflight.check_config(config,web_test_ca=self.ca)['failed'])
+
     def test_mismatched_database_would_backup_wrong_target(self):
         config=copy.deepcopy(self.config);config['services']['api']['environment']['DATABASE_URL']=config['services']['api']['environment']['DATABASE_URL'].replace('@db:', '@elsewhere:')
         result=preflight.check_config(config,web_test_ca=self.ca)

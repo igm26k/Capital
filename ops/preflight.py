@@ -18,11 +18,11 @@ def command(args):
     if result.returncode:raise RuntimeError('certificate_validation')
     return result.stdout.strip()
 
-def certificate(cert,key,hostname,ca=None):
+def certificate(cert,key,hostname,ca=None,minimum_validity=604800):
     cert,key=pathlib.Path(cert),pathlib.Path(key)
     if not cert.is_file() or not key.is_file() or key.is_symlink():raise RuntimeError('certificate_files')
     if stat.S_IMODE(key.stat().st_mode)&0o077:raise RuntimeError('private_key_permissions')
-    command(['openssl','x509','-checkend','604800','-noout','-in',str(cert)])
+    command(['openssl','x509','-checkend',str(minimum_validity),'-noout','-in',str(cert)])
     public=command(['openssl','x509','-pubkey','-noout','-in',str(cert)])
     if public!=command(['openssl','pkey','-pubout','-in',str(key)]):raise RuntimeError('certificate_key_mismatch')
     try:ipaddress.ip_address(hostname);identity=['-verify_ip',hostname]
@@ -86,7 +86,10 @@ def check_config(config,web_test_ca=None):
     check('database_tls_chain_and_key',database_tls)
     def web_tls():
         directory=bind(services['web'],'/etc/nginx/tls');origin=urllib.parse.urlsplit(environment['PUBLIC_ORIGIN'])
-        certificate(directory/'localhost.crt',directory/'localhost.key',origin.hostname,web_test_ca)
+        # Public IP certificates use a mandatory short-lived profile (~6 days).
+        try:ipaddress.ip_address(origin.hostname);minimum=86400
+        except ValueError:minimum=604800
+        certificate(directory/'localhost.crt',directory/'localhost.key',origin.hostname,web_test_ca,minimum_validity=minimum)
     check('web_tls_chain_and_key',web_tls)
     return {'ready':not errors,'passed':checks,'failed':errors,'test_only_web_trust':web_test_ca is not None}
 
