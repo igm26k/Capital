@@ -42,7 +42,7 @@ journalctl -u accounting-certbot-renew.service
 Пробное продление `certbot renew --dry-run` успешно; запуск systemd service
 завершился Result=success / ExecMainStatus=0. Первый сертификат действителен
 до 2026-10-23 21:33:36 UTC (2026-10-24 00:33:36 МСК).
-Сертификат сам по себе не открывает HTTPS приложение: постоянное production
-окружение и внешний ingress 443 в рамках этой задачи не запускались.
+После отдельного развёртывания 2026-10-17 production nginx использует этот
+сертификат на IPv4 TCP 443. См. ../../docs/agent-tasks/PERSONAL-DEPLOYMENT.md.
 При изменении публичного IP потребуется новый сертификат и обновление hook/origin.
 Приватные ключи, ACME аккаунты и защищённые конфиги не добавлять в Git.
