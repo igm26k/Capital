@@ -151,16 +151,22 @@ fun AccountPanel(model: AuthViewModel) {
                 FinancialCommandStatus(model, "Ваш черновик: $name, $type; ${if (archived) "в архив" else "активен"}")
                 Text(if (editingId == null) "Новый счет" else "Изменить счет", style = MaterialTheme.typography.titleMedium)
                 ValidatedTextField(name, { name = it }, if (editingId == null) "Название счета" else "Новое название счета", "name", validation, enabled)
-                Text("Тип счета: $type")
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                HorizontalDivider()
+                Text("Тип счета", style = MaterialTheme.typography.titleSmall)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf("bank" to "Банк", "cash" to "Наличные", "card" to "Карта").forEach { (value, label) ->
-                        TextButton(enabled = enabled, onClick = { type = value }) { Text(label) }
+                        FilterChip(selected = type == value, enabled = enabled, onClick = { type = value }, label = { Text(label) })
                     }
                 }
                 if (editingId == null) {
-                    Text("Валюта счета: $currency")
-                    Row { Money.scales.keys.take(3).forEach { code -> TextButton(enabled = enabled, onClick = { currency = code }) { Text(code) } } }
-                    Row { Money.scales.keys.drop(3).forEach { code -> TextButton(enabled = enabled, onClick = { currency = code }) { Text(code) } } }
+                    Text("Валюта счета", style = MaterialTheme.typography.titleSmall)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Money.scales.keys.forEach { code ->
+                            FilterChip(selected = currency == code, enabled = enabled, onClick = { currency = code }, label = { Text(code) })
+                        }
+                    }
+                    HorizontalDivider()
+                    Text("Начальный остаток и дата открытия", style = MaterialTheme.typography.titleSmall)
                     ValidatedTextField(balance, { balance = it }, "Начальный остаток", "balance", validation, enabled)
                     ValidatedTextField(opened, { opened = it }, "Дата открытия (YYYY-MM-DDTHH:MM:SS)", "opened", validation, enabled)
                     ValidatedTextField(zone, { zone = it }, "Часовой пояс открытия", "zone", validation, enabled)
@@ -177,7 +183,7 @@ fun AccountPanel(model: AuthViewModel) {
                     }
                 }
                 if (error.isNotEmpty()) Text(error)
-                Button(enabled = enabled, onClick = save@{
+                Button(modifier = Modifier.fillMaxWidth(), enabled = enabled, onClick = save@{
                     error = ""
                     if (!validation.submit(accountFieldErrors(name, balance, opened, zone, currency, editingId == null))) return@save
                     try {
