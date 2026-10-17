@@ -8,6 +8,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.capital.accounting.api.*
@@ -85,28 +86,52 @@ fun AccountPanel(model: AuthViewModel) {
     if (navigation.value == null) Button(enabled = !state.busy, onClick = model::loadAccounts) { Text("Обновить счета") }
     if (navigation.value == null) FinancialCommandStatus(model, "Ваш черновик: $name, $type; ${if (archived) "в архив" else "активен"}")
     if (!editorOpen && section.value == "accounts") {
-        Text("Счета", style = MaterialTheme.typography.titleLarge)
-        Text("Показаны счета: ${when (accountFilter) { "archived" -> "архивные"; "all" -> "все"; else -> "активные" }}")
-        listOf("active" to "Активные счета", "archived" to "Архивные счета", "all" to "Все счета").forEach { (value, label) ->
-            TextButton(onClick = { accountFilter = value }) { Text(label) }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Счета", style = MaterialTheme.typography.headlineMedium)
+                Text("Ваши деньги по счетам и валютам", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
+        Button(modifier = Modifier.fillMaxWidth(), enabled = enabled && !scope.saving, onClick = ::createAccount) { Text("Добавить счет") }
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf("active" to "Активные счета", "archived" to "Архивные счета", "all" to "Все счета").forEach { (value, label) ->
+                FilterChip(selected = accountFilter == value, onClick = { accountFilter = value }, label = { Text(label) })
+            }
+        }
+        Text("Показаны счета: ${when (accountFilter) { "archived" -> "архивные"; "all" -> "все"; else -> "активные" }}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         val visibleAccounts = state.accounts.filter { when (accountFilter) { "archived" -> it.archived_at != null; "all" -> true; else -> it.archived_at == null } }
-        Text("Итоги показанных счетов по валютам")
-        visibleAccounts.groupBy { it.currency }.toSortedMap().forEach { (currency, accounts) ->
-            Text("Итого: ${Money.displayTotal(accounts.map { it.posted_balance_minor }, currency)}")
+        if (visibleAccounts.isNotEmpty()) Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer), modifier = Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Итоги показанных счетов по валютам", style = MaterialTheme.typography.labelLarge)
+                visibleAccounts.groupBy { it.currency }.toSortedMap().forEach { (currency, accounts) ->
+                    Text("Итого: ${Money.displayTotal(accounts.map { it.posted_balance_minor }, currency)}", style = MaterialTheme.typography.headlineSmall)
+                }
+                Text("${visibleAccounts.size} счетов · Валюты учитываются отдельно", style = MaterialTheme.typography.bodySmall)
+            }
         }
-        if (state.accountsLoaded && visibleAccounts.isEmpty() && !state.busy) Text(if (state.accounts.isEmpty()) "Создайте первый счет" else "В выбранном фильтре счетов нет.")
+        if (state.accountsLoaded && visibleAccounts.isEmpty() && !state.busy) OutlinedCard(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(if (state.accounts.isEmpty()) "Создайте первый счет" else "В выбранном фильтре счетов нет.", style = MaterialTheme.typography.titleMedium)
+                Text(if (state.accounts.isEmpty()) "Добавьте карту, банковский счет или наличные, чтобы видеть остатки и учитывать операции." else "Выберите другой фильтр, чтобы увидеть остальные счета.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
         visibleAccounts.forEach { account ->
-            Text("${account.name}${if (account.archived_at != null) " · В архиве" else ""}")
-            Text("Тип: ${when (account.type) { "bank" -> "Банк"; "card" -> "Карта"; else -> "Наличные" }} · Валюта: ${account.currency}")
-            Text(Money.display(account.posted_balance_minor, account.currency))
-            TextButton(enabled = !state.busy && state.persisted, onClick = {
-                model.applyHistoryFilter(TransactionFilter(accountId = account.id))
-                section.value = "operations"
-            }) { Text("Операции счета ${account.name}") }
-            Button(enabled = enabled, onClick = { guard.request { editingId = account.id; editingVersion = account.version; currency = account.currency; editingBalance = account.posted_balance_minor; name = account.name; type = account.type; archived = account.archived_at != null; error = ""; validation.reset(); navigation.value = "account"  } }) { Text("Изменить счет ${account.name}") }
+            OutlinedCard(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("${account.name}${if (account.archived_at != null) " · В архиве" else ""}", style = MaterialTheme.typography.titleMedium)
+                    Text("${when (account.type) { "bank" -> "Банк"; "card" -> "Карта"; else -> "Наличные" }} · ${account.currency}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(Money.display(account.posted_balance_minor, account.currency), style = MaterialTheme.typography.headlineMedium)
+                    HorizontalDivider()
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TextButton(enabled = !state.busy && state.persisted, onClick = {
+                            model.applyHistoryFilter(TransactionFilter(accountId = account.id))
+                            section.value = "operations"
+                        }) { Text("Операции счета ${account.name}") }
+                        TextButton(enabled = enabled, onClick = { guard.request { editingId = account.id; editingVersion = account.version; currency = account.currency; editingBalance = account.posted_balance_minor; name = account.name; type = account.type; archived = account.archived_at != null; error = ""; validation.reset(); navigation.value = "account" } }) { Text("Изменить счет ${account.name}") }
+                    }
+                }
+            }
         }
-        Button(enabled = enabled && !scope.saving, onClick = ::createAccount) { Text("Добавить счет") }
         TextButton(enabled = enabled && !scope.saving, onClick = { navigation.value = "account" }) { Text("Открыть черновик счета") }
         DraftGuardControls(guard, "account", enabled) { navigation.value = "account" }
     } else if (editorOpen) Dialog(onDismissRequest = ::close, properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)) {
