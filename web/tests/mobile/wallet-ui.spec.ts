@@ -68,3 +68,28 @@ test('Wallet requires an explicit decision for an orphan transfer', async ({ pag
   await expect(page.getByText(/Новых счетов: 2.*Исключено строк: 1/)).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
+test('Wallet has no account or column mapping and automatically creates only missing accounts', async ({ page }) => {
+  const existing = { id: '00000000-0000-4000-8000-000000000099', name: 'Cash', currency: 'EUR', type: 'cash', archived_at: null, posted_balance_minor: '0', version: '1', balance_version: '1' };
+  const writes: { path: string; body: Record<string, unknown> }[] = [];
+  await page.route('**/api/v1/workspaces/*/*', route => {
+    if (route.request().method() === 'POST') { writes.push({ path: new URL(route.request().url()).pathname, body: route.request().postDataJSON() }); return route.fulfill({ json: {} }); }
+    if (new URL(route.request().url()).pathname.endsWith('/accounts')) return route.fulfill({ json: { items: [existing], next_cursor: null } });
+    return route.fallback();
+  });
+  await page.reload();
+  await page.locator('summary').filter({ hasText: /^Импорт из Wallet$/ }).click();
+  await page.getByLabel('Файл Wallet CSV').setInputFiles({ name: 'wallet_records.csv', mimeType: 'text/csv', buffer: Buffer.from(header + row('Cash', '12.34') + row('Bank', '50', 'Доход', 'false', 'USD')) });
+  await expect(page.getByText('1 строк · Существующий счет', { exact: true })).toBeVisible();
+  await expect(page.getByText('1 строк · Будет создан автоматически', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('Импорт Wallet', { exact: true }).getByRole('combobox')).toHaveCount(0);
+  await page.locator('summary').filter({ hasText: /^Экспорт CSV$/ }).click();
+  await expect(page.getByLabel('Колонка даты', { exact: true })).toHaveCount(0);
+  await expect(page.getByLabel('CSV файл', { exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Подготовить импорт Wallet', exact: true }).click();
+  await page.getByRole('button', { name: 'Подтвердить импорт Wallet', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Импорт Wallet завершен' })).toBeVisible();
+  const createdAccounts = writes.filter(r => r.path.endsWith('/accounts'));
+  expect(createdAccounts).toHaveLength(1);
+  expect(createdAccounts[0].body).toMatchObject({ name: 'Bank', currency: 'USD' });
+  expect(writes.filter(r => r.path.endsWith('/transactions')).map(r => r.body.account_id)).toContain(existing.id);
+});

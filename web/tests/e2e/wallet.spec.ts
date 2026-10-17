@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { parseWallet, planWallet, walletAccountKey, walletPairs } from '../../src/features/imports/wallet';
+import { parseWallet, planWallet, walletPairs } from '../../src/features/imports/wallet';
 import type { Account, Auth, List, Transaction } from '../../src/api/client';
 
 test('Wallet plans commit to the real test ledger and exact replay does not duplicate records', async ({ context }) => {
@@ -14,8 +14,7 @@ test('Wallet plans commit to the real test ledger and exact replay does not dupl
     'Wallet Bank;Transfer;USD;100;999;Expense;Card;;2025-08-12T15:00:00.000Z;true;;',
     'Wallet Cash;Transfer;EUR;91;999;Income;Cash;;2025-08-12T15:00:00.000Z;true;;',
   ].join('\n'));
-  const mapping = Object.fromEntries(file.rows.map(r => [walletAccountKey(r), 'new']));
-  const plan = await planWallet(file, walletPairs(file.rows), mapping, [], [], auth.profile.id, auth.workspace.id, auth.workspace.sync_generation_id, false);
+  const plan = await planWallet(file, walletPairs(file.rows), [], [], auth.profile.id, auth.workspace.id, auth.workspace.sync_generation_id, false);
   expect(plan.transactions).toBe(3);
   for (let pass = 0; pass < 2; pass++) {
     for (const command of plan.commands) {

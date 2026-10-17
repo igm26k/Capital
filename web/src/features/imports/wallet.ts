@@ -11,8 +11,7 @@ export const walletAccountKey = (r: Pick<WalletRow, 'account' | 'currency'>) => 
 // RFC 4180 quoting, including escaped quotes and newlines inside a field.
 export function walletCSV(text: string): string[][] {
   text = text.replace(/^\uFEFF/, '');
-  const first = text.slice(0, text.indexOf('\n') < 0 ? text.length : text.indexOf('\n'));
-  const delimiter = first.includes(';') ? ';' : first.includes('\t') ? '\t' : ',';
+  const delimiter = ';';
   const rows: string[][] = []; let row: string[] = [], value = '', quoted = false, closed = false;
   const cell = () => { row.push(value); value = ''; closed = false; };
   for (let i = 0; i < text.length; i++) {
@@ -39,8 +38,8 @@ async function id(namespace: string): Promise<string> {
 export async function parseWallet(text: string): Promise<WalletFile> {
   if (new TextEncoder().encode(text).length > 10 * 1024 * 1024) throw new Error('Файл Wallet должен быть не больше 10 MiB.');
   const [header, ...records] = walletCSV(text);
-  const required = ['account', 'category', 'currency', 'amount', 'type', 'date', 'transfer'];
-  if (!header || new Set(header).size !== header.length || required.some(c => !header.includes(c))) throw new Error('Это не CSV выгрузка Wallet: нужны account, category, currency, amount, type, date, transfer.');
+  const columns = ['account', 'category', 'currency', 'amount', 'ref_currency_amount', 'type', 'payment_type', 'note', 'date', 'transfer', 'payee', 'labels'];
+  if (!header || header.length !== columns.length || columns.some((name, i) => header[i] !== name)) throw new Error('Выберите CSV в формате wallet_records.csv: 12 колонок Wallet с разделителем «;». Другие форматы импорта не поддерживаются.');
   if (!records.length || records.length > 20000) throw new Error('Выберите выгрузку Wallet от 1 до 20000 строк.');
   const rows: WalletRow[] = [], errors: string[] = [];
   records.forEach((fields, index) => {
@@ -84,7 +83,7 @@ export function walletPairs(rows: WalletRow[]): WalletPair[] {
   }
   return pairs;
 }
-export async function planWallet(file: WalletFile, pairs: WalletPair[], mapping: Record<string, string>, accounts: Account[], categories: Category[], owner: string, workspace: string, generation: string, allowSkipped: boolean): Promise<WalletPlan> {
+export async function planWallet(file: WalletFile, pairs: WalletPair[], accounts: Account[], categories: Category[], owner: string, workspace: string, generation: string, allowSkipped: boolean): Promise<WalletPlan> {
   if (file.errors.length) throw new Error('Исправьте ошибки CSV перед импортом.');
   const commands: WalletCommand[] = [], mapped = new Map<string, string>(), categoryIDs = new Map<string, string>();
   const root = `wallet:v1:${owner}:${workspace}`;
@@ -92,16 +91,16 @@ export async function planWallet(file: WalletFile, pairs: WalletPair[], mapping:
   const groups = new Map<string, WalletRow[]>();
   for (const row of file.rows) { const key = walletAccountKey(row); if (!groups.has(key)) groups.set(key, []); groups.get(key)!.push(row); }
   for (const [key, rows] of groups) {
-    const first = rows[0], selection = mapping[key];
-    if (!selection) throw new Error(`Выберите счет для ${first.account}.`);
-    let accountID = selection;
-    if (selection === 'new') {
+    const first = rows[0];
+    const matches = accounts.filter(a => a.name === first.account && a.currency === first.currency);
+    const active = matches.filter(a => !a.archived_at);
+    if (active.length > 1) throw new Error(`Найдено несколько активных счетов «${first.account}» в ${first.currency}. Устраните одинаковые названия перед импортом.`);
+    if (!active.length && matches.length) throw new Error(`Счет «${first.account}» в ${first.currency} находится в архиве. Восстановите его перед импортом.`);
+    let accountID = active[0]?.id;
+    if (!accountID) {
       accountID = await id(`${root}:account:${key}`);
       const opened = file.rows.reduce((a, r) => r.date < a ? r.date : a, first.date);
       append('accounts', { id: accountID, name: first.account, currency: first.currency, type: /cash|наличн/i.test(first.account) ? 'cash' : /card|карт/i.test(first.account) ? 'card' : 'bank', opened_at: opened, occurred_timezone: 'UTC', opening_balance_minor: '0' }, `Счет: ${first.account}`);
-    } else {
-      const account = accounts.find(a => a.id === selection && !a.archived_at && a.currency === first.currency);
-      if (!account) throw new Error(`Счет для ${first.account} недоступен или имеет другую валюту.`);
     }
     if ([...mapped.values()].includes(accountID)) throw new Error('Разные счета Wallet нельзя объединять в один счет при импорте.');
     mapped.set(key, accountID);
