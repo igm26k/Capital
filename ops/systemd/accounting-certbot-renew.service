@@ -1,0 +1,10 @@
+[Unit]
+Description=Renew Accounting IP HTTPS certificate
+Wants=network-online.target
+After=network-online.target apache2.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/accounting-certbot/bin/certbot renew --quiet --no-random-sleep-on-renew
+TimeoutStartSec=15min
+UMask=0077
