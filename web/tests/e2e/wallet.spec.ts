@@ -13,10 +13,14 @@ test('Wallet plans commit to the real test ledger and exact replay does not dupl
     'Wallet Cash;Groceries;EUR;5;999;Income;Cash;Synthetic income;2025-08-12T15:00:00.000Z;false;;',
     'Wallet Bank;Transfer;USD;100;999;Expense;Card;;2025-08-12T15:00:00.000Z;true;;',
     'Wallet Cash;Transfer;EUR;91;999;Income;Cash;;2025-08-12T15:02:00.000Z;true;;',
+    'Wallet Cash;Adjustment;EUR;10;10;Income;Cash;Missing source;2025-09-01T12:00:00.000Z;true;;',
+    'Wallet Cash;Adjustment;EUR;2;2;Expense;Cash;Missing destination;2025-09-02T12:00:00.000Z;true;;',
   ].join('\n'));
   const plan = await planWallet(file, walletPairs(file.rows), [], [], auth.profile.id, auth.workspace.id, auth.workspace.sync_generation_id, false);
   expect(walletPairs(file.rows)).toMatchObject([{ debit: 4, credit: 5, match: 'reference' }]);
-  expect(plan.transactions).toBe(3);
+  expect(plan.transactions).toBe(5);
+  expect(plan.adjustments).toBe(2);
+  expect(plan.skipped).toBe(0);
   for (let pass = 0; pass < 2; pass++) {
     for (const command of plan.commands) {
       const response = await context.request.post(`/api/v1/workspaces/${auth.workspace.id}/${command.path}`, { headers: { ...headers, 'X-CSRF-Token': auth.csrf_token, 'X-Sync-Generation': plan.generation, 'Idempotency-Key': command.key, 'Content-Type': 'application/json' }, data: command.body });
@@ -28,9 +32,13 @@ test('Wallet plans commit to the real test ledger and exact replay does not dupl
   const accounts = (await accountResponse.json() as List<Account>).items;
   expect(accounts).toHaveLength(2);
   expect(accounts.find(a => a.currency === 'USD')?.posted_balance_minor).toBe('-10000');
-  expect(accounts.find(a => a.currency === 'EUR')?.posted_balance_minor).toBe('8366');
+  expect(accounts.find(a => a.currency === 'EUR')?.posted_balance_minor).toBe('9166');
   const history = await context.request.get(`/api/v1/workspaces/${auth.workspace.id}/transactions`);
   const transactions = (await history.json() as List<Transaction>).items;
+  expect(transactions.filter(t => t.kind === 'adjustment')).toHaveLength(2);
+  const adjustments = transactions.filter(t => t.kind === 'adjustment');
+  expect(adjustments.flatMap(t => t.entries.map(e => e.amount_minor)).sort()).toEqual(['-200', '1000']);
+  expect(adjustments.every(t => t.occurred_at.startsWith('2025-09-') && t.reason && !t.allocations.length)).toBe(true);
   expect(transactions.filter(t => t.kind === 'transfer')).toHaveLength(1);
   expect(transactions.filter(t => t.kind === 'expense')).toHaveLength(1);
   expect(transactions.filter(t => t.kind === 'income')).toHaveLength(1);

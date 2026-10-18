@@ -5,7 +5,7 @@ export type WalletRow = { number: number; account: string; category: string; cur
 export type WalletFile = { rows: WalletRow[]; errors: string[]; digest: string };
 export type WalletPair = { debit: number; credit: number; match?: 'timestamp' | 'amount' | 'reference' | 'manual' };
 export type WalletCommand = { path: 'accounts' | 'categories' | 'transactions'; key: string; body: string; label: string };
-export type WalletPlan = { owner: string; workspace: string; generation: string; digest: string; commands: WalletCommand[]; skipped: number; rows: number; createdAccounts: number; createdCategories: number; transactions: number; key: string };
+export type WalletPlan = { owner: string; workspace: string; generation: string; digest: string; commands: WalletCommand[]; skipped: number; rows: number; createdAccounts: number; createdCategories: number; transactions: number; adjustments?: number; key: string };
 export const walletAccountKey = (r: Pick<WalletRow, 'account' | 'currency'>) => JSON.stringify([r.account, r.currency]);
 
 // RFC 4180 quoting, including escaped quotes and newlines inside a field.
@@ -121,6 +121,18 @@ export function walletPairs(rows: WalletRow[]): WalletPair[] {
   }
   return pairs;
 }
+// The export uses transfer=true for both real transfers and balance corrections.
+// Only rows without any remaining plausible opposite side are corrections;
+// multiple candidate transfers still require a manual decision.
+export function walletCorrections(rows: WalletRow[], pairs: WalletPair[]): WalletRow[] {
+  const used = new Set(pairs.flatMap(p => [p.debit, p.credit]));
+  const remaining = rows.filter(r => r.transfer && !used.has(r.number));
+  return remaining.filter(row => !remaining.some(other => {
+    if (row.kind === other.kind || walletAccountKey(row) === walletAccountKey(other) || Math.abs(Date.parse(row.date) - Date.parse(other.date)) > WALLET_TRANSFER_WINDOW_MS) return false;
+    if (row.date === other.date) return true;
+    return row.currency === other.currency ? row.amount === other.amount : !!row.referenceAmount && row.referenceAmount === other.referenceAmount;
+  }));
+}
 export async function planWallet(file: WalletFile, pairs: WalletPair[], accounts: Account[], categories: Category[], owner: string, workspace: string, generation: string, allowSkipped: boolean): Promise<WalletPlan> {
   if (file.errors.length) throw new Error('Исправьте ошибки CSV перед импортом.');
   const commands: WalletCommand[] = [], mapped = new Map<string, string>(), categoryIDs = new Map<string, string>();
@@ -168,8 +180,14 @@ export async function planWallet(file: WalletFile, pairs: WalletPair[], accounts
     append('transactions', { id: transactionID, kind: row.kind, account_id: mapped.get(walletAccountKey(row))!, amount_minor: row.amount, occurred_at: row.date, occurred_timezone: 'UTC', note: walletNote(row), payee: row.payee, tag_ids: [], allocations: [{ id: await id(`${transactionID}:allocation`), category_id: categoryIDs.get(row.category) ?? null, amount_minor: row.amount }] }, `Строка ${row.number}: ${row.kind === 'expense' ? 'расход' : 'доход'}`);
     transactions++;
   }
+  const corrections = walletCorrections(file.rows, pairs);
+  for (const row of corrections) {
+    const transactionID = await id(`${root}:${file.digest}:adjustment:${row.number}`);
+    append('transactions', { id: transactionID, kind: 'adjustment', account_id: mapped.get(walletAccountKey(row))!, amount_minor: row.kind === 'expense' ? `-${row.amount}` : row.amount, occurred_at: row.date, occurred_timezone: 'UTC', reason: row.kind === 'expense' ? 'Корректировка Wallet: отсутствует направление перевода' : 'Корректировка Wallet: отсутствует источник поступления', note: walletNote(row), payee: row.payee }, `Корректировка: строка ${row.number}`);
+    used.add(row.number); transactions++;
+  }
   const skipped = file.rows.filter(r => r.transfer && !used.has(r.number)).length;
   if (skipped && !allowSkipped) throw new Error('Сопоставьте оставшиеся переводы или явно подтвердите их исключение.');
   if (!transactions) throw new Error('В плане нет операций для импорта.');
-  return { owner, workspace, generation, digest: file.digest, commands, skipped, rows: file.rows.length, createdAccounts: commands.filter(c => c.path === 'accounts').length, createdCategories: commands.filter(c => c.path === 'categories').length, transactions, key: file.digest };
+  return { owner, workspace, generation, digest: file.digest, commands, skipped, rows: file.rows.length, createdAccounts: commands.filter(c => c.path === 'accounts').length, createdCategories: commands.filter(c => c.path === 'categories').length, transactions, adjustments: corrections.length, key: file.digest };
 }

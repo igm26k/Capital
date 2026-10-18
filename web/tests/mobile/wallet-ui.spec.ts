@@ -49,24 +49,33 @@ test('Wallet resumes the exact uncertain command after reload', async ({ page })
     if (route.request().url().endsWith('/transactions') && !lost) { lost = true; return route.abort('connectionfailed'); }
     return route.fulfill({ json: {} });
   });
-  await page.getByLabel('Файл Wallet CSV').setInputFiles({ name: 'wallet_records.csv', mimeType: 'text/csv', buffer: Buffer.from(header + row('Cash', '12.34')) });
+  await page.getByLabel('Файл Wallet CSV').setInputFiles({ name: 'wallet_records.csv', mimeType: 'text/csv', buffer: Buffer.from(header + row('Cash', '12.34', 'Доход', 'true')) });
   await page.getByRole('button', { name: 'Подготовить импорт Wallet', exact: true }).click();
   await page.getByRole('button', { name: 'Подтвердить импорт Wallet', exact: true }).click();
   await expect(page.getByRole('alert')).toBeVisible();
-  expect(requests).toHaveLength(3);
+  expect(requests).toHaveLength(2);
   await page.reload(); await page.locator('summary').filter({ hasText: /^Импорт из Wallet$/ }).click();
   await page.getByRole('button', { name: 'Продолжить импорт Wallet', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Импорт Wallet завершен' })).toBeVisible();
-  expect(requests).toHaveLength(4);
-  expect(requests[3]).toEqual(requests[2]);
+  expect(requests).toHaveLength(3);
+  expect(requests[2]).toEqual(requests[1]);
+  expect(JSON.parse(requests[2].body!)).toMatchObject({ kind: 'adjustment', amount_minor: '1234' });
 });
-test('Wallet requires an explicit decision for an orphan transfer', async ({ page }) => {
+test('Wallet imports an orphan movement as an explicit correction without a fictitious account', async ({ page }) => {
+  const writes: Record<string, unknown>[] = [];
+  await page.route('**/api/v1/workspaces/*/*', route => {
+    if (route.request().method() !== 'POST') return route.fallback();
+    writes.push(route.request().postDataJSON()); return route.fulfill({ json: {} });
+  });
   await page.getByLabel('Файл Wallet CSV').setInputFiles({ name: 'wallet_records.csv', mimeType: 'text/csv', buffer: Buffer.from(header + row('Cash', '12.34') + row('Bank', '100', 'Расход', 'true', 'USD')) });
-  await expect(page.getByRole('button', { name: 'Подготовить импорт Wallet', exact: true })).toBeDisabled();
-  await page.getByRole('checkbox', { name: /Я проверил строки без пары/ }).check();
+  await expect(page.getByText('Корректирующие проводки Wallet (1)', { exact: true })).toBeVisible();
+  await expect(page.getByRole('checkbox', { name: /Я проверил строки без пары/ })).toHaveCount(0);
   await page.getByRole('button', { name: 'Подготовить импорт Wallet', exact: true }).click();
-  await expect(page.getByText(/Новых счетов: 2.*Исключено строк: 1/)).toBeVisible();
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await expect(page.getByText(/Из них корректировок: 1.*Исключено строк: 0/)).toBeVisible();
+  await page.getByRole('button', { name: 'Подтвердить импорт Wallet', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Импорт Wallet завершен' })).toBeVisible();
+  expect(writes.filter(r => r.kind === 'adjustment')).toEqual([expect.objectContaining({ account_id: expect.any(String), amount_minor: '-10000', occurred_at: '2025-08-12T15:00:00.000Z' })]);
+  expect(writes.filter(r => 'opening_balance_minor' in r)).toHaveLength(2);
 });
 test('Wallet has no account or column mapping and automatically creates only missing accounts', async ({ page }) => {
   const existing = { id: '00000000-0000-4000-8000-000000000099', name: 'Cash', currency: 'EUR', type: 'cash', archived_at: null, posted_balance_minor: '0', version: '1', balance_version: '1' };
@@ -100,5 +109,5 @@ test('Wallet resolves grouped transfers and shows why each pair was suggested', 
   await page.getByText('Проверить пары переводов (2)', { exact: true }).click();
   await expect(page.getByText('Единственное совпадение суммы и валюты', { exact: true })).toHaveCount(2);
   await page.getByRole('button', { name: 'Подготовить импорт Wallet', exact: true }).click();
-  await expect(page.getByText(/Доходов, расходов и переводов: 2\. Исключено строк: 0/)).toBeVisible();
+  await expect(page.getByText(/Всего операций: 2\. Из них корректировок: 0\. Исключено строк: 0/)).toBeVisible();
 });

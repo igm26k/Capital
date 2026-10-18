@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { parseWallet, planWallet, walletCSV, walletPairs } from '../../src/features/imports/wallet';
+import { parseWallet, planWallet, walletCSV, walletPairs, walletCorrections } from '../../src/features/imports/wallet';
 const header = 'account;category;currency;amount;ref_currency_amount;type;payment_type;note;date;transfer;payee;labels\n';
 const date = '2025-08-12T15:00:00.000Z';
 const row = (account: string, amount: string, kind = 'Расход', transfer = 'false', currency = 'EUR', note = '') => `${account};Еда;${currency};${amount};999999;${kind};Наличные;${note};${date};${transfer};;\n`;
@@ -29,8 +29,8 @@ test('Wallet only pairs unambiguous transfers, never turns transfers into expens
   expect(walletPairs(file.rows)).toEqual([]);
   await expect(planWallet(file, [], [], [], 'owner', 'workspace', 'generation', false)).rejects.toThrow('переводы');
   const plan = await planWallet(file, [{ debit: 2, credit: 3 }], [], [], 'owner', 'workspace', 'generation', true);
-  expect(plan.skipped).toBe(1); expect(plan.transactions).toBe(1);
-  expect(JSON.parse(plan.commands.at(-1)!.body)).toMatchObject({ kind: 'transfer', source_amount_minor: '10000', target_amount_minor: '9100', rate: null, fee: null });
+  expect(plan.skipped).toBe(0); expect(plan.transactions).toBe(2); expect(plan.adjustments).toBe(1);
+  expect(JSON.parse(plan.commands.find(c => JSON.parse(c.body).kind === 'transfer')!.body)).toMatchObject({ kind: 'transfer', source_amount_minor: '10000', target_amount_minor: '9100', rate: null, fee: null });
   const paired = await parseWallet(header + row('Bank', '100', 'Расход', 'true') + row('Cash', '100', 'Доход', 'true'));
   expect(walletPairs(paired.rows)).toMatchObject([{ debit: 2, credit: 3 }]);
   const mismatch = await parseWallet(header + row('Bank', '100', 'Расход', 'true') + row('Cash', '99', 'Доход', 'true'));
@@ -104,4 +104,21 @@ test('Wallet never matches different same-currency amounts or movements on one a
   expect(walletPairs(file.rows)).toEqual([]);
   const same = await parseWallet(header + row('Bank', '100', 'Расход', 'true') + row('Bank', '100', 'Доход', 'true').replace(date, '2025-08-12T15:02:00.000Z'));
   expect(walletPairs(same.rows)).toEqual([]);
+});
+test('Wallet orphan debits and credits become dated signed adjustments', async () => {
+  const file = await parseWallet(header + row('Bank', '100', 'Расход', 'true', 'USD') + row('Cash', '20', 'Доход', 'true').replace(date, '2025-08-13T15:00:00.000Z'));
+  expect(walletPairs(file.rows)).toEqual([]);
+  expect(walletCorrections(file.rows, [])).toHaveLength(2);
+  const plan = await planWallet(file, [], [], [], 'owner', 'workspace', 'generation', false);
+  expect(plan.adjustments).toBe(2); expect(plan.skipped).toBe(0); expect(plan.transactions).toBe(2);
+  const movements = plan.commands.filter(c => c.path === 'transactions').map(c => JSON.parse(c.body));
+  expect(movements).toEqual([expect.objectContaining({ kind: 'adjustment', amount_minor: '-10000', occurred_at: date }), expect.objectContaining({ kind: 'adjustment', amount_minor: '2000', occurred_at: '2025-08-13T15:00:00.000Z' })]);
+  expect(movements.every(m => !('target_account_id' in m) && !('allocations' in m) && m.reason)).toBe(true);
+  expect(await planWallet(file, [], [], [], 'owner', 'workspace', 'generation', false)).toEqual(plan);
+});
+test('Wallet ambiguous candidates remain transfers for manual review, not adjustments', async () => {
+  const file = await parseWallet(header + row('Bank A', '100', 'Расход', 'true') + row('Bank B', '100', 'Расход', 'true') + row('Cash', '100', 'Доход', 'true'));
+  expect(walletPairs(file.rows)).toEqual([]);
+  expect(walletCorrections(file.rows, [])).toEqual([]);
+  await expect(planWallet(file, [], [], [], 'owner', 'workspace', 'generation', false)).rejects.toThrow('Сопоставьте');
 });
