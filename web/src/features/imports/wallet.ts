@@ -130,13 +130,15 @@ export async function planWallet(file: WalletFile, accounts: Account[], categori
   for (const row of file.rows) { const key = walletAccountKey(row); if (!groups.has(key)) groups.set(key, []); groups.get(key)!.push(row); }
   for (const [key, rows] of groups) {
     const first = rows[0];
-    const matches = accounts.filter(a => a.name === first.account && a.currency === first.currency);
+    const importedID = await id(`${root}:account:${key}`);
+    // Preserve the link to an auto-created account after the owner renames it.
+    const matches = accounts.filter(a => (a.name === first.account || a.id === importedID) && a.currency === first.currency);
     const active = matches.filter(a => !a.archived_at);
     if (active.length > 1) throw new Error(`Найдено несколько активных счетов «${first.account}» в ${first.currency}. Устраните одинаковые названия перед импортом.`);
     if (!active.length && matches.length) throw new Error(`Счет «${first.account}» в ${first.currency} находится в архиве. Восстановите его перед импортом.`);
     let accountID = active[0]?.id;
     if (!accountID) {
-      accountID = await id(`${root}:account:${key}`);
+      accountID = importedID;
       const opened = file.rows.reduce((a, r) => r.date < a ? r.date : a, first.date);
       append('accounts', { id: accountID, name: first.account, currency: first.currency, type: /cash|наличн/i.test(first.account) ? 'cash' : /card|карт/i.test(first.account) ? 'card' : 'bank', opened_at: opened, occurred_timezone: 'UTC', opening_balance_minor: '0' }, `Счет: ${first.account}`);
     }

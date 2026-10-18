@@ -131,3 +131,15 @@ test('Wallet never rounds reference values or picks between duplicate cross-curr
     expect(walletCorrections(file.rows)).toHaveLength(3);
   }
 });
+
+test('Wallet reuses its deterministic account after a rename without creating another account', async () => {
+  const file = await parseWallet(header + row('Original name', '12.34'));
+  const first = await planWallet(file, [], [], 'owner', 'workspace', 'generation');
+  const account = JSON.parse(first.commands.find(c => c.path === 'accounts')!.body);
+  const renamed = { ...account, name: 'Corrected name', archived_at: null, version: '2', balance_version: '2', posted_balance_minor: '0' };
+  const next = await planWallet(file, [renamed], [], 'owner', 'workspace', 'generation');
+  expect(next.createdAccounts).toBe(0);
+  const operation = JSON.parse(next.commands.find(c => c.path === 'transactions')!.body);
+  expect(operation.account_id).toBe(account.id);
+  expect(next.commands.filter(c => c.path === 'transactions')).toEqual(first.commands.filter(c => c.path === 'transactions'));
+});
