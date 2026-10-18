@@ -39,7 +39,8 @@ test('Wallet home shows live per-currency overview and category shares, with rec
 test('Wallet home shortcuts open the working forms, history filters and reports', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Добавить операцию', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Сохранить операцию', exact: true })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Новая операция' }).getByRole('button', { name: 'Добавить', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Отмена', exact: true }).click();
   await page.getByRole('navigation').getByRole('link', { name: 'Счета', exact: true }).click();
   await page.getByRole('button', { name: 'Операции счета Евро карта', exact: true }).click();
   await page.getByText('Фильтры операций', { exact: true }).click();

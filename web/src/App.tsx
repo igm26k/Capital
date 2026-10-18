@@ -21,6 +21,7 @@ import { AnalyticsPanel } from './features/analytics/AnalyticsPanel';
 import { TransactionHistory } from './features/transactions/TransactionHistory';
 import { HomeOverview } from './features/home/HomeOverview';
 import { Icon } from './shared/Icon';
+import { OperationModal } from './features/transactions/OperationModal';
 // A single unfinished command survives reload in this tab. No credentials are persisted.
 type Command = { owner: string; session: string; workspace: string; generation: string; key: string; path: string; body: string; method?: 'POST' | 'PUT' | 'DELETE' };
 const storageKey = 'accounting.pending.v1';
@@ -69,7 +70,7 @@ export function App() {
   const [editing, setEditing] = useState<Transaction | null>(null);
   const [categories, setCategories] = useState<Category[]>([]), [tags, setTags] = useState<Tag[]>([]);
   const [pending, setPending] = useState<Command | null>(null), [busy, setBusy] = useState(false), [loading, setLoading] = useState(false), [message, setMessage] = useState(''), [error, setError] = useState(''), [online, setOnline] = useState(navigator.onLine), [formVersion, setFormVersion] = useState(0);
-  function authenticated(value: Auth) { setReportHistoryQuery(undefined); activeSession.current = value.session.id; setAccounts([]); setCategories([]); setTags([]); setEditing(null); setRefundParent(null); setDeleting(null); setBulkConflict(null); setResourceConflict(null); setConflict(null); setAuth(value); setPending(restore(value)); setError(''); setMessage(''); }
+  function authenticated(value: Auth) { setOperationOpen(false); setReportHistoryQuery(undefined); activeSession.current = value.session.id; setAccounts([]); setCategories([]); setTags([]); setEditing(null); setRefundParent(null); setDeleting(null); setBulkConflict(null); setResourceConflict(null); setConflict(null); setAuth(value); setPending(restore(value)); setError(''); setMessage(''); }
   async function session() {
     setStarting(true); setStartupError('');
     try { authenticated(await request<Auth>('/auth/session')); }
@@ -98,7 +99,7 @@ export function App() {
     setBusy(true); setError(''); setMessage('');
     try {
       await request(command.path, { method: command.method ?? 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': auth.csrf_token, 'X-Sync-Generation': command.generation, 'Idempotency-Key': command.key }, body: command.body });
-      persist(null); setPending(null); setEditing(null); setRefundParent(null); setDeleting(null); setBulkConflict(null); setResourceConflict(null); setConflict(null); setFormVersion(v => v + 1); setMessage('Сохранено.');
+      persist(null); setPending(null); setOperationOpen(false); setEditing(null); setRefundParent(null); setDeleting(null); setBulkConflict(null); setResourceConflict(null); setConflict(null); setFormVersion(v => v + 1); setMessage('Сохранено.');
       try { await refresh(auth); } catch (error) { setError('Операция сохранена, но обновить список не удалось. Нажмите «Обновить».'); showError(error); }
     } catch (error) {
       if (error instanceof RequestError && ['action_result_expired', 'idempotency_conflict'].includes(error.code)) {
@@ -204,28 +205,21 @@ export function App() {
     <div hidden={section !== "accounts"} className="screen" aria-label="Счета">
     <AccountManager records={() => showRecords()} history={id => showRecords(`account_id=${encodeURIComponent(id)}`)} key={`accounts-${formVersion}-${resourceRevision}`} accounts={accounts} disabled={busy || loading || !!pending || needsRefresh || !online} loading={loading} submit={create} fail={setError} >
       <HomeOverview workspace={auth.workspace.id} active={section === 'accounts'} revision={historyRevision} accounts={accounts} categories={categories} records={showRecords} openRecord={id => { navigate('operations'); void editTransaction(id); }} />
-      <button className="add-record-fab" aria-label="Добавить операцию" disabled={busy || loading || !!pending || needsRefresh || !online} onClick={() => { setOperationOpen(true); navigate('operations'); }}><Icon name="plus" /></button>
+      <button className="add-record-fab" aria-label="Добавить операцию" disabled={busy || loading || !!pending || needsRefresh || !online} onClick={() => { setError(''); setOperationOpen(true); navigate('operations'); }}><Icon name="plus" /></button>
     </AccountManager>
     </div>
     <div hidden={section !== "operations"} className="screen" aria-label="Операции">
-    <div className="screen-heading"><h2>Операции</h2><p className="hint">Расходы, доходы и переводы</p></div>
-    <details className="editor-disclosure" open={operationOpen} onToggle={e => setOperationOpen(e.currentTarget.open)}><summary>Добавить операцию</summary><TransactionForm key={`transaction-${formVersion}`} accounts={accounts.filter(a => !a.archived_at)} categories={categories} tags={tags} disabled={busy || loading || !!pending || needsRefresh || !online} submit={body => create('transactions', body)} fail={setError} />
-    </details>
-    <details className="editor-disclosure"><summary>Перевод между счетами</summary>
-    <TransferForm key={`transfer-${formVersion}`} accounts={accounts.filter(a => !a.archived_at)} categories={categories} tags={tags} disabled={busy || loading || !!pending || needsRefresh || !online} submit={body => create('transactions', body)} fail={setError} />
-    </details>
-
+    <div className="screen-heading operations-heading"><h2>Операции</h2><button className="operations-add" aria-label="Добавить операцию" disabled={busy || loading || !!pending || needsRefresh || !online} onClick={() => { setError(''); setOperationOpen(true); }}><Icon name="plus" /></button></div>
     {bulkConflict && <BulkConflict value={bulkConflict} categories={categories} tags={tags} disabled={busy || loading || !!pending || !online} refresh={() => { setError(''); void refresh(auth).catch(showError); }} />}
     {deleting && <DeleteTransaction value={deleting} accounts={accounts} disabled={busy || loading || !!pending || needsRefresh || !online} confirm={() => create(`transactions/${deleting.transaction.id}`, { expected_version: deleting.transaction.version, related_versions: deleting.related.map(t => ({ id: t.id, version: t.version })) }, 'DELETE')} cancel={() => setDeleting(null)} />}
     {conflict && <TransactionConflict value={conflict} accounts={accounts} categories={categories} tags={tags} disabled={busy || loading || !!pending || !online} reload={() => void editTransaction(conflict.current.id)} dismiss={() => setConflict(null)} />}
     {editing && ['expense', 'income'].includes(editing.kind) && <TransactionForm key={`edit-${editing.id}-${editing.version}`} initial={editing} parentVersion={editingParentVersion} accounts={accounts} categories={categories} tags={tags} disabled={busy || loading || !!pending || needsRefresh || !online} submit={body => create(`transactions/${editing.id}`, body, 'PUT')} fail={setError} cancel={() => setEditing(null)} />}
     {editing?.kind === 'transfer' && <TransferForm key={`edit-transfer-${editing.id}-${editing.version}`} initial={editing} initialFee={editingFee} accounts={accounts} categories={categories} tags={tags} disabled={busy || loading || !!pending || needsRefresh || !online} submit={body => create(`transactions/${editing.id}`, body, 'PUT')} fail={setError} cancel={() => setEditing(null)} />}
     {refundParent && (!editing || editing.kind === 'refund') && <RefundForm key={`refund-${refundParent.id}-${refundParent.version}-${editing?.id ?? 'new'}`} parent={refundParent} transferVersion={refundTransferVersion} initial={editing ?? undefined} accounts={accounts} categories={categories} tags={tags} disabled={busy || loading || !!pending || needsRefresh || !online} submit={body => create(editing ? `transactions/${editing.id}` : 'transactions', body, editing ? 'PUT' : 'POST')} fail={setError} cancel={() => { setRefundParent(null); setEditing(null); }} />}
-    <details className="editor-disclosure"><summary>Корректировка остатка</summary><AdjustmentForm key={`adjustment-${formVersion}`} accounts={accounts.filter(a => !a.archived_at)} disabled={busy || loading || !!pending || needsRefresh || !online} submit={create} fail={setError} />
-    </details>
     {editing?.kind === 'adjustment' && <AdjustmentForm key={`edit-adjustment-${editing.id}-${editing.version}`} accounts={accounts} initial={editing} disabled={busy || loading || !!pending || needsRefresh || !online} submit={create} fail={setError} cancel={() => setEditing(null)} />}
     <TransactionHistory filterRevision={historyNavigation} filterQuery={reportHistoryQuery} key={`${auth.session.id}-${auth.workspace.id}`} workspace={auth.workspace.id} revision={historyRevision} accounts={accounts} categories={categories} tags={tags} disabled={busy || loading || !!pending || needsRefresh || !online} edit={id => void editTransaction(id)} refund={id => void newRefund(id)} remove={id => void deleteTransaction(id)} classify={body => create('transactions/classification', body)} fail={showError} />
     </div>
+    {operationOpen && <OperationModal accounts={accounts.filter(a => !a.archived_at)} categories={categories} tags={tags} disabled={busy || loading || !!pending || needsRefresh || !online} saving={busy} error={error} submit={create} cancel={() => setOperationOpen(false)} />}
     <div hidden={section !== "more"} className="screen" aria-label="Еще">
     <div className="screen-heading"><h2>Еще</h2><p className="hint">Отчеты, справочники и настройки</p></div>
     <details className="editor-disclosure"><summary>Категории и теги</summary>

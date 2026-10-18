@@ -5,9 +5,9 @@ import { categoryLabel } from '../../shared/categories';
 import { occurrence } from '../../shared/time';
 import { OccurrenceFields } from '../../shared/OccurrenceFields';
 type Part = { id: string; category: string; amount: string };
-type Props = { accounts: Account[]; categories: Category[]; tags: Tag[]; disabled: boolean; submit: (body: object) => void; fail: (message: string) => void; initial?: Transaction; initialFee?: Transaction | null; cancel?: () => void };
+type Props = { accounts: Account[]; categories: Category[]; tags: Tag[]; disabled: boolean; submit: (body: object) => void; fail: (message: string) => void; initial?: Transaction; initialFee?: Transaction | null; cancel?: () => void; embedded?: boolean; formID?: string };
 
-export function TransferForm({ accounts, categories, tags, disabled, submit, fail, initial, initialFee, cancel }: Props) {
+export function TransferForm({ accounts, categories, tags, disabled, submit, fail, initial, initialFee, cancel, embedded = false, formID }: Props) {
   const originalSource = initial?.entries.find(e => BigInt(e.amount_minor) < 0n);
   const originalTarget = initial?.entries.find(e => BigInt(e.amount_minor) > 0n);
   const [sourceID, setSourceID] = useState(originalSource?.account_id ?? ''), [targetID, setTargetID] = useState(originalTarget?.account_id ?? '');
@@ -40,7 +40,7 @@ export function TransferForm({ accounts, categories, tags, disabled, submit, fai
       submit({ ...(initial ? { expected_version: initial.version, expected_fee_version: initialFee?.version ?? null } : { id: crypto.randomUUID() }), kind: 'transfer', source_account_id: source.id, target_account_id: target.id, source_amount_minor: debit, target_amount_minor: credit, rate: null, fee, ...occurrence(data, initial), note: data.get('transfer_note'), payee: data.get('transfer_payee'), tag_ids: data.getAll('transfer_tag') });
     } catch (error) { fail((error as Error).message); }
   }
-  return <section><h2>{initial ? 'Изменить перевод' : 'Новый перевод'}</h2><form onSubmit={save}><fieldset disabled={disabled || !target}>
+  return <section className={embedded ? 'embedded-operation' : undefined}>{!embedded && <h2>{initial ? 'Изменить перевод' : 'Новый перевод'}</h2>}<form id={formID} onSubmit={save}><fieldset disabled={disabled || !target}>
     <label>Со счета<select aria-label="Со счета" value={source?.id ?? ''} onChange={event => setSourceID(event.target.value)}>{sources.map(a => <option key={a.id} value={a.id}>{a.name} · {a.currency}</option>)}</select></label>
     <label>На счет<select aria-label="На счет" value={target?.id ?? ''} onChange={event => setTargetID(event.target.value)}>{targets.map(a => <option key={a.id} value={a.id}>{a.name} · {a.currency}</option>)}</select></label>
     <label>Сумма списания, {source?.currency ?? 'EUR'}<input name="source_amount" inputMode="decimal" required defaultValue={originalSource ? decimal((-BigInt(originalSource.amount_minor)).toString(), originalSource.currency) : ''} /></label>
@@ -59,6 +59,6 @@ export function TransferForm({ accounts, categories, tags, disabled, submit, fai
     <OccurrenceFields label="Дата перевода" initial={initial?.occurred_at} />
     <label>Получатель перевода<input name="transfer_payee" maxLength={200} defaultValue={initial?.payee} /></label>
     {tags.some(t => !t.archived_at || initial?.tag_ids.includes(t.id)) && <fieldset className="tag-options"><legend>Теги перевода</legend>{tags.filter(t => !t.archived_at || initial?.tag_ids.includes(t.id)).map(t => <label className="check" key={t.id}><input type="checkbox" aria-label={`Тег перевода ${t.name}`} name="transfer_tag" value={t.id} defaultChecked={initial?.tag_ids.includes(t.id)} />{t.name}</label>)}</fieldset>}
-    <label>Описание перевода<textarea aria-label="Описание перевода" name="transfer_note" maxLength={2000} defaultValue={initial?.note} /></label><button>{initial ? 'Сохранить изменения перевода' : 'Сохранить перевод'}</button>{cancel && <button type="button" className="secondary" onClick={cancel}>Отменить редактирование</button>}
+    <label>Описание перевода<textarea aria-label="Описание перевода" name="transfer_note" maxLength={2000} defaultValue={initial?.note} /></label>{!embedded && <><button>{initial ? 'Сохранить изменения перевода' : 'Сохранить перевод'}</button>{cancel && <button type="button" className="secondary" onClick={cancel}>Отменить редактирование</button>}</>}
   </fieldset></form>{!target && <p>Для перевода создайте второй счет.</p>}</section>;
 }

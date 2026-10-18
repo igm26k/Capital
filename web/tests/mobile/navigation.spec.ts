@@ -64,8 +64,8 @@ test('dark theme and direct section URL work', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'dark' });
   await page.goto('/#operations');
   await expect(page.getByRole('heading', { name: 'История операций' })).toBeVisible();
-  await page.getByText('Добавить операцию', { exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Сохранить операцию', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Добавить операцию', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Новая операция' }).getByRole('button', { name: 'Добавить', exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 test('uncertain account save keeps the same command and key after reload', async ({ page }) => {
