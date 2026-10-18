@@ -8,6 +8,8 @@ async function register(page: Page) {
   await page.getByRole('button', { name: 'Зарегистрироваться', exact: true }).click();
   await expect(page.getByRole('navigation', { name: 'Основная навигация' })).toBeVisible();
   await page.getByRole('navigation').getByRole('link', { name: 'Еще', exact: true }).click();
+  await page.getByRole('button', { name: 'Группы настроек', exact: true }).click();
+  await page.getByRole('navigation', { name: 'Группы настроек' }).getByRole('button', { name: 'Импорт и экспорт', exact: true }).click();
   await page.locator('summary').filter({ hasText: /^Импорт из Wallet$/ }).click();
 }
 test('Wallet automatically creates accounts, repeat import reuses them, and CSV export downloads', async ({ page, context }) => {

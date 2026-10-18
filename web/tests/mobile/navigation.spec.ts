@@ -29,7 +29,8 @@ test('accounts match Android, filters and history navigation preserve SPA and br
   await page.getByText('Фильтры операций', { exact: true }).click();
   await expect(page.getByLabel('Счет истории', { exact: true })).toHaveValue('archive');
   await page.getByRole('navigation').getByRole('link', { name: 'Еще', exact: true }).click();
-  await expect(page.getByText('Бюджеты, отчеты и правила', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Группы настроек', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Профиль', exact: true })).toBeVisible();
   await page.goBack();
   await expect(page.getByRole('heading', { name: 'История операций' })).toBeVisible();
   await page.getByRole('navigation').getByRole('link', { name: 'Счета', exact: true }).click();

@@ -22,6 +22,7 @@ import { TransactionHistory } from './features/transactions/TransactionHistory';
 import { HomeOverview } from './features/home/HomeOverview';
 import { Icon } from './shared/Icon';
 import { OperationModal } from './features/transactions/OperationModal';
+import { SettingsNavigation, restoreSettingsGroup } from './features/settings/SettingsNavigation';
 // A single unfinished command survives reload in this tab. No credentials are persisted.
 type Command = { owner: string; session: string; workspace: string; generation: string; key: string; path: string; body: string; method?: 'POST' | 'PUT' | 'DELETE' };
 const storageKey = 'accounting.pending.v1';
@@ -40,6 +41,7 @@ function currentSection(): Section {
   return value === 'operations' || value === 'more' ? value : 'accounts';
 }
 export function App() {
+  const [settingsGroup, setSettingsGroup] = useState(restoreSettingsGroup);
   const [historyNavigation, setHistoryNavigation] = useState(0);
   const [operationOpen, setOperationOpen] = useState(false);
   const [section, setSection] = useState<Section>(currentSection);
@@ -221,22 +223,32 @@ export function App() {
     </div>
     {operationOpen && <OperationModal accounts={accounts.filter(a => !a.archived_at)} categories={categories} tags={tags} disabled={busy || loading || !!pending || needsRefresh || !online} saving={busy} error={error} submit={create} cancel={() => setOperationOpen(false)} />}
     <div hidden={section !== "more"} className="screen" aria-label="Еще">
-    <div className="screen-heading"><h2>Еще</h2><p className="hint">Отчеты, справочники и настройки</p></div>
-    <details className="editor-disclosure"><summary>Категории и теги</summary>
+    <SettingsNavigation value={settingsGroup} change={setSettingsGroup} active={section === 'more'} />
+    <div className="settings-group" hidden={settingsGroup !== 'classification'}>
     <ClassificationManager key={`classification-${formVersion}-${resourceRevision}`} categories={categories} tags={tags} disabled={busy || loading || !!pending || needsRefresh || !online} submit={create} fail={setError} />
-    </details>
+    </div>
+    <div className="settings-group" hidden={settingsGroup !== 'analytics'}>
     <details open={analyticsOpen} onToggle={e => setAnalyticsOpen(e.currentTarget.open)}><summary>Бюджеты, отчеты и правила</summary>{analyticsOpen && <AnalyticsPanel key={`${auth.session.id}:${auth.workspace.sync_generation_id}`} auth={auth} accounts={accounts} categories={categories} tags={tags} revision={historyRevision} classify={body => create('transactions/classification',body)} fail={showError} drill={query => {setReportHistoryQuery(`${query}&limit=25`);navigate('operations');}} />}</details>
+    </div>
+    <div className="settings-group" hidden={settingsGroup !== 'data'}>
     <details><summary>Импорт из Wallet</summary><WalletImportPanel key={`${auth.profile.id}:${auth.workspace.id}:${auth.session.id}`} auth={auth} accounts={accounts} categories={categories} blocked={busy || loading || !!pending || needsRefresh || !online} changed={() => { void refresh(auth).catch(showError); }} fail={showError} working={setBusy} /></details>
     <details onToggle={e=>setCSVOpen(e.currentTarget.open)}><summary>Экспорт CSV</summary>{csvOpen && <CSVPanel key={`${auth.session.id}:${auth.workspace.sync_generation_id}`} auth={auth} accounts={accounts} changed={()=>{void refresh(auth).catch(showError);}} fail={showError}/>}</details>
+    </div>
+    <div className="settings-group" hidden={settingsGroup !== 'sources'}>
     <details onToggle={e=>setSourcesOpen(e.currentTarget.open)}><summary>Банковские предложения</summary>{sourcesOpen&&<SourcesPanel key={`${auth.session.id}:${auth.workspace.sync_generation_id}`} auth={auth} accounts={accounts} changed={()=>{void refresh(auth).catch(showError);}} fail={showError}/>}</details>
     <p className="hint">Ручной учет и CSV. Банковские подключения пока недоступны.</p>
+    </div>
+    <div className="settings-group" hidden={settingsGroup !== 'profile'}>
     <section className="profile-card"><h2>Профиль</h2><p>{auth.profile.email}</p><button className="secondary" disabled={busy || loading || !online} onClick={() => { setError(''); void refresh(auth).catch(showError); }}>{loading ? 'Загрузка…' : 'Обновить данные'}</button></section>
+    </div>
+    <div className="settings-group" hidden={settingsGroup !== 'security'}>
     <PrivacyPanel auth={auth} fail={showError} deleted={async()=>{
       let localCleared=true;try{await clearCSVCommandsForOwner(auth.profile.id);}catch{localCleared=false;}
       try {for(const key of Object.keys(sessionStorage)){if([`accounting.planning.pending.v1:${auth.profile.id}:`,`accounting.csv.pending.v1:${auth.profile.id}:`,`accounting.csv.last:${auth.profile.id}:`].some(prefix=>key.startsWith(prefix)))sessionStorage.removeItem(key);}}catch{/* In-memory state is cleared below. */}
       if(activeSession.current!==auth.session.id)return;
       persist(null);setPending(null);activeSession.current=null;setAuth(null);setAccounts([]);setCategories([]);setTags([]);setReportHistoryQuery(undefined);setError(localCleared?'Профиль и личные данные удалены.':'Профиль удалён. Очистите данные этого сайта в настройках браузера: локальное хранилище недоступно.');}}/>
     <SessionManager key={auth.session.id} disabled={busy || loading || !!pending || !online} revoke={revokeSession} fail={showError} />
+    </div>
     </div>
     <nav className="bottom-nav" aria-label="Основная навигация">
       {([['accounts', 'Счета', '◫'], ['operations', 'Операции', '⇄'], ['more', 'Еще', '⋯']] as const).map(([id, label, symbol]) =>
