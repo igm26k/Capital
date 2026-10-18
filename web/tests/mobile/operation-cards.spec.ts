@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 const workspace = { id: '00000000-0000-4000-8000-000000000001', name: 'Финансы', sync_generation_id: 'generation' };
 const accounts = [{ id: 'eur', name: 'Евро', type: 'bank', currency: 'EUR', version: '1', balance_version: '1', posted_balance_minor: '10000', archived_at: null }, { id: 'rub', name: 'Рубли', type: 'bank', currency: 'RUB', version: '1', balance_version: '1', posted_balance_minor: '10000', archived_at: null }];
 const expense = { id: '00000000-0000-4000-8000-000000000011', version: '1', kind: 'expense', status: 'posted', occurred_at: '2026-10-01T12:00:00Z', occurred_timezone: 'UTC', payee: 'Магазин с очень длинным названием', note: 'Длинное примечание для проверки компактной строки\nВторая строка примечания', reason: null, parent_transaction_id: null, fee_transaction_id: null, tag_ids: ['home'], entries: [{ account_id: 'eur', amount_minor: '-1234', currency: 'EUR' }], allocations: [{ id: 'part', category_id: 'food', amount_minor: '1234', remaining_refundable_minor: '1234' }] };
-const transfer = { ...expense, id: '00000000-0000-4000-8000-000000000012', kind: 'transfer', payee: '', note: '', tag_ids: [], entries: [{ account_id: 'eur', amount_minor: '-59500', currency: 'EUR' }, { account_id: 'rub', amount_minor: '5236000', currency: 'RUB' }], allocations: [] };
+const transfer = { ...expense, id: '00000000-0000-4000-8000-000000000012', kind: 'transfer', payee: 'Обмен валюты', note: '', tag_ids: [], entries: [{ account_id: 'eur', amount_minor: '-59500', currency: 'EUR' }, { account_id: 'rub', amount_minor: '5236000', currency: 'RUB' }], allocations: [] };
 const pending = { ...expense, id: '00000000-0000-4000-8000-000000000013', kind: 'income', status: 'pending', payee: 'Зарплата', note: '', entries: [{ account_id: 'eur', amount_minor: '10000', currency: 'EUR' }] };
 test.beforeEach(async ({ page }) => {
   await page.route('**/api/v1/**', route => {
@@ -23,10 +23,12 @@ for (const width of [320, 390]) test(`operation rows stay compact and readable a
   if (width === 320) await page.emulateMedia({ colorScheme: 'dark' });
   await page.goto('/#operations');
   const card = page.getByTestId(`transaction-${expense.id}`);
-  await expect(card.locator('summary')).toContainText('Продукты');
+  await expect(card.locator('.operation-copy>strong')).toHaveText('Продукты');
+  await expect(page.getByTestId(`transaction-${pending.id}`).locator('.operation-copy>strong')).toHaveText('Продукты');
   await expect(card.locator('summary')).toContainText('−12,34 €');
   expect((await card.boundingBox())!.height).toBeLessThanOrEqual(85);
   const fx = page.getByTestId(`transaction-${transfer.id}`);
+  await expect(fx.locator('.operation-copy>strong')).toHaveText('Перевод');
   await expect(fx.locator('summary')).toContainText('−595,00 €');
   await expect(fx.locator('summary')).toContainText('52360,00 ₽');
   await expect(page.getByTestId(`transaction-${pending.id}`).locator('summary')).toContainText('Предварительная');

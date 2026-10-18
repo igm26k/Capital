@@ -9,13 +9,13 @@ export function OperationCard({ transaction: t, accounts, categories, tags, disa
   const kind = t.kind === 'expense' && t.parent_transaction_id ? 'Комиссия перевода' : kinds[t.kind] ?? t.kind;
   const category = (id: string | null) => id ? categories.find(c => c.id === id) ? categoryLabel(categories.find(c => c.id === id)!, categories) : 'Категория недоступна' : 'Без категории';
   const account = (id: string) => accounts.find(a => a.id === id)?.name ?? 'Счет недоступен';
-  const label = t.payee || kind;
   const entries = t.kind === 'transfer' ? [...t.entries].sort((a, b) => BigInt(a.amount_minor) < BigInt(b.amount_minor) ? -1 : 1) : t.entries;
   const names = [...new Set(t.allocations.map(p => category(p.category_id)))].join(' · ');
+  const label = t.kind === 'expense' || t.kind === 'income' ? names || 'Без категории' : t.kind === 'transfer' || t.kind === 'adjustment' ? kind : t.payee || kind;
   return <li className={`operation-card${selected ? ' is-selected' : ''}`} data-testid={`transaction-${t.id}`}>
     <details className="operation-details"><summary>
       <span className="operation-icon"><Icon name={t.kind === 'transfer' ? 'transfer' : t.kind === 'income' || t.kind === 'refund' ? 'income' : t.kind === 'opening' || t.kind === 'adjustment' ? 'bank' : 'expense'} /></span>
-      <span className="operation-copy"><strong title={label}>{label}</strong><span title={names}>{[names || kind, entries.map(e => account(e.account_id)).join(' → ')].filter(Boolean).join(' · ')}</span>{t.note && <small className="operation-preview">{t.note}</small>}{t.status === 'pending' && <small className="pending-label">Предварительная</small>}</span>
+      <span className="operation-copy"><strong title={label}>{label}</strong><span>{[t.payee !== label ? t.payee : '', entries.map(e => account(e.account_id)).join(' → ')].filter(Boolean).join(' · ')}</span>{t.note && <small className="operation-preview">{t.note}</small>}{t.status === 'pending' && <small className="pending-label">Предварительная</small>}</span>
       <span className="operation-values">{entries.map((e, i) => <strong key={i} className={t.kind === 'transfer' || t.kind === 'opening' || t.kind === 'adjustment' ? 'neutral-value' : BigInt(e.amount_minor) > 0n ? 'income-value' : 'expense-value'}>{money(e.amount_minor, e.currency).replace(e.currency, symbols[e.currency] ?? e.currency)}</strong>)}<time dateTime={t.occurred_at}>{new Date(t.occurred_at).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}</time></span>
       <span className="operation-chevron" aria-hidden="true">⌄</span>
     </summary><div className="operation-expanded">
