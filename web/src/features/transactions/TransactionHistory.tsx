@@ -4,12 +4,12 @@ import { categoryLabel } from '../../shared/categories';
 import { BulkClassificationForm } from './BulkClassificationForm';
 import { money } from '../../shared/money';
 const kinds: Record<string, string> = { opening: 'Начальный остаток', expense: 'Расход', income: 'Доход', transfer: 'Перевод', refund: 'Возврат', adjustment: 'Корректировка' };
-type Props = { filterQuery?: string; workspace: string; revision: number; accounts: Account[]; categories: Category[]; tags: Tag[]; disabled: boolean; edit: (id: string) => void; refund: (id: string) => void; remove: (id: string) => void; classify: (body: object) => void; fail: (error: unknown) => void };
-export function TransactionHistory({ filterQuery, workspace, revision, accounts, categories, tags, disabled, edit, refund, remove, classify, fail }: Props) {
+type Props = { filterRevision?: number; filterQuery?: string; workspace: string; revision: number; accounts: Account[]; categories: Category[]; tags: Tag[]; disabled: boolean; edit: (id: string) => void; refund: (id: string) => void; remove: (id: string) => void; classify: (body: object) => void; fail: (error: unknown) => void };
+export function TransactionHistory({ filterRevision, filterQuery, workspace, revision, accounts, categories, tags, disabled, edit, refund, remove, classify, fail }: Props) {
   const [items, setItems] = useState<Transaction[]>([]), [cursor, setCursor] = useState<string | null>(null), [query, setQuery] = useState('limit=25'), [loading, setLoading] = useState(false), [error, setError] = useState(''), [retry, setRetry] = useState(0);
   const [selected, setSelected] = useState<Transaction[]>([]);
   const sequence = useRef(0);
-  useEffect(() => { if (filterQuery) {setQuery(filterQuery);setRetry(v=>v+1);} },[filterQuery]);
+  useEffect(() => { if (filterQuery) {setQuery(filterQuery);setRetry(v=>v+1);} },[filterQuery, filterRevision]);
   const root = `/workspaces/${workspace}/transactions`;
   useEffect(() => {
     const requestID = ++sequence.current, controller = new AbortController();

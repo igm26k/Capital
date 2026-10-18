@@ -21,6 +21,7 @@ test('accounts match Android, filters and history navigation preserve SPA and br
   await expect(page.getByRole('navigation').getByRole('link', { name: 'Счета', exact: true })).toHaveAttribute('aria-current', 'page');
   await expect(page.getByLabel('Итоги по валютам')).toContainText('1150,00 EUR');
   await expect(page.getByRole('button', { name: 'Изменить счет Старая карта' })).toBeHidden();
+  await page.getByRole('button', { name: 'Настроить счета', exact: true }).click();
   await page.getByRole('button', { name: 'Архивные счета', exact: true }).click();
   await expect(page.getByLabel('Итоги по валютам')).toContainText('7,00 USD');
   await page.getByRole('button', { name: 'Операции счета Старая карта' }).click();
