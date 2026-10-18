@@ -44,6 +44,12 @@ test('Wallet home renders real ledger data without treating FX or corrections as
   await expect(page.getByRole('heading', { name: 'История операций' })).toBeVisible();
   await page.getByText('Фильтры операций', { exact: true }).click();
   await expect(page.getByLabel('Статус в истории', { exact: true })).toHaveValue('posted');
+  await expect(page.locator('.history')).toContainText('Synthetic store');
+  await expect(page.locator('.history')).not.toContainText('Wallet');
+  await expect(page.locator('.history')).not.toContainText('строка');
+  await page.getByRole('button', { name: 'Изменить операцию Shop', exact: true }).click();
+  await expect(page.getByRole('textbox', { name: 'Примечание', exact: true })).not.toHaveValue(/Wallet|строка/);
+  await expect(page.getByRole('combobox', { name: 'Категория', exact: true }).locator('option:checked')).toHaveText('Groceries');
   expect(writes).toEqual([]);
   expect(errors).toEqual([]);
 });

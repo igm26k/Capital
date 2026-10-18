@@ -1,3 +1,4 @@
+import { presentTransactions } from '../shared/transactionText';
 export class RequestError extends Error {
   constructor(public status: number, public code: string, message: string) { super(message); }
 }
@@ -15,7 +16,9 @@ export async function request<T>(path: string, init: RequestInit = {}): Promise<
     const error = await response.json().catch(() => null);
     throw new RequestError(response.status, error?.code ?? 'http_error', error?.message ?? `HTTP ${response.status}`);
   }
-  return response.status === 204 ? undefined as T : await response.json() as T;
+  if (response.status === 204) return undefined as T;
+  const value: unknown = await response.json();
+  return (read && /^\/workspaces\/[^/]+\/transactions(?:\/[^/?]+)?(?:\?|$)/.test(path) ? presentTransactions(value) : value) as T;
 }
 export type Auth = { profile: { id: string; email: string }; session: { id: string }; workspace: Workspace; csrf_token: string; transport: 'cookie' };
 export type Workspace = { id: string; name: string; sync_generation_id: string };

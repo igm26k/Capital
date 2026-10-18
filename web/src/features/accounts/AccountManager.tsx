@@ -3,9 +3,9 @@ import type { Account } from '../../api/client';
 import { money } from '../../shared/money';
 import { AccountForm } from './AccountForm';
 import { Icon } from '../../shared/Icon';
-type Props = { accounts: Account[]; disabled: boolean; loading: boolean; submit: (path: string, body: object, method?: 'POST' | 'PUT') => void; fail: (message: string) => void; history: (id: string) => void; records: () => void; reports: () => void; children?: ReactNode };
+type Props = { accounts: Account[]; disabled: boolean; loading: boolean; submit: (path: string, body: object, method?: 'POST' | 'PUT') => void; fail: (message: string) => void; history: (id: string) => void; records: () => void; children?: ReactNode };
 const types = { bank: 'Банк', card: 'Карта', cash: 'Наличные' };
-export function AccountManager({ accounts, disabled, loading, submit, fail, history, records, reports, children }: Props) {
+export function AccountManager({ accounts, disabled, loading, submit, fail, history, records, children }: Props) {
   const [selected, setSelected] = useState<Account | null>(null);
   const [creating, setCreating] = useState(false);
   const [settings, setSettings] = useState(false);
@@ -22,7 +22,6 @@ export function AccountManager({ accounts, disabled, loading, submit, fail, hist
   }
   return <div className="account-screen">
     <div hidden={creating || !!selected}>
-      <div className="home-tabs"><span aria-current="page">Счета</span><button onClick={reports}>Бюджеты и отчеты</button></div>
       <div className="accounts-toolbar"><h2>Список счетов <span>{visible.length}</span></h2><button className="icon-button" aria-label="Настроить счета" aria-expanded={settings} onClick={() => setSettings(!settings)}><Icon name="settings" /></button></div>
       {settings && <div className="filter-chips" role="group" aria-label="Фильтр счетов">{[['active', 'Активные счета'], ['archived', 'Архивные счета'], ['all', 'Все счета']].map(([value, label]) => <button key={value} className="chip" aria-pressed={filter === value} onClick={() => setFilter(value)}>{label}</button>)}</div>}
       {loading && <p role="status">Загружаем счета…</p>}

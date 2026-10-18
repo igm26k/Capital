@@ -48,7 +48,10 @@ test('Wallet home shortcuts open the working forms, history filters and reports'
   await page.getByRole('button', { name: 'Все записи', exact: true }).click();
   await expect(page.getByLabel('Счет истории', { exact: true })).toHaveValue('');
   await page.getByRole('navigation').getByRole('link', { name: 'Счета', exact: true }).click();
-  await page.getByRole('button', { name: 'Бюджеты и отчеты', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Открыть меню', exact: true })).toHaveCount(0);
+  await expect(page.locator('.home-tabs')).toHaveCount(0);
+  await page.getByRole('navigation').getByRole('link', { name: 'Еще', exact: true }).click();
+  await page.getByText('Бюджеты, отчеты и правила', { exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Бюджеты и отчеты', exact: true })).toBeVisible();
 });
 test('overview period requests confirmed operations and can recover from an API error', async ({ page }) => {
