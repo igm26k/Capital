@@ -82,3 +82,40 @@ test('Wallet home supports dark mode and long names on a narrow screen', async (
   }
   await page.screenshot({ path: test.info().outputPath('wallet-home-dark-320.png'), fullPage: true });
 });
+test('reset clears every history filter and pagination, including unapplied fields', async ({ page }) => {
+  const requests: string[] = [];
+  await page.route('**/tags?*', route => route.fulfill({ json: { items: [{ id: 'tag', name: 'Личное', archived_at: null }], next_cursor: null } }));
+  await page.route('**/transactions?*', route => {
+    const url = new URL(route.request().url()); requests.push(url.search.slice(1));
+    return route.fulfill({ json: { items: [], next_cursor: url.searchParams.has('q') && !url.searchParams.has('cursor') ? 'next-page' : null } });
+  });
+  await page.goto('/#operations');
+  await expect(page.getByRole('button', { name: 'Сбросить фильтры', exact: true })).toBeVisible();
+  await page.getByText('Фильтры операций', { exact: true }).click();
+  await page.getByLabel('Счет истории', { exact: true }).selectOption('eur');
+  await page.getByLabel('Категория истории', { exact: true }).selectOption('food');
+  await page.getByLabel('Тег истории', { exact: true }).selectOption('tag');
+  await page.getByLabel('Тип в истории', { exact: true }).selectOption('expense');
+  await page.getByLabel('Статус в истории', { exact: true }).selectOption('posted');
+  await page.getByLabel('С даты', { exact: true }).fill('2026-01-01');
+  await page.getByLabel('По дату включительно', { exact: true }).fill('2026-10-01');
+  await page.getByLabel('Поиск в истории', { exact: true }).fill('Магазин');
+  await page.getByLabel('Операций на странице', { exact: true }).selectOption('100');
+  await page.getByRole('button', { name: 'Применить фильтры', exact: true }).click();
+  await page.getByRole('button', { name: 'Загрузить еще операции', exact: true }).click();
+  await expect.poll(() => requests.some(q => q.includes('cursor=next-page'))).toBe(true);
+  await page.getByRole('button', { name: 'Сбросить фильтры', exact: true }).click();
+  await expect.poll(() => requests.at(-1)).toBe('limit=25');
+  for (const name of ['Счет истории', 'Категория истории', 'Тег истории', 'Тип в истории', 'Статус в истории']) await expect(page.getByLabel(name, { exact: true })).toHaveValue('');
+  for (const name of ['С даты', 'По дату включительно', 'Поиск в истории']) await expect(page.getByLabel(name, { exact: true })).toHaveValue('');
+  await expect(page.getByLabel('Операций на странице', { exact: true })).toHaveValue('25');
+  await expect(page.getByRole('button', { name: 'Загрузить еще операции' })).toHaveCount(0);
+  // Also clear a draft while the applied query is already the default.
+  await page.getByLabel('Поиск в истории', { exact: true }).fill('Несохраненный фильтр');
+  await page.getByLabel('С даты', { exact: true }).fill('2026-01-01');
+  const count = requests.length;
+  await page.getByRole('button', { name: 'Сбросить фильтры', exact: true }).click();
+  await expect.poll(() => requests.length).toBeGreaterThan(count);
+  await expect(page.getByLabel('Поиск в истории', { exact: true })).toHaveValue('');
+  await expect(page.getByLabel('С даты', { exact: true })).toHaveValue('');
+});
