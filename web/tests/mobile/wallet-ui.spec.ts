@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { parseWallet, planWallet } from '../../src/features/imports/wallet';
 const workspace = { id: '00000000-0000-4000-8000-000000000001', name: 'Финансы', sync_generation_id: 'generation' };
 const header = 'account;category;currency;amount;ref_currency_amount;type;payment_type;note;date;transfer;payee;labels\n';
 const row = (account: string, amount: string, kind = 'Расход', transfer = 'false', currency = 'EUR') => `${account};Продукты;${currency};${amount};99999;${kind};Наличные;Тест;2025-08-12T15:00:00.000Z;${transfer};;\n`;
@@ -113,7 +114,12 @@ test('Wallet displays multiple exact-time transfer pairs and their evidence', as
 });
 test('Wallet stops before writes if older guessed transfers were already imported', async ({ page }) => {
   let writes = 0;
-  await page.route('**/api/v1/workspaces/*/transactions/*', route => route.fulfill({ json: { kind: 'transfer' } }));
+  const plan = await planWallet(await parseWallet(header + row('Bank', '100', 'Расход', 'true')), [], [], 'owner', workspace.id, 'generation');
+  await page.route('**/api/v1/workspaces/*/transactions?**', route => {
+    const url = new URL(route.request().url());
+    if (url.searchParams.get('kind') !== 'transfer') return route.fallback();
+    return route.fulfill({ json: url.searchParams.has('cursor') ? { items: [{ id: plan.legacyTransferIds![0], kind: 'transfer' }], next_cursor: null } : { items: [], next_cursor: 'second-page' } });
+  });
   await page.route('**/api/v1/workspaces/*/*', route => {
     if (route.request().method() !== 'POST') return route.fallback();
     writes++; return route.fulfill({ json: {} });
@@ -126,7 +132,12 @@ test('Wallet stops before writes if older guessed transfers were already importe
 });
 test('Wallet stops before writes when the matched rows were previously imported as corrections', async ({ page }) => {
   let writes = 0;
-  await page.route('**/api/v1/workspaces/*/transactions/*', route => route.fulfill({ json: { kind: 'adjustment' } }));
+  const plan = await planWallet(await parseWallet(header + row('Bank A', '100', 'Расход', 'true') + row('Bank B', '200', 'Расход', 'true') + row('Cash A', '100', 'Доход', 'true') + row('Cash B', '200', 'Доход', 'true')), [], [], 'owner', workspace.id, 'generation');
+  await page.route('**/api/v1/workspaces/*/transactions?**', route => {
+    const url = new URL(route.request().url());
+    if (url.searchParams.get('kind') !== 'adjustment') return route.fallback();
+    return route.fulfill({ json: url.searchParams.has('cursor') ? { items: [{ id: plan.legacyAdjustmentIds![0], kind: 'adjustment' }], next_cursor: null } : { items: [], next_cursor: 'second-page' } });
+  });
   await page.route('**/api/v1/workspaces/*/*', route => {
     if (route.request().method() !== 'POST') return route.fallback();
     writes++; return route.fulfill({ json: {} });
@@ -135,5 +146,34 @@ test('Wallet stops before writes when the matched rows were previously imported 
   await page.getByRole('button', { name: 'Подготовить импорт Wallet', exact: true }).click();
   await page.getByRole('button', { name: 'Подтвердить импорт Wallet', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('корректировками по старому алгоритму');
+  expect(writes).toBe(0);
+});
+
+test('Wallet checks absent legacy records with successful list requests, without individual probes', async ({ page }) => {
+  const probes: string[] = [];
+  const lists: string[] = [];
+  page.on('request', request => {
+    const url = new URL(request.url());
+    if (/\/transactions\/[^/]+$/.test(url.pathname)) probes.push(url.pathname);
+    if (url.pathname.endsWith('/transactions') && url.searchParams.has('kind')) lists.push(url.searchParams.get('kind')!);
+  });
+  await page.getByLabel('Файл Wallet CSV').setInputFiles({ name: 'wallet_records.csv', mimeType: 'text/csv', buffer: Buffer.from(header + row('Bank', '100', 'Расход', 'true')) });
+  await page.getByRole('button', { name: 'Подготовить импорт Wallet', exact: true }).click();
+  await page.getByRole('button', { name: 'Подтвердить импорт Wallet', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Импорт Wallet завершен' })).toBeVisible();
+  expect(lists).toContain('transfer');
+  expect(probes).toEqual([]);
+});
+test('Wallet stops before writes when the legacy list cannot be checked', async ({ page }) => {
+  let writes = 0;
+  await page.route('**/api/v1/workspaces/*/*', route => {
+    if (route.request().method() === 'POST') { writes++; return route.fulfill({ json: {} }); }
+    if (new URL(route.request().url()).searchParams.get('kind') === 'transfer') return route.fulfill({ status: 503, json: { message: 'Проверка временно недоступна' } });
+    return route.fallback();
+  });
+  await page.getByLabel('Файл Wallet CSV').setInputFiles({ name: 'wallet_records.csv', mimeType: 'text/csv', buffer: Buffer.from(header + row('Bank', '100', 'Расход', 'true')) });
+  await page.getByRole('button', { name: 'Подготовить импорт Wallet', exact: true }).click();
+  await page.getByRole('button', { name: 'Подтвердить импорт Wallet', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('Импорт приостановлен (http_error)');
   expect(writes).toBe(0);
 });

@@ -1,4 +1,4 @@
-import { request, RequestError, type Auth } from '../../api/client';
+import { request, listAll, type Auth } from '../../api/client';
 import { closeWalletJournal, compareAuxiliaryCommand, readCSVCommand } from './commandStorage';
 import type { WalletPlan } from './wallet';
 export type WalletProgress = { key: string; digest: string; cursor: number };
@@ -30,13 +30,14 @@ export async function walletLock<T>(auth: Auth, action: () => Promise<T>): Promi
 // Reclassification requires reconciliation, not an additional balance movement.
 export async function checkLegacyWalletRecords(auth: Auth, plan: WalletPlan): Promise<void> {
   const checks = [{ ids: plan.legacyTransferIds ?? [], kind: 'transfer', label: 'переводами' }, { ids: plan.legacyAdjustmentIds ?? [], kind: 'adjustment', label: 'корректировками' }];
-  for (const check of checks) for (let start = 0; start < check.ids.length; start += 8) {
-    const conflicts = await Promise.all(check.ids.slice(start, start + 8).map(async id => {
-      if (!/^[0-9a-f-]{36}$/.test(id)) throw new Error('Некорректный идентификатор проверки Wallet.');
-      try { const value = await request<{ kind: string }>(`/workspaces/${auth.workspace.id}/transactions/${id}`, { signal: AbortSignal.timeout(30000) }); return value.kind === check.kind; }
-      catch (e) { if (e instanceof RequestError && e.status === 404) return false; throw e; }
-    }));
-    if (conflicts.some(Boolean)) throw new Error(`Часть этих строк уже записана ${check.label} по старому алгоритму. Сначала нужна сверка ранее импортированных операций: новые записи не отправлены, чтобы не изменить остаток дважды.`);
+  for (const check of checks) {
+    if (!check.ids.length) continue;
+    if (check.ids.some(id => !/^[0-9a-f-]{36}$/.test(id))) throw new Error('Некорректный идентификатор проверки Wallet.');
+    // Missing records are normal. List pages return 200 even when empty,
+    // avoiding individual 404 probes while checking every existing record.
+    const ids = new Set(check.ids);
+    const records = await listAll<{ id: string; kind: string }>(`/workspaces/${auth.workspace.id}/transactions?kind=${check.kind}`);
+    if (records.some(record => record.kind === check.kind && ids.has(record.id))) throw new Error(`Часть этих строк уже записана ${check.label} по старому алгоритму. Сначала нужна сверка ранее импортированных операций: новые записи не отправлены, чтобы не изменить остаток дважды.`);
   }
 }
 export async function saveWallet(auth: Auth, plan: WalletPlan): Promise<void> {
