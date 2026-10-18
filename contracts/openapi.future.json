@@ -1352,6 +1352,9 @@
           },
           {
             "$ref": "#/components/schemas/RefundCreate"
+          },
+          {
+            "$ref": "#/components/schemas/HistoricalAdjustmentCreate"
           }
         ],
         "discriminator": {
@@ -1360,7 +1363,8 @@
             "expense": "#/components/schemas/ExpenseCreate",
             "income": "#/components/schemas/IncomeCreate",
             "transfer": "#/components/schemas/TransferCreate",
-            "refund": "#/components/schemas/RefundCreate"
+            "refund": "#/components/schemas/RefundCreate",
+            "adjustment": "#/components/schemas/HistoricalAdjustmentCreate"
           }
         }
       },
@@ -4818,6 +4822,64 @@
             }
           }
         ]
+      },
+      "HistoricalAdjustmentCreate": {
+        "type": "object",
+        "description": "Import a known nonzero signed balance movement at its original date. It adds a delta and does not replace the current balance.",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "kind": {
+            "const": "adjustment"
+          },
+          "account_id": {
+            "$ref": "#/components/schemas/UUID"
+          },
+          "amount_minor": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Money"
+              },
+              {
+                "not": {
+                  "const": "0"
+                }
+              }
+            ]
+          },
+          "occurred_at": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "occurred_timezone": {
+            "$ref": "#/components/schemas/Timezone"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "payee": {
+            "type": "string",
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "account_id",
+          "amount_minor",
+          "occurred_at",
+          "occurred_timezone",
+          "reason",
+          "note",
+          "payee"
+        ],
+        "additionalProperties": false
       }
     },
     "parameters": {

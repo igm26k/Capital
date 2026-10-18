@@ -44,6 +44,10 @@ func MountLedger(mux *http.ServeMux, runner *commands.Runner, options AuthOption
 		}))
 	}
 	mux.HandleFunc("POST /api/v1/workspaces/{workspace_id}/transactions", mutationHandler(runner, options, validateTransactionCreate, func(r *http.Request, body []byte) commands.Command {
+		if transactionKind(body) == "adjustment" {
+			v, _ := ledger.DecodeHistoricalAdjustment(body)
+			return ledger.CreateHistoricalAdjustment(r.PathValue("workspace_id"), v)
+		}
 		if transactionKind(body) == "transfer" {
 			v, _ := ledger.DecodeTransferCreate(body)
 			return ledger.CreateTransfer(r.PathValue("workspace_id"), v)
@@ -280,6 +284,10 @@ func transactionKind(body []byte) string {
 	return discriminator.Kind
 }
 func validateTransactionCreate(body []byte) error {
+	if transactionKind(body) == "adjustment" {
+		_, e := ledger.DecodeHistoricalAdjustment(body)
+		return e
+	}
 	if transactionKind(body) == "refund" {
 		_, e := ledger.DecodeRefundCreate(body)
 		return e
