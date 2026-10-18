@@ -33,11 +33,12 @@ test('existing imported operations use our category in history and edit form wit
     return route.fulfill({ json: body });
   });
   await page.goto('/#operations');
-  await expect(page.getByText('Купил хлеб', { exact: true })).toBeVisible();
+  await expect(page.locator('.operation-preview').filter({ hasText: 'Купил хлеб' })).toBeVisible();
   await expect(page.locator('.history')).toContainText('Наша категория');
   await expect(page.getByLabel('Операции', { exact: true })).not.toContainText('Wallet');
   await expect(page.getByLabel('Операции', { exact: true })).not.toContainText('строка 42');
   await expect(page.getByLabel('Операции', { exact: true })).not.toContainText('Исходная категория');
+  await page.getByTestId(`transaction-${transaction.id}`).locator('summary').click();
   await page.getByRole('button', { name: 'Изменить операцию Магазин', exact: true }).click();
   await expect(page.getByRole('textbox', { name: 'Примечание', exact: true })).toHaveValue('Купил хлеб');
   await expect(page.getByRole('combobox', { name: 'Категория', exact: true })).toHaveValue('our-category');

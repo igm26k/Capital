@@ -1,0 +1,58 @@
+import { test, expect } from '@playwright/test';
+const workspace = { id: '00000000-0000-4000-8000-000000000001', name: 'Финансы', sync_generation_id: 'generation' };
+const accounts = [{ id: 'eur', name: 'Евро', type: 'bank', currency: 'EUR', version: '1', balance_version: '1', posted_balance_minor: '10000', archived_at: null }, { id: 'rub', name: 'Рубли', type: 'bank', currency: 'RUB', version: '1', balance_version: '1', posted_balance_minor: '10000', archived_at: null }];
+const expense = { id: '00000000-0000-4000-8000-000000000011', version: '1', kind: 'expense', status: 'posted', occurred_at: '2026-10-01T12:00:00Z', occurred_timezone: 'UTC', payee: 'Магазин с очень длинным названием', note: 'Длинное примечание для проверки компактной строки\nВторая строка примечания', reason: null, parent_transaction_id: null, fee_transaction_id: null, tag_ids: ['home'], entries: [{ account_id: 'eur', amount_minor: '-1234', currency: 'EUR' }], allocations: [{ id: 'part', category_id: 'food', amount_minor: '1234', remaining_refundable_minor: '1234' }] };
+const transfer = { ...expense, id: '00000000-0000-4000-8000-000000000012', kind: 'transfer', payee: '', note: '', tag_ids: [], entries: [{ account_id: 'eur', amount_minor: '-59500', currency: 'EUR' }, { account_id: 'rub', amount_minor: '5236000', currency: 'RUB' }], allocations: [] };
+const pending = { ...expense, id: '00000000-0000-4000-8000-000000000013', kind: 'income', status: 'pending', payee: 'Зарплата', note: '', entries: [{ account_id: 'eur', amount_minor: '10000', currency: 'EUR' }] };
+test.beforeEach(async ({ page }) => {
+  await page.route('**/api/v1/**', route => {
+    const path = new URL(route.request().url()).pathname;
+    let body: unknown = { items: [], next_cursor: null };
+    if (path.endsWith('/auth/session')) body = { profile: { id: 'owner', email: 'cards@example.test' }, session: { id: 'session' }, workspace, csrf_token: 'csrf', transport: 'cookie' };
+    else if (path.endsWith('/workspaces')) body = { items: [workspace], next_cursor: null };
+    else if (path.endsWith('/accounts')) body = { items: accounts, next_cursor: null };
+    else if (path.endsWith('/categories')) body = { items: [{ id: 'food', name: 'Продукты', parent_id: null, archived_at: null }], next_cursor: null };
+    else if (path.endsWith('/tags')) body = { items: [{ id: 'home', name: 'Дом', archived_at: null }], next_cursor: null };
+    else if (path.endsWith('/transactions')) body = { items: [expense, transfer, pending], next_cursor: null };
+    else if (path.endsWith('/' + expense.id)) body = expense;
+    return route.fulfill({ json: body });
+  });
+});
+for (const width of [320, 390]) test(`operation rows stay compact and readable at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 844 });
+  if (width === 320) await page.emulateMedia({ colorScheme: 'dark' });
+  await page.goto('/#operations');
+  const card = page.getByTestId(`transaction-${expense.id}`);
+  await expect(card.locator('summary')).toContainText('Продукты');
+  await expect(card.locator('summary')).toContainText('−12,34 €');
+  expect((await card.boundingBox())!.height).toBeLessThanOrEqual(85);
+  const fx = page.getByTestId(`transaction-${transfer.id}`);
+  await expect(fx.locator('summary')).toContainText('−595,00 €');
+  await expect(fx.locator('summary')).toContainText('52360,00 ₽');
+  await expect(page.getByTestId(`transaction-${pending.id}`).locator('summary')).toContainText('Предварительная');
+  await expect(card.getByRole('button', { name: /^Изменить операцию/ })).toBeHidden();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: test.info().outputPath(`operation-cards-${width}.png`), fullPage: true });
+  await card.locator('summary').click();
+  await expect(card.locator('.operation-note')).toHaveText(expense.note);
+  await expect(card).toContainText('Теги: Дом');
+  await expect(card.getByRole('button', { name: /^Изменить операцию/ })).toBeVisible();
+});
+test('expanded rows retain classification, editing, refunds and deletion confirmation', async ({ page }) => {
+  const writes: string[] = []; page.on('request', r => { if (r.method() !== 'GET') writes.push(r.url()); });
+  await page.goto('/#operations');
+  const card = page.getByTestId(`transaction-${expense.id}`); await card.locator('summary').click();
+  await card.getByRole('checkbox', { name: /^Выбрать операцию/ }).check();
+  await expect(page.getByRole('heading', { name: 'Массовая классификация' })).toBeVisible();
+  await card.getByRole('checkbox', { name: /^Выбрать операцию/ }).uncheck();
+  await card.getByRole('button', { name: /^Изменить операцию/ }).click();
+  await expect(page.getByRole('heading', { name: 'Изменить операцию', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Отменить редактирование' }).click();
+  await card.getByRole('button', { name: /^Возврат по операции/ }).click();
+  await expect(page.getByRole('heading', { name: 'Новый возврат' })).toBeVisible();
+  await page.getByRole('button', { name: 'Отменить возврат' }).click();
+  await card.getByRole('button', { name: /^Удалить операцию/ }).click();
+  await expect(page.getByRole('heading', { name: 'Удаление операции' })).toBeVisible();
+  await page.getByRole('button', { name: 'Отменить удаление' }).click();
+  expect(writes).toEqual([]);
+});
