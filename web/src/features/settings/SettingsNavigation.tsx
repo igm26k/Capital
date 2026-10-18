@@ -21,7 +21,7 @@ export function SettingsNavigation({ value, change, active }: { value: SettingsG
     return () => { document.removeEventListener('pointerdown', outside); document.removeEventListener('keydown', escape); };
   }, [open]);
   return <div className="settings-navigation" ref={wrapper} onBlur={event => { if (event.relatedTarget instanceof Node && !event.currentTarget.contains(event.relatedTarget)) setOpen(false); }}>
-    <div className="screen-heading settings-heading"><div><h2>Еще</h2><p className="hint">{settingsGroups.find(([id]) => id === value)?.[1]}</p></div><button className="icon-button settings-trigger" ref={trigger} aria-label="Группы настроек" aria-expanded={open} aria-controls="settings-group-menu" onClick={() => setOpen(v => !v)}><Icon name="menu" /></button></div>
+    <div className="screen-heading settings-heading"><div><h2>Настройки</h2><p className="hint">{settingsGroups.find(([id]) => id === value)?.[1]}</p></div><button className="icon-button settings-trigger" ref={trigger} aria-label="Группы настроек" aria-expanded={open} aria-controls="settings-group-menu" onClick={() => setOpen(v => !v)}><Icon name="menu" /></button></div>
     {open && <nav className="settings-group-menu" id="settings-group-menu" aria-label="Группы настроек">{settingsGroups.map(([id, label]) => <button key={id} aria-current={value === id ? 'page' : undefined} onClick={() => { change(id); setOpen(false); trigger.current?.focus(); }}>{label}<span aria-hidden="true">{value === id ? '✓' : '›'}</span></button>)}</nav>}
   </div>;
 }

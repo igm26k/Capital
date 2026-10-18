@@ -51,7 +51,7 @@ test('Wallet home shortcuts open the working forms, history filters and reports'
   await page.getByRole('navigation').getByRole('link', { name: 'Счета', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Открыть меню', exact: true })).toHaveCount(0);
   await expect(page.locator('.home-tabs')).toHaveCount(0);
-  await page.getByRole('navigation').getByRole('link', { name: 'Еще', exact: true }).click();
+  await page.getByRole('navigation').getByRole('link', { name: 'Настройки', exact: true }).click();
   await page.getByRole('button', { name: 'Группы настроек', exact: true }).click();
   await page.getByRole('navigation', { name: 'Группы настроек' }).getByRole('button', { name: 'Бюджеты и отчеты', exact: true }).click();
   await page.getByText('Бюджеты, отчеты и правила', { exact: true }).click();

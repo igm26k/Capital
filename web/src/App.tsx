@@ -222,7 +222,7 @@ export function App() {
     <TransactionHistory filterRevision={historyNavigation} filterQuery={reportHistoryQuery} key={`${auth.session.id}-${auth.workspace.id}`} workspace={auth.workspace.id} revision={historyRevision} accounts={accounts} categories={categories} tags={tags} disabled={busy || loading || !!pending || needsRefresh || !online} edit={id => void editTransaction(id)} refund={id => void newRefund(id)} remove={id => void deleteTransaction(id)} classify={body => create('transactions/classification', body)} fail={showError} />
     </div>
     {operationOpen && <OperationModal accounts={accounts.filter(a => !a.archived_at)} categories={categories} tags={tags} disabled={busy || loading || !!pending || needsRefresh || !online} saving={busy} error={error} submit={create} cancel={() => setOperationOpen(false)} />}
-    <div hidden={section !== "more"} className="screen" aria-label="Еще">
+    <div hidden={section !== "more"} className="screen" aria-label="Настройки">
     <SettingsNavigation value={settingsGroup} change={setSettingsGroup} active={section === 'more'} />
     <div className="settings-group" hidden={settingsGroup !== 'classification'}>
     <ClassificationManager key={`classification-${formVersion}-${resourceRevision}`} categories={categories} tags={tags} disabled={busy || loading || !!pending || needsRefresh || !online} submit={create} fail={setError} />
@@ -251,7 +251,7 @@ export function App() {
     </div>
     </div>
     <nav className="bottom-nav" aria-label="Основная навигация">
-      {([['accounts', 'Счета', '◫'], ['operations', 'Операции', '⇄'], ['more', 'Еще', '⋯']] as const).map(([id, label, symbol]) =>
+      {([['accounts', 'Счета', '◫'], ['operations', 'Операции', '⇄'], ['more', 'Настройки', '⋯']] as const).map(([id, label, symbol]) =>
         <a key={id} href={`#${id}`} aria-current={section === id ? 'page' : undefined}><span className="nav-symbol" aria-hidden="true">{symbol}</span><span>{label}</span></a>)}
     </nav>
     </>}
