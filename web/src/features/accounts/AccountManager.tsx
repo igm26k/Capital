@@ -4,7 +4,7 @@ import { money } from '../../shared/money';
 import { AccountForm } from './AccountForm';
 import { Icon } from '../../shared/Icon';
 type Props = { accounts: Account[]; disabled: boolean; loading: boolean; submit: (path: string, body: object, method?: 'POST' | 'PUT') => void; fail: (message: string) => void; history: (id: string) => void; records: () => void; children?: ReactNode };
-const types = { bank: 'Банк', card: 'Карта', cash: 'Наличные' };
+const currencySymbols: Record<string, string> = { EUR: '€', USD: '$', RUB: '₽', GBP: '£', JPY: '¥' };
 export function AccountManager({ accounts, disabled, loading, submit, fail, history, records, children }: Props) {
   const [selected, setSelected] = useState<Account | null>(null);
   const [creating, setCreating] = useState(false);
@@ -32,10 +32,9 @@ export function AccountManager({ accounts, disabled, loading, submit, fail, hist
         return <li className="account-tile" key={account.id} style={{ '--tile-color': color } as CSSProperties}>
           <button className="tile-main" disabled={disabled} aria-label={`Операции счета ${account.name}`} onClick={() => history(account.id)}>
             <span className="tile-name" title={account.name}>{account.name}</span>
-            <strong className="tile-balance" data-testid={`balance-${account.id}`}>{money(account.posted_balance_minor, account.currency)}</strong>
-            <span className="tile-meta"><Icon name={account.type === 'bank' ? 'bank' : account.type === 'card' ? 'card' : 'cash'} />{account.archived_at ? 'В архиве' : types[account.type]}</span>
+            <strong className="tile-balance" data-testid={`balance-${account.id}`}>{money(account.posted_balance_minor, account.currency).replace(account.currency, currencySymbols[account.currency] ?? account.currency)}</strong>
           </button>
-          <button className="tile-edit" disabled={disabled} aria-label={`Изменить счет ${account.name}`} onClick={() => setSelected(account)}>⋮</button>
+          {settings && <button className="tile-edit" disabled={disabled} aria-label={`Изменить счет ${account.name}`} onClick={() => setSelected(account)}>Изменить</button>}
         </li>;
       })}<li className="add-account-tile"><button disabled={disabled} onClick={() => setCreating(true)}><Icon name="plus" /><span>Добавить счет</span></button></li></ul>
       {!!visible.length && <div className="currency-summary" aria-label="Итоги по валютам"><span>Всего</span>{[...totals].sort(([a], [b]) => a.localeCompare(b)).map(([currency, total]) => <strong key={currency}>{money(total.toString(), currency)}</strong>)}</div>}
