@@ -496,3 +496,7 @@ Compose «Разобрать сохранённые изменения» пок�
 Регрессия **54/54 PASS** на предыдущем APK этого шага: storage28 + API17 + History4/Details5. Последние изменения затронули только отображение recovery dialog и добавили money test; остальные пути не запускались повторно в broad run. На финальном APK повторены combined offline UIhost3 и actual Worker host3: **6/6 PASS**, original commands/WorkSpec/backoff/cold recovery и SQL no duplicates. Combined queue36/head37/accounts124456/10000/accountversion24/balance_version21/deleted8/active-entrybalance134456 unchanged. Первый broad/host run также PASS; реальный delayed worker attempt4/backoff240 наблюдался без cancel/replacement.
 
 **52/52 unit**, final debug/test APK build, lint, generator --check, bash syntax и diff --check PASS. Full make gate не запускался; script теперь ожидает147 executions (122 direct +25 host). Общий план in_progress: далее аудит оставшейся APP-02/S3/APP-03 приемки, включая полные gates, recovery/epoch и Android→web convergence; цель не считается завершённой.
+
+## APK в корне репозитория
+
+Каждый успешный `assembleDebug` или подписанный `assembleRelease` атомарно обновляет `../android_latest.apk`. Неподписанная release-сборка сохраняет предыдущий APK. Перед коммитом готового Android-изменения запускайте `python3 ops/personal_signing.py --sdk /opt/accounting-sdk --verify-all` из корня: итоговый файл должен быть подписан существующим release-ключом. Включайте APK в коммит и push. Правило закреплено в корневом `AGENTS.md`.

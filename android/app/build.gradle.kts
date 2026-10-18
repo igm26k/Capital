@@ -79,3 +79,24 @@ val prepareDebugTrust = tasks.register<PrepareDebugTrust>("prepareDebugTrust") {
 androidComponents.onVariants(androidComponents.selector().withBuildType("debug")) {
     it.sources.res?.addGeneratedSourceDirectory(prepareDebugTrust, PrepareDebugTrust::outputDirectory)
 }
+
+// Keep the requested repository artifact in sync with every installable APK build.
+listOf("Debug", "Release").forEach { buildType ->
+    tasks.matching { it.name == "assemble$buildType" }.configureEach {
+        doLast {
+            if (buildType == "Release" && releaseSecrets.any { it.isNullOrEmpty() }) {
+                logger.lifecycle("Unsigned release: android_latest.apk is preserved; use ops/personal_signing.py.")
+            } else {
+                val apk = layout.buildDirectory.file("outputs/apk/${buildType.lowercase()}/app-${buildType.lowercase()}.apk").get().asFile
+                require(apk.isFile) { "Expected installable APK is missing: $apk" }
+                val destination = rootProject.file("../android_latest.apk").toPath()
+                val temporary = java.nio.file.Files.createTempFile(destination.parent, ".android-latest-", ".apk")
+                try {
+                    java.nio.file.Files.copy(apk.toPath(), temporary, java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+                    java.nio.file.Files.move(temporary, destination, java.nio.file.StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE)
+                } finally { java.nio.file.Files.deleteIfExists(temporary) }
+                logger.lifecycle("Updated ${destination.fileName} from ${buildType.lowercase()} APK")
+            }
+        }
+    }
+}
