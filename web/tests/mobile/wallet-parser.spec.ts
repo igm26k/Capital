@@ -64,12 +64,13 @@ test('Wallet accepts only the fixed wallet_records.csv column format', async () 
   await expect(parseWallet(header.replaceAll(';', ',') + row('Cash', '1').replaceAll(';', ','))).rejects.toThrow('wallet_records.csv');
   await expect(parseWallet(header.replace('ref_currency_amount;', '') + row('Cash', '1'))).rejects.toThrow('wallet_records.csv');
 });
-test('Wallet does not split larger same-time groups by matching amounts or references', async () => {
+test('Wallet splits same-time groups only into mutually unique pairs', async () => {
   const file = await parseWallet(header + row('Bank A', '100', 'Расход', 'true') + row('Bank B', '200', 'Расход', 'true') + row('Cash A', '100', 'Доход', 'true') + row('Cash B', '200', 'Доход', 'true'));
-  expect(walletPairs(file.rows)).toEqual([]);
+  expect(walletPairs(file.rows)).toEqual([{ debit: 2, credit: 4, match: 'amount' }, { debit: 3, credit: 5, match: 'amount' }]);
   const plan = await planWallet(file, [], [], 'owner', 'workspace', 'generation');
-  expect(plan.adjustments).toBe(4);
-  expect(plan.commands.filter(c => c.path === 'transactions').map(c => JSON.parse(c.body).amount_minor)).toEqual(['-10000', '-20000', '10000', '20000']);
+  expect(plan.adjustments).toBe(0);
+  expect(plan.transactions).toBe(2);
+  expect(plan.legacyAdjustmentIds).toHaveLength(4);
 });
 test('Wallet does not pair close timestamps even with equal amounts and reference values', async () => {
   for (const offset of ['2025-08-12T14:59:59.999Z', '2025-08-12T15:00:00.001Z', '2025-08-12T15:05:00.000Z']) {
@@ -79,7 +80,7 @@ test('Wallet does not pair close timestamps even with equal amounts and referenc
     expect(walletPairs([...file.rows].reverse())).toEqual([]);
   }
 });
-test('Wallet ignores reference currency amounts when classifying or calculating movements', async () => {
+test('Wallet never uses reference amounts to link different timestamps or set ledger amounts', async () => {
   for (const ref of ['91.23', '91.2300000000000001', '0', '-91.23', 'NaN', '']) {
     const debit = row('Bank', '100', 'Расход', 'true', 'USD').replace(';999999;', ';91.23;');
     const credit = row('Cash', '91.23', 'Доход', 'true').replace(';999999;', `;${ref};`).replace(date, '2025-08-12T15:02:00.000Z');
@@ -112,4 +113,21 @@ test('Wallet treats every nonexplicit movement as a correction with no skipped r
   expect(walletCorrections(file.rows)).toHaveLength(3);
   const plan = await planWallet(file, [], [], 'owner', 'workspace', 'generation');
   expect(plan.adjustments).toBe(3); expect(plan.skipped).toBe(0);
+});
+test('Wallet recognizes concurrent RUB transfer and EUR to RUB conversion at rate 88', async () => {
+  const content = header + row('Settlement RUB', '60358.28', 'Расход', 'true', 'RUB').replace(';999999;', ';60358.280;') + row('Settlement RUB', '52360', 'Доход', 'true', 'RUB').replace(';999999;', ';55607.476635514024;') + row('Savings RUB', '60358.28', 'Доход', 'true', 'RUB').replace(';999999;', ';60358.28;') + row('FX EUR', '595', 'Расход', 'true', 'EUR').replace(';999999;', ';055607.47663551402400;');
+  const file = await parseWallet(content);
+  expect(walletPairs(file.rows)).toEqual([{ debit: 2, credit: 4, match: 'amount' }, { debit: 5, credit: 3, match: 'reference' }]);
+  expect(walletCorrections(file.rows)).toEqual([]);
+  const plan = await planWallet(file, [], [], 'owner', 'workspace', 'generation');
+  const movements = plan.commands.filter(c => c.path === 'transactions').map(c => JSON.parse(c.body));
+  expect(movements).toEqual([expect.objectContaining({ kind: 'transfer', source_amount_minor: '6035828', target_amount_minor: '6035828' }), expect.objectContaining({ kind: 'transfer', source_amount_minor: '59500', target_amount_minor: '5236000', rate: null })]);
+  expect(plan.legacyAdjustmentIds).toHaveLength(4);
+});
+test('Wallet never rounds reference values or picks between duplicate cross-currency candidates', async () => {
+  for (const reference of ['100.0000000000000001', '100', '0', 'NaN', '']) {
+    const file = await parseWallet(header + row('FX USD', '1', 'Расход', 'true', 'USD').replace(';999999;', ';100;') + row('Cash EUR', '2', 'Доход', 'true').replace(';999999;', `;${reference};`) + row('Other EUR', '3', 'Доход', 'true').replace(';999999;', `;${reference};`));
+    expect(walletPairs(file.rows)).toEqual([]);
+    expect(walletCorrections(file.rows)).toHaveLength(3);
+  }
 });

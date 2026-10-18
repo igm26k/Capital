@@ -1,11 +1,11 @@
 import type { Account, Category } from '../../api/client';
 import { minor } from '../../shared/money';
 
-export type WalletRow = { number: number; account: string; category: string; currency: string; amount: string; kind: 'expense' | 'income'; date: string; transfer: boolean; payee: string; note: string; payment: string; labels: string };
+export type WalletRow = { number: number; account: string; category: string; currency: string; amount: string; kind: 'expense' | 'income'; date: string; transfer: boolean; payee: string; note: string; payment: string; labels: string; referenceAmount: string | null };
 export type WalletFile = { rows: WalletRow[]; errors: string[]; digest: string };
-export type WalletPair = { debit: number; credit: number; match?: 'timestamp' };
+export type WalletPair = { debit: number; credit: number; match?: 'timestamp' | 'amount' | 'reference' };
 export type WalletCommand = { path: 'accounts' | 'categories' | 'transactions'; key: string; body: string; label: string };
-export type WalletPlan = { owner: string; workspace: string; generation: string; digest: string; commands: WalletCommand[]; skipped: number; rows: number; createdAccounts: number; createdCategories: number; transactions: number; adjustments?: number; legacyTransferIds?: string[]; key: string };
+export type WalletPlan = { owner: string; workspace: string; generation: string; digest: string; commands: WalletCommand[]; skipped: number; rows: number; createdAccounts: number; createdCategories: number; transactions: number; adjustments?: number; legacyTransferIds?: string[]; legacyAdjustmentIds?: string[]; key: string };
 export const walletAccountKey = (r: Pick<WalletRow, 'account' | 'currency'>) => JSON.stringify([r.account, r.currency]);
 
 // RFC 4180 quoting, including escaped quotes and newlines inside a field.
@@ -35,6 +35,14 @@ async function id(namespace: string): Promise<string> {
   const s = await hash(namespace);
   return `${s.slice(0, 8)}-${s.slice(8, 12)}-5${s.slice(13, 16)}-a${s.slice(17, 20)}-${s.slice(20, 32)}`;
 }
+// Compare reference values exactly; never use them as ledger amounts or rates.
+function referenceKey(value: string): string | null {
+  if (!/^\d+(?:[.,]\d+)?$/.test(value)) return null;
+  const [whole, fraction = ''] = value.replace(',', '.').split('.');
+  const integer = whole.replace(/^0+(?=\d)/, ''), decimal = fraction.replace(/0+$/, '');
+  const key = decimal ? `${integer}.${decimal}` : integer;
+  return key === '0' ? null : key;
+}
 export async function parseWallet(text: string): Promise<WalletFile> {
   if (new TextEncoder().encode(text).length > 10 * 1024 * 1024) throw new Error('Файл Wallet должен быть не больше 10 MiB.');
   const [header, ...records] = walletCSV(text);
@@ -60,7 +68,7 @@ export async function parseWallet(text: string): Promise<WalletFile> {
       const date = new Date(r.date).toISOString();
       if (date.slice(0, 10) < '1900-01-01' || Date.parse(date) > Date.now()) throw new Error('Дата вне допустимого диапазона.');
       if (!['true', 'false'].includes(r.transfer.toLowerCase())) throw new Error('Признак перевода должен быть true или false.');
-      const row: WalletRow = { number, account: r.account, category: r.category, currency: r.currency, amount, kind, date, transfer: r.transfer.toLowerCase() === 'true', payee: r.payee ?? '', note: r.note ?? '', payment: r.payment_type ?? '', labels: r.labels ?? '' };
+      const row: WalletRow = { number, account: r.account, category: r.category, currency: r.currency, amount, kind, date, transfer: r.transfer.toLowerCase() === 'true', payee: r.payee ?? '', note: r.note ?? '', payment: r.payment_type ?? '', labels: r.labels ?? '', referenceAmount: referenceKey(r.ref_currency_amount) };
       if (walletNote(row).length > 1900) throw new Error('Слишком длинное примечание.');
       rows.push(row);
     } catch (e) { errors.push(`Строка ${number}: ${e instanceof Error ? e.message : 'Некорректные данные.'}`); }
@@ -73,9 +81,8 @@ export function walletNote(r: WalletRow): string {
 export function validWalletPair(debit: WalletRow, credit: WalletRow): boolean {
   return debit.transfer && credit.transfer && debit.kind === 'expense' && credit.kind === 'income' && walletAccountKey(debit) !== walletAccountKey(credit) && (debit.currency !== credit.currency || debit.amount === credit.amount);
 }
-// The Wallet format has no shared transfer id. By the owner's import policy,
-// only a group of exactly two opposite movements at the exact same instant
-// qualifies as a transfer. Amounts/reference values never split larger groups.
+// Only movements at the exact same instant can be transfer counterparts.
+// Larger groups are split only when each side has exactly one compatible match.
 export function walletPairs(rows: WalletRow[]): WalletPair[] {
   const groups = new Map<string, WalletRow[]>();
   for (const row of rows.filter(r => r.transfer)) {
@@ -83,9 +90,29 @@ export function walletPairs(rows: WalletRow[]): WalletPair[] {
     groups.get(row.date)!.push(row);
   }
   const pairs: WalletPair[] = [];
-  for (const group of groups.values()) if (group.length === 2) {
-    const debit = group.find(r => r.kind === 'expense'), credit = group.find(r => r.kind === 'income');
-    if (debit && credit && validWalletPair(debit, credit)) pairs.push({ debit: debit.number, credit: credit.number, match: 'timestamp' });
+  for (const group of groups.values()) {
+    if (group.length === 2) {
+      const debit = group.find(r => r.kind === 'expense'), credit = group.find(r => r.kind === 'income');
+      if (debit && credit && validWalletPair(debit, credit)) pairs.push({ debit: debit.number, credit: credit.number, match: 'timestamp' });
+      continue;
+    }
+    const candidates = new Map<number, { count: number; other: WalletRow }>();
+    const add = (row: WalletRow, other: WalletRow) => {
+      const previous = candidates.get(row.number);
+      if (previous?.count === 2) return;
+      candidates.set(row.number, { count: (previous?.count ?? 0) + 1, other });
+    };
+    for (const debit of group.filter(r => r.kind === 'expense')) {
+      for (const credit of group.filter(r => r.kind === 'income')) {
+        if (!validWalletPair(debit, credit)) continue;
+        if (debit.currency !== credit.currency && (!debit.referenceAmount || debit.referenceAmount !== credit.referenceAmount)) continue;
+        add(debit, credit); add(credit, debit);
+      }
+    }
+    for (const debit of group.filter(r => r.kind === 'expense')) {
+      const candidate = candidates.get(debit.number);
+      if (candidate?.count === 1 && candidates.get(candidate.other.number)?.count === 1) pairs.push({ debit: debit.number, credit: candidate.other.number, match: debit.currency === candidate.other.currency ? 'amount' : 'reference' });
+    }
   }
   return pairs;
 }
@@ -125,9 +152,13 @@ export async function planWallet(file: WalletFile, accounts: Account[], categori
   }
   const byNumber = new Map(file.rows.map(r => [r.number, r])), used = new Set<number>();
   let transactions = 0;
+  const legacyAdjustmentIds: string[] = [];
   for (const pair of pairs) {
     const debit = byNumber.get(pair.debit), credit = byNumber.get(pair.credit);
     if (!debit || !credit || !validWalletPair(debit, credit) || used.has(pair.debit) || used.has(pair.credit)) throw new Error('Некорректная или повторяющаяся пара перевода.');
+    if (pair.match !== 'timestamp') {
+      legacyAdjustmentIds.push(await id(`${root}:${file.digest}:adjustment:${debit.number}`), await id(`${root}:${file.digest}:adjustment:${credit.number}`));
+    }
     const source = mapped.get(walletAccountKey(debit))!, target = mapped.get(walletAccountKey(credit))!;
     if (source === target) throw new Error('Для перевода нужны два разных счета.');
     const note = `${walletNote(debit)}\nЗачисление Wallet · строка ${credit.number} · ${credit.date}\n${walletNote(credit)}`;
@@ -150,5 +181,5 @@ export async function planWallet(file: WalletFile, accounts: Account[], categori
     used.add(row.number); transactions++;
   }
   if (!transactions) throw new Error('В плане нет операций для импорта.');
-  return { owner, workspace, generation, digest: file.digest, commands, skipped: 0, rows: file.rows.length, createdAccounts: commands.filter(c => c.path === 'accounts').length, createdCategories: commands.filter(c => c.path === 'categories').length, transactions, adjustments: corrections.length, legacyTransferIds, key: file.digest };
+  return { owner, workspace, generation, digest: file.digest, commands, skipped: 0, rows: file.rows.length, createdAccounts: commands.filter(c => c.path === 'accounts').length, createdCategories: commands.filter(c => c.path === 'categories').length, transactions, adjustments: corrections.length, legacyTransferIds, legacyAdjustmentIds, key: file.digest };
 }

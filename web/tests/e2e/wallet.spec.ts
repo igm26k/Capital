@@ -45,3 +45,33 @@ test('Wallet plans commit to the real test ledger and exact replay does not dupl
   expect(transactions.find(t => t.kind === 'expense')?.allocations[0].category_id).toBeTruthy();
   expect(transactions.find(t => t.kind === 'expense')?.note).toContain('Synthetic expense');
 });
+
+test('Wallet preserves concurrent RUB transfer and EUR conversion amounts and rate in the real ledger', async ({ context }) => {
+  const origin = { Origin: 'https://localhost:8444' };
+  const registration = await context.request.post('/api/v1/auth/register', { headers: origin, data: { email: `wallet-fx-${crypto.randomUUID()}@example.test`, password: 'wallet-synthetic-test-password-2026', device_name: 'Wallet FX acceptance', transport: 'cookie', timezone: 'UTC' } });
+  expect(registration.status()).toBe(201);
+  const auth = await registration.json() as Auth;
+  const file = await parseWallet('account;category;currency;amount;ref_currency_amount;type;payment_type;note;date;transfer;payee;labels\n' + [
+    'Settlement RUB;Transfer;RUB;60358.28;60358.28;Expense;Cash;;2025-08-12T15:00:00.000Z;true;;',
+    'Settlement RUB;Transfer;RUB;52360;55607.476635514024;Income;Cash;;2025-08-12T15:00:00.000Z;true;;',
+    'Savings RUB;Transfer;RUB;60358.28;60358.28;Income;Cash;;2025-08-12T15:00:00.000Z;true;;',
+    'FX EUR;Transfer;EUR;595;55607.476635514024;Expense;Cash;;2025-08-12T15:00:00.000Z;true;;',
+  ].join('\n'));
+  const plan = await planWallet(file, [], [], auth.profile.id, auth.workspace.id, auth.workspace.sync_generation_id);
+  expect(plan.transactions).toBe(2); expect(plan.adjustments).toBe(0);
+  for (let pass = 0; pass < 2; pass++) for (const command of plan.commands) {
+    const response = await context.request.post(`/api/v1/workspaces/${auth.workspace.id}/${command.path}`, { headers: { ...origin, 'X-CSRF-Token': auth.csrf_token, 'X-Sync-Generation': plan.generation, 'Idempotency-Key': command.key, 'Content-Type': 'application/json' }, data: command.body });
+    expect(response.status(), await response.text()).toBe(201);
+    if (pass) expect(response.headers()['idempotency-replayed']).toBe('true');
+  }
+  const accounts = (await (await context.request.get(`/api/v1/workspaces/${auth.workspace.id}/accounts`)).json() as List<Account>).items;
+  expect(accounts).toHaveLength(3);
+  expect(accounts.find(a => a.name === 'Settlement RUB')?.posted_balance_minor).toBe('-799828');
+  expect(accounts.find(a => a.name === 'Savings RUB')?.posted_balance_minor).toBe('6035828');
+  expect(accounts.find(a => a.name === 'FX EUR')?.posted_balance_minor).toBe('-59500');
+  const transactions = (await (await context.request.get(`/api/v1/workspaces/${auth.workspace.id}/transactions?kind=transfer`)).json() as List<Transaction>).items;
+  expect(transactions).toHaveLength(2);
+  const fx = transactions.find(t => t.entries.some(e => e.currency === 'EUR'))!;
+  expect(fx.rate).toEqual({ numerator: '88', denominator: '1' });
+  expect(fx.entries).toEqual(expect.arrayContaining([expect.objectContaining({ currency: 'EUR', amount_minor: '-59500' }), expect.objectContaining({ currency: 'RUB', amount_minor: '5236000' })]));
+});
