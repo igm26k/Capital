@@ -195,7 +195,7 @@ export function App() {
     catch (error) { showError(error); } finally { setBusy(false); }
   }
   function showRecords(query?: string) { setReportHistoryQuery(query ? `${query}&limit=25` : 'limit=25'); setHistoryNavigation(v => v + 1); navigate('operations'); }
-  return <main className={auth ? "app-shell wallet-shell" : "login-shell"}><header className="app-header">{auth ? <><div className="header-title"><h1>{section === 'accounts' ? 'Главная' : section === 'operations' ? 'Операции' : 'Еще'}</h1><span>{auth.workspace.name}</span></div><button className="icon-button" aria-label="Обновить" disabled={busy || loading || !online} onClick={() => { setError(''); void refresh(auth).catch(showError); }}><Icon name="refresh" /></button></> : <div><span className="eyebrow">ЛИЧНЫЕ ФИНАНСЫ</span><h1>Capital</h1></div>}</header>
+  return <main className={auth ? "app-shell wallet-shell" : "login-shell"}><header className="app-header">{auth ? <><div className="header-title"><h1>Capital</h1></div><button className="header-logout" disabled={busy || !!pending} onClick={() => void logout()}>Выход</button></> : <div><span className="eyebrow">ЛИЧНЫЕ ФИНАНСЫ</span><h1>Capital</h1></div>}</header>
     {!online && <p role="status" className="notice">Нет соединения. Данные на экране могут быть устаревшими; новые операции недоступны.</p>}
     {starting ? <p role="status">Проверяем сессию…</p> : startupError ? <section><p role="alert">{startupError}</p><button onClick={() => void session()}>Повторить проверку сессии</button></section> : !auth ? <><AuthForm onAuth={authenticated} />{error && <p role="alert">{error}</p>}</> : <>
     {message && <p role="status" className="notice success">{message}</p>}{error && <p role="alert" className="notice">{error}</p>}
@@ -236,7 +236,7 @@ export function App() {
     <details onToggle={e=>setCSVOpen(e.currentTarget.open)}><summary>Экспорт CSV</summary>{csvOpen && <CSVPanel key={`${auth.session.id}:${auth.workspace.sync_generation_id}`} auth={auth} accounts={accounts} changed={()=>{void refresh(auth).catch(showError);}} fail={showError}/>}</details>
     <details onToggle={e=>setSourcesOpen(e.currentTarget.open)}><summary>Банковские предложения</summary>{sourcesOpen&&<SourcesPanel key={`${auth.session.id}:${auth.workspace.sync_generation_id}`} auth={auth} accounts={accounts} changed={()=>{void refresh(auth).catch(showError);}} fail={showError}/>}</details>
     <p className="hint">Ручной учет и CSV. Банковские подключения пока недоступны.</p>
-    <section className="profile-card"><h2>Профиль</h2><p>{auth.profile.email}</p><button className="secondary" disabled={busy || !!pending} onClick={() => void logout()}>Выйти</button></section>
+    <section className="profile-card"><h2>Профиль</h2><p>{auth.profile.email}</p><button className="secondary" disabled={busy || loading || !online} onClick={() => { setError(''); void refresh(auth).catch(showError); }}>{loading ? 'Загрузка…' : 'Обновить данные'}</button></section>
     <PrivacyPanel auth={auth} fail={showError} deleted={async()=>{
       let localCleared=true;try{await clearCSVCommandsForOwner(auth.profile.id);}catch{localCleared=false;}
       try {for(const key of Object.keys(sessionStorage)){if([`accounting.planning.pending.v1:${auth.profile.id}:`,`accounting.csv.pending.v1:${auth.profile.id}:`,`accounting.csv.last:${auth.profile.id}:`].some(prefix=>key.startsWith(prefix)))sessionStorage.removeItem(key);}}catch{/* In-memory state is cleared below. */}

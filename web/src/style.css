@@ -60,3 +60,4 @@ main.wallet-shell{max-width:760px;padding:0 16px calc(108px + env(safe-area-inse
 .tile-name{padding-right:0;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}.tile-edit{top:auto;bottom:0;border-radius:9px 0 9px 0}.tile-meta{padding-right:30px}
 /* Section navigation lives only in the bottom bar. */
 .wallet-shell>.app-header{padding-left:20px}.wallet-shell .accounts-toolbar{margin-top:16px}
+.header-logout{background:transparent;color:#fff;padding:10px 14px;min-height:48px;border-radius:10px;font-weight:500}.header-logout:focus-visible{outline-color:#fff}.header-title h1{margin:0}
