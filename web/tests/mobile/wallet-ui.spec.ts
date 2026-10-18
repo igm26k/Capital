@@ -102,12 +102,24 @@ test('Wallet has no account or column mapping and automatically creates only mis
   expect(createdAccounts[0].body).toMatchObject({ name: 'Bank', currency: 'USD' });
   expect(writes.filter(r => r.path.endsWith('/transactions')).map(r => r.body.account_id)).toContain(existing.id);
 });
-test('Wallet resolves grouped transfers and shows why each pair was suggested', async ({ page }) => {
+test('Wallet shows grouped movements as corrections instead of guessed transfers', async ({ page }) => {
   await page.getByLabel('Файл Wallet CSV').setInputFiles({ name: 'wallet_records.csv', mimeType: 'text/csv', buffer: Buffer.from(header + row('Bank A', '100', 'Расход', 'true') + row('Bank B', '200', 'Расход', 'true') + row('Cash A', '100', 'Доход', 'true') + row('Cash B', '200', 'Доход', 'true')) });
-  await expect(page.getByText(/Подобрано пар: 2\. Без пары: 0 строк/)).toBeVisible();
+  await expect(page.getByText(/Подобрано пар: 0\. Корректировок: 4/)).toBeVisible();
   await expect(page.getByRole('checkbox', { name: /Я проверил строки без пары/ })).toHaveCount(0);
-  await page.getByText('Проверить пары переводов (2)', { exact: true }).click();
-  await expect(page.getByText('Единственное совпадение суммы и валюты', { exact: true })).toHaveCount(2);
+  await expect(page.getByText('Проверить пары переводов (2)', { exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: 'Подготовить импорт Wallet', exact: true }).click();
-  await expect(page.getByText(/Всего операций: 2\. Из них корректировок: 0\. Исключено строк: 0/)).toBeVisible();
+  await expect(page.getByText(/Всего операций: 4\. Из них корректировок: 4\. Исключено строк: 0/)).toBeVisible();
+});
+test('Wallet stops before writes if older guessed transfers were already imported', async ({ page }) => {
+  let writes = 0;
+  await page.route('**/api/v1/workspaces/*/transactions/*', route => route.fulfill({ json: { kind: 'transfer' } }));
+  await page.route('**/api/v1/workspaces/*/*', route => {
+    if (route.request().method() !== 'POST') return route.fallback();
+    writes++; return route.fulfill({ json: {} });
+  });
+  await page.getByLabel('Файл Wallet CSV').setInputFiles({ name: 'wallet_records.csv', mimeType: 'text/csv', buffer: Buffer.from(header + row('Bank', '100', 'Расход', 'true')) });
+  await page.getByRole('button', { name: 'Подготовить импорт Wallet', exact: true }).click();
+  await page.getByRole('button', { name: 'Подтвердить импорт Wallet', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('по старому алгоритму');
+  expect(writes).toBe(0);
 });

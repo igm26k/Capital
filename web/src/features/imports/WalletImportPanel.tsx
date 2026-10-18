@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { RequestError, type Account, type Auth, type Category } from '../../api/client';
 import { money } from '../../shared/money';
-import { parseWallet, planWallet, validWalletPair, walletAccountKey, walletPairs, walletCorrections, type WalletFile, type WalletPair, type WalletPlan, type WalletRow } from './wallet';
-import { finishWallet, loadWallet, runWallet, saveWallet, walletLock, type WalletProgress } from './walletRunner';
+import { parseWallet, planWallet, walletAccountKey, walletPairs, walletCorrections, type WalletFile, type WalletPlan, type WalletRow } from './wallet';
+import { checkLegacyWalletTransfers, finishWallet, loadWallet, runWallet, saveWallet, walletLock, type WalletProgress } from './walletRunner';
 type Props = { auth: Auth; accounts: Account[]; categories: Category[]; blocked: boolean; changed: () => void; fail: (e: unknown) => void; working: (busy: boolean) => void };
 export function WalletImportPanel({ auth, accounts, categories, blocked, changed, fail, working }: Props) {
-  const [file, setFile] = useState<WalletFile | null>(null), [pairs, setPairs] = useState<WalletPair[]>([]);
-  const [skip, setSkip] = useState(false), [error, setError] = useState(''), [ready, setReady] = useState(false), [busy, setBusy] = useState(false);
+  const [file, setFile] = useState<WalletFile | null>(null);
+  const [error, setError] = useState(''), [ready, setReady] = useState(false), [busy, setBusy] = useState(false);
   const [plan, setPlan] = useState<WalletPlan | null>(null), [progress, setProgress] = useState<WalletProgress | null>(null), [preview, setPreview] = useState<WalletPlan | null>(null);
   const alive = useRef(true), stopped = useRef(false), running = useRef(false), choosing = useRef(0);
   useEffect(() => {
@@ -19,25 +19,23 @@ export function WalletImportPanel({ auth, accounts, categories, blocked, changed
     for (const row of file?.rows ?? []) { const key = walletAccountKey(row); if (!values.has(key)) values.set(key, []); values.get(key)!.push(row); }
     return values;
   }, [file]);
-  const used = new Set(pairs.flatMap(p => [p.debit, p.credit]));
+  const pairs = useMemo(() => file ? walletPairs(file.rows) : [], [file]);
   const corrections = file ? walletCorrections(file.rows, pairs) : [];
-  const corrective = new Set(corrections.map(r => r.number));
-  const unresolved = file?.rows.filter(r => r.transfer && !used.has(r.number) && !corrective.has(r.number)) ?? [];
   async function selectFile(input: File | undefined) {
     if (!input) return;
     const sequence = ++choosing.current;
-    setError(''); setPreview(null); setFile(null); setSkip(false);
+    setError(''); setPreview(null); setFile(null);
     try {
       if (input.size > 10 * 1024 * 1024) throw new Error('Файл Wallet должен быть не больше 10 MiB.');
       const parsed = await parseWallet(new TextDecoder('utf-8', { fatal: true }).decode(await input.arrayBuffer()));
       if (!alive.current || sequence !== choosing.current) return;
-      setFile(parsed); setPairs(walletPairs(parsed.rows));
+      setFile(parsed);
     } catch (e) { if (alive.current && sequence === choosing.current) setError(e instanceof Error ? e.message : 'Не удалось прочитать Wallet CSV.'); }
   }
   async function prepare() {
     if (!file) return;
     setError(''); setBusy(true);
-    try { const value = await planWallet(file, pairs, accounts, categories, auth.profile.id, auth.workspace.id, auth.workspace.sync_generation_id, skip); if (alive.current) setPreview(value); }
+    try { const value = await planWallet(file, accounts, categories, auth.profile.id, auth.workspace.id, auth.workspace.sync_generation_id); if (alive.current) setPreview(value); }
     catch (e) { if (alive.current) setError(e instanceof Error ? e.message : 'Не удалось подготовить импорт.'); }
     finally { if (alive.current) setBusy(false); }
   }
@@ -46,7 +44,7 @@ export function WalletImportPanel({ auth, accounts, categories, blocked, changed
     running.current = true; stopped.current = false; setBusy(true); working(true); setError('');
     try {
       await walletLock(auth, async () => {
-        if (value) { await saveWallet(auth, value); if (!alive.current) return; setPlan(value); setProgress({ key: `${value.digest}:0`, digest: value.digest, cursor: 0 }); setPreview(null); }
+        if (value) { await checkLegacyWalletTransfers(auth, value); await saveWallet(auth, value); if (!alive.current) return; setPlan(value); setProgress({ key: `${value.digest}:0`, digest: value.digest, cursor: 0 }); setPreview(null); }
         await runWallet(auth, () => stopped.current || !alive.current, next => { if (alive.current) setProgress(next); });
       });
     } catch (e) {
@@ -81,12 +79,11 @@ export function WalletImportPanel({ auth, accounts, categories, blocked, changed
           return <li key={key}><strong>{first.account} · {first.currency}</strong><span>{rows.length} строк · {existing.length === 1 ? 'Существующий счет' : existing.length > 1 ? 'Обнаружены одинаковые названия счетов' : accounts.some(a => a.name === first.account && a.currency === first.currency) ? 'Счет в архиве — восстановите перед импортом' : 'Будет создан автоматически'}</span></li>;
         })}</ul>
         <details><summary>Предпросмотр операций Wallet</summary><ul className="wallet-rows">{file.rows.filter(r => !r.transfer).slice(0, 50).map(r => <li key={r.number}><strong>Строка {r.number} · {r.account}</strong><span>{r.date.slice(0, 10)} · {r.kind === 'expense' ? 'Расход' : 'Доход'} · {money(r.amount, r.currency)}</span><span>{r.category}{r.note ? ` · ${r.note}` : ''}</span></li>)}</ul><p className="hint">Первые 50 операций. Все строки проверяются перед подготовкой плана. Категории создаются или сопоставляются по точному имени; метки и способ оплаты сохраняются в примечании.</p></details>
-        <h3>Переводы между счетами</h3><p>Подобрано пар: {pairs.length}. Без пары: {unresolved.length} строк. Корректировок: {corrections.length}. Автоподбор учитывает точные суммы и время с разницей до 5 минут. Каждая пара будет одной операцией перевода; суммы списания и зачисления сохранятся в своих валютах.</p>
-        {!!pairs.length && <details><summary>Проверить пары переводов ({pairs.length})</summary><ul className="wallet-rows">{pairs.map(pair => { const d = file.rows.find(r => r.number === pair.debit)!, c = file.rows.find(r => r.number === pair.credit)!; return <li key={pair.debit}><span>Строки {d.number} → {c.number}: {d.account} → {c.account}</span><span>{money(d.amount, d.currency)} → {money(c.amount, c.currency)}</span><span>Списание: {d.date} · Зачисление: {c.date}</span><span>{({ timestamp: 'Две строки с одинаковым временем', amount: 'Единственное совпадение суммы и валюты', reference: 'Единственное совпадение справочной суммы Wallet', manual: 'Пара выбрана вручную' } as const)[pair.match ?? 'manual']}</span><button className="secondary" onClick={() => { setPairs(ps => ps.filter(p => p.debit !== pair.debit)); setPreview(null); setSkip(false); }}>Разъединить строки {d.number}/{c.number}</button></li>; })}</ul></details>}
-        {!!corrections.length && <details><summary>Корректирующие проводки Wallet ({corrections.length})</summary><p className="hint">В выгрузке нет второй стороны этих движений. Они будут записаны корректировками остатка: зачисление увеличит остаток, списание уменьшит. Исходные даты и примечания сохранятся; в доходы и расходы эти записи не попадут.</p><ul className="wallet-rows">{corrections.map(r => <li key={r.number}><strong>Строка {r.number} · {r.account}</strong><span>{r.date} · {money(r.kind === 'expense' ? `-${r.amount}` : r.amount, r.currency)}</span><span>{r.kind === 'expense' ? 'Не указано направление перевода' : 'Не указан источник поступления'}</span></li>)}</ul></details>}
-        {!!unresolved.length && <details open><summary>Сопоставить оставшиеся переводы ({unresolved.length})</summary><p className="hint">Для этих строк однозначной пары по времени и сумме нет. Выберите соответствующее зачисление. Для одной валюты суммы должны совпадать; комиссию мастер не предполагает.</p><ul className="wallet-rows">{unresolved.map(r => <li key={r.number}><strong>Строка {r.number} · {r.account}</strong><span>{r.date} · {r.kind === 'expense' ? 'Списание' : 'Зачисление'} · {money(r.amount, r.currency)}</span>{r.kind === 'expense' && <label>Зачисление для строки {r.number}<select value="" onChange={e => { if (e.target.value) { setPairs(ps => [...ps, { debit: r.number, credit: Number(e.target.value), match: 'manual' }]); setPreview(null); setSkip(false); } }}><option value="">Выберите строку зачисления</option>{unresolved.filter(c => validWalletPair(r, c)).map(c => <option key={c.number} value={c.number}>Строка {c.number} · {c.account} · {c.date.slice(0, 10)} · {money(c.amount, c.currency)}</option>)}</select></label>}</li>)}</ul><label className="check"><input type="checkbox" checked={skip} onChange={e => { setSkip(e.target.checked); setPreview(null); }} />Я проверил строки без пары и исключаю их из этого импорта ({unresolved.length})</label></details>}
-        <p className="hint">Одинаковые покупки остаются отдельными записями. Повтор того же плана использует те же идентификаторы. При повторном импорте не меняйте пары переводов. Другая или отредактированная выгрузка требует проверки пересечения периодов.</p>
-        <button className="primary-action" disabled={!!file.errors.length || (!!unresolved.length && !skip)} onClick={() => void prepare()}>Подготовить импорт Wallet</button>
+        <h3>Переводы между счетами</h3><p>Подобрано пар: {pairs.length}. Корректировок: {corrections.length}. Только две противоположные строки на разных счетах с одинаковым временем считаются переводом. Все остальные движения записываются корректировками. Каждая пара будет одной операцией перевода; суммы списания и зачисления сохранятся в своих валютах.</p>
+        {!!pairs.length && <details><summary>Проверить пары переводов ({pairs.length})</summary><ul className="wallet-rows">{pairs.map(pair => { const d = file.rows.find(r => r.number === pair.debit)!, c = file.rows.find(r => r.number === pair.credit)!; return <li key={pair.debit}><span>Строки {d.number} → {c.number}: {d.account} → {c.account}</span><span>{money(d.amount, d.currency)} → {money(c.amount, c.currency)}</span><span>Списание: {d.date} · Зачисление: {c.date}</span><span>Явная пара: две строки с одинаковым временем</span></li>; })}</ul></details>}
+        {!!corrections.length && <details><summary>Корректирующие проводки Wallet ({corrections.length})</summary><p className="hint">Эти движения не образуют явных пар перевода. Они будут записаны корректировками остатка: зачисление увеличит остаток, списание уменьшит. Исходные даты и примечания сохранятся; в доходы и расходы эти записи не попадут.</p><ul className="wallet-rows">{corrections.map(r => <li key={r.number}><strong>Строка {r.number} · {r.account}</strong><span>{r.date} · {money(r.kind === 'expense' ? `-${r.amount}` : r.amount, r.currency)}</span><span>{r.kind === 'expense' ? 'Неявное списание — корректировка' : 'Неявное зачисление — корректировка'}</span></li>)}</ul></details>}
+        <p className="hint">Одинаковые покупки остаются отдельными записями. Повтор того же плана использует те же идентификаторы. Другая или отредактированная выгрузка требует проверки пересечения периодов.</p>
+        <button className="primary-action" disabled={!!file.errors.length} onClick={() => void prepare()}>Подготовить импорт Wallet</button>
         {preview && <aside className="notice"><h3>Подтвердите перенос</h3><p>Новых счетов: {preview.createdAccounts}. Новых категорий: {preview.createdCategories}. Всего операций: {preview.transactions}. Из них корректировок: {preview.adjustments ?? 0}. Исключено строк: {preview.skipped}.</p><p>После подтверждения записи начнут сохраняться. Импорт может занять несколько минут; оставьте вкладку открытой.</p><button onClick={() => void run(preview)}>Подтвердить импорт Wallet</button><button className="secondary" onClick={() => setPreview(null)}>Вернуться к проверке</button></aside>}
       </>}
     </fieldset>}

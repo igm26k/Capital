@@ -1,4 +1,4 @@
-import { request, type Auth } from '../../api/client';
+import { request, RequestError, type Auth } from '../../api/client';
 import { closeWalletJournal, compareAuxiliaryCommand, readCSVCommand } from './commandStorage';
 import type { WalletPlan } from './wallet';
 export type WalletProgress = { key: string; digest: string; cursor: number };
@@ -26,6 +26,19 @@ export async function walletLock<T>(auth: Auth, action: () => Promise<T>): Promi
     return action();
   });
 }
+// A formerly guessed transfer must not also be posted as new corrections.
+// Stop for reconciliation instead of silently applying the same movements twice.
+export async function checkLegacyWalletTransfers(auth: Auth, plan: WalletPlan): Promise<void> {
+  const ids = plan.legacyTransferIds ?? [];
+  for (let start = 0; start < ids.length; start += 8) {
+    const conflicts = await Promise.all(ids.slice(start, start + 8).map(async id => {
+      if (!/^[0-9a-f-]{36}$/.test(id)) throw new Error('Некорректный идентификатор проверки Wallet.');
+      try { const value = await request<{ kind: string }>(`/workspaces/${auth.workspace.id}/transactions/${id}`, { signal: AbortSignal.timeout(30000) }); return value.kind === 'transfer'; }
+      catch (e) { if (e instanceof RequestError && e.status === 404) return false; throw e; }
+    }));
+    if (conflicts.some(Boolean)) throw new Error('Часть этих строк уже записана переводами по старому алгоритму. Сначала нужна сверка ранее импортированных операций: новые корректировки не отправлены, чтобы не изменить остаток дважды.');
+  }
+}
 export async function saveWallet(auth: Auth, plan: WalletPlan): Promise<void> {
   const keys = storageKeys(auth.profile.id, auth.workspace.id);
   const existing = await loadWallet(auth);
@@ -48,6 +61,7 @@ export async function runWallet(auth: Auth, stop: () => boolean, updated: (value
   const { plan } = saved;
   let { progress } = saved;
   if (plan.generation !== auth.workspace.sync_generation_id) throw new Error('Данные пространства восстановлены или изменены. Продолжение старого импорта остановлено; требуется сверка уже записанных операций.');
+  await checkLegacyWalletTransfers(auth, plan);
   const keys = storageKeys(auth.profile.id, auth.workspace.id);
   while (progress.cursor < plan.commands.length && !stop()) {
     if (!navigator.onLine) throw new Error('Нет соединения. После подключения продолжите сохраненный импорт.');
