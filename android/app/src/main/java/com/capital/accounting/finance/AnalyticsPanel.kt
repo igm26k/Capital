@@ -17,7 +17,7 @@ import java.util.UUID
 @Composable
 fun AnalyticsPanel(model: AuthViewModel) {
     val section = LocalFinancialSection.current
-    if (section.value != "more") return
+    if (section.value != "more" || LocalSettingsGroup.current != "analytics") return
     val state = model.state; val auth = state.auth ?: return
     var expanded by rememberSaveable { mutableStateOf(false) }
     TextButton(onClick = { expanded = !expanded }) { Text("Бюджеты, отчеты и правила") }

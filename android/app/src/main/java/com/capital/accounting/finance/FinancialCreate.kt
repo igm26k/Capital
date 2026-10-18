@@ -1,11 +1,11 @@
 package com.capital.accounting.finance
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.capital.accounting.api.Account
 import com.capital.accounting.api.Transaction
@@ -32,6 +32,7 @@ data class FinancialTransactionRequest(val action: FinancialTransactionAction, v
 
 /** An ephemeral UI intent scoped to the signed-in owner, never a submitted command. */
 class FinancialCreateRouter {
+    var operationTarget by mutableStateOf<String?>(null)
     var request by mutableStateOf<FinancialCreationRequest?>(null)
     var transactionRequest by mutableStateOf<FinancialTransactionRequest?>(null)
     var canCreate by mutableStateOf(false)
@@ -78,58 +79,21 @@ fun HandleFinancialCreate(prefix: String, enabled: Boolean, create: (FinancialCr
 @Composable
 fun FinancialAddButton(model: AuthViewModel, router: FinancialCreateRouter) {
     val state = model.state
-    var menu by remember(router) { mutableStateOf(false) }
-    var choosing by remember(router) { mutableStateOf<FinancialCreation?>(null) }
-    val enabled = !state.busy && state.persisted && !state.financeBlocked && router.canCreate && router.request == null && router.transactionRequest == null
-    fun dismiss() { menu = false; choosing = null }
-    fun select(request: FinancialCreationRequest) { router.request = request; dismiss() }
-    LaunchedEffect(state.financeBlocked, state.logoutPending, state.revokePendingId) {
-        if (state.financeBlocked || state.logoutPending || state.revokePendingId != null) { router.request = null; router.transactionRequest = null; dismiss() }
+    val section = LocalFinancialSection.current.value
+    val canQueue = if (section == "accounts") state.canQueueAccounts else state.canQueueBasicCreates
+    val enabled = !state.busy && state.persisted && (!state.financeBlocked || canQueue) && router.canCreate && router.request == null && router.transactionRequest == null
+    fun select(request: FinancialCreationRequest) { router.request = request }
+    LaunchedEffect(state.financeBlocked, canQueue, state.logoutPending, state.revokePendingId) {
+        if ((state.financeBlocked && !canQueue) || state.logoutPending || state.revokePendingId != null) { router.request = null; router.transactionRequest = null; router.operationTarget = null }
     }
-    if (!router.editorOpen && state.detailStack.isEmpty()) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp), horizontalArrangement = Arrangement.End) {
-            Button(enabled = enabled, onClick = { menu = true }) {
-                Text("Добавить")
-            }
+    if (!router.editorOpen && state.detailStack.isEmpty() && section != "more") {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp), horizontalArrangement = Arrangement.End) {
+            FloatingActionButton(modifier = Modifier.semantics { contentDescription = if (section == "accounts") "Добавить счет" else "Добавить операцию" }, onClick = {
+                if (enabled) {
+                    if (section == "accounts") select(FinancialCreationRequest(FinancialCreation.ACCOUNT))
+                    else if (!router.routeToFirstAccount(state)) select(FinancialCreationRequest(FinancialCreation.EXPENSE))
+                }
+            }, containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary) { Text("+", style = MaterialTheme.typography.headlineMedium) }
         }
     }
-    if (menu) AlertDialog(
-        onDismissRequest = ::dismiss,
-        title = { Text(when (choosing) { FinancialCreation.REFUND -> "Исходный расход для возврата"; FinancialCreation.ADJUSTMENT -> "Счет для корректировки"; else -> "Что добавить?" }) },
-        text = {
-            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                when (choosing) {
-                    FinancialCreation.REFUND -> {
-                        Button(enabled = !state.busy, onClick = model::loadTransactions) { Text("Загрузить историю для возврата") }
-                        val expenses = state.transactions.filter { it.kind == "expense" && it.status == "posted" && (it.parent_transaction_id == null || state.transactions.any { linked -> linked.id == it.parent_transaction_id && linked.kind == "transfer" }) }
-                        if (expenses.isEmpty()) Text("Нет исходных расходов. Обновите историю или сначала добавьте расход.")
-                        expenses.forEach { expense ->
-                            TextButton(enabled = enabled, onClick = { select(FinancialCreationRequest(FinancialCreation.REFUND, expense = expense, transfer = state.transactions.find { it.id == expense.parent_transaction_id })) }) { Text("Возврат для ${expense.note.ifEmpty { "расхода ${expense.entries.joinToString { Money.display(it.amount_minor, it.currency) }} от ${openingLocal(expense.occurred_at, expense.occurred_timezone)}" }}") }
-                        }
-                    }
-                    FinancialCreation.ADJUSTMENT -> {
-                        Button(enabled = !state.busy, onClick = model::loadAccounts) { Text("Загрузить счета для корректировки") }
-                        val accounts = state.accounts.filter { it.archived_at == null && it.deleted_at == null }
-                        if (accounts.isEmpty()) Text("Нет активных счетов. Обновите список или сначала создайте счет.")
-                        accounts.forEach { account ->
-                            TextButton(enabled = enabled, onClick = { select(FinancialCreationRequest(FinancialCreation.ADJUSTMENT, account = account)) }) { Text("Остаток счета ${account.name} · ${account.currency}") }
-                        }
-                    }
-                    else -> {
-                        if (state.accountsLoaded && state.accounts.none { it.archived_at == null && it.deleted_at == null }) Text("Сначала создайте активный счет для операций.")
-                        FinancialCreation.entries.forEach { kind ->
-                            val financial = kind in listOf(FinancialCreation.EXPENSE, FinancialCreation.INCOME, FinancialCreation.TRANSFER, FinancialCreation.REFUND, FinancialCreation.ADJUSTMENT)
-                            TextButton(enabled = enabled && (!financial || state.accountsLoaded), onClick = {
-                                if (financial && router.routeToFirstAccount(state)) dismiss()
-                                else if (kind in listOf(FinancialCreation.REFUND, FinancialCreation.ADJUSTMENT)) choosing = kind
-                                else select(FinancialCreationRequest(kind))
-                            }) { Text(kind.label) }
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = { TextButton(onClick = ::dismiss) { Text("Отменить добавление") } },
-        dismissButton = { if (choosing != null) TextButton(onClick = { choosing = null }) { Text("К выбору действия") } },
-    )
 }

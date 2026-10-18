@@ -165,20 +165,12 @@ fun TransferPanel(model: AuthViewModel) {
             if (currency != null) feeParts = fee.allocations.map { AllocationDraft(it.id, it.category_id, Money.display(it.amount_minor, currency).removeSuffix(" $currency")) }
         }
     }
-    if (!editorOpen && LocalFinancialSection.current.value == "operations") {
-        Text("Переводы", style = MaterialTheme.typography.titleLarge)
-        Button(enabled = enabled && state.accountsLoaded && !scope.saving, onClick = ::createTransfer) { Text("Новый перевод") }
-        TextButton(enabled = enabled && !scope.saving, onClick = { navigation.value = "transfer" }) { Text("Открыть черновик перевода") }
-        accounts.forEach { item ->
-            TextButton(enabled = enabled && !scope.saving, onClick = { guard.request { reset(); sourceId = item.id; navigation.value = "transfer" } }) { Text("Списать со счета: ${item.name} · ${item.currency}") }
-        }
-        DraftGuardControls(guard, "transfer", enabled) { navigation.value = "transfer" }
-    } else if (editorOpen) FinancialEditorScreen(model, "transfer", guard, "Вернуться к истории переводов", ::close) {
+    HandleOperationType("transfer", editingId != null, enabled, guard) { _, wasEditing -> if (wasEditing) reset() }
+    if (editorOpen) FinancialEditorScreen(model, "transfer", guard, "Вернуться к истории переводов", ::close) {
+        if (editingId == null) OperationTypeSelect(model, "transfer", enabled)
         Text(if (editingId == null) "Новый перевод" else "Изменение перевода", style = MaterialTheme.typography.titleLarge)
-        accounts.forEach { item ->
-            TextButton(enabled = enabled && (editingId == null || sourceCurrency == item.currency), onClick = { sourceId = item.id }) { Text("Списать со счета: ${item.name} · ${item.currency}") }
-            TextButton(enabled = enabled && item.id != source?.id && (editingId == null || targetCurrency == item.currency), onClick = { targetId = item.id }) { Text("Зачислить на счет: ${item.name} · ${item.currency}") }
-        }
+        CapitalSelect("Со счета", source?.id ?: "", accounts.filter { editingId == null || sourceCurrency == it.currency }.map { it.id to "${it.name} · ${it.currency}" }, enabled) { sourceId = it }
+        CapitalSelect("На счет", target?.id ?: "", accounts.filter { it.id != source?.id && (editingId == null || targetCurrency == it.currency) }.map { it.id to "${it.name} · ${it.currency}" }, enabled) { targetId = it }
         Text("Списание: ${source?.name ?: "Выберите счет"}; зачисление: ${target?.name ?: "Выберите другой счет"}")
         ValidatedTextField(sourceAmount, { sourceAmount = it }, "Сумма списания перевода", "sourceAmount", validation, enabled)
         ValidatedTextField(receivingAmount, { targetAmount = it }, "Сумма зачисления перевода", "targetAmount", validation, enabled && !sameCurrency)
@@ -190,7 +182,7 @@ fun TransferPanel(model: AuthViewModel) {
         ValidatedTextField(occurred, { occurred = it }, "Дата перевода (YYYY-MM-DDTHH:MM:SS)", "occurred", validation, enabled)
         ValidatedTextField(zone, { zone = it }, "Часовой пояс перевода", "zone", validation, enabled)
         ValidatedTextField(payee, { payee = it }, "Получатель перевода", "payee", validation, enabled)
-        ValidatedTextField(note, { note = it }, "Примечание перевода", "note", validation, enabled, singleLine = false)
+        ValidatedTextField(transactionNote(note), { note = it }, "Примечание перевода", "note", validation, enabled, singleLine = false)
         state.tags.filter { it.archived_at == null || it.id in tags }.forEach { tag ->
             Row {
                 Checkbox(tag.id in tags, { checked -> tags = if (checked) (tags + tag.id).distinct() else tags - tag.id }, enabled = enabled, modifier = Modifier.semantics { contentDescription = "Тег перевода ${tag.name}" })
@@ -252,7 +244,7 @@ fun TransferPanel(model: AuthViewModel) {
                 else ApiClient.json.encodeToString(TransferReplace(instant, zone, note, payee, tags, "transfer", from.id, to.id, debit, credit, exactRate, fee, editingVersion, expectedFeeVersion))
                 error = ""; model.submitTransaction(request, editingId)
             } catch (_: Exception) { error = "Проверьте разные счета, положительные суммы, точную сумму частей комиссии, дату и длину текста." }
-        }) { Text(if (editingId == null) "Сохранить перевод" else "Сохранить изменения перевода") }
+        }) { Text(if (editingId == null) "Добавить" else "Сохранить изменения перевода") }
         if (editingId != null) {
             val current = state.transactions.find { it.id == editingId }
             val currentFee = state.transactions.find { it.id == current?.fee_transaction_id }
@@ -274,7 +266,7 @@ fun TransferPanel(model: AuthViewModel) {
     }
     if (LocalFinancialSection.current.value == "operations") {
         deleting?.let { transfer ->
-            Text("Удалить перевод: ${transfer.note}")
+            Text("Удалить перевод: ${transactionNote(transfer.note)}")
             Text("Списание и зачисление будут исключены из остатков.")
             deletingFee?.let { Text("Вместе с переводом будет удалена комиссия: ${it.note}; ${it.entries.joinToString { entry -> Money.display(entry.amount_minor, entry.currency) }}") }
             state.transactions.filter { it.kind == "refund" && it.parent_transaction_id in listOf(transfer.id, transfer.fee_transaction_id) }.forEach { Text("Зависимый возврат: ${it.note}. Сначала удалите возврат.") }
@@ -284,10 +276,6 @@ fun TransferPanel(model: AuthViewModel) {
                 deleting = null; deletingFee = null
             }) { Text("Подтвердить удаление перевода") }
             TextButton(enabled = enabled, onClick = { deleting = null; deletingFee = null }) { Text("Отменить удаление перевода") }
-        }
-        (state.historyItems ?: state.transactions).filter { it.kind == "transfer" }.forEach { transfer ->
-            TextButton(enabled = enabled && (transfer.fee_transaction_id == null || state.transactions.any { it.id == transfer.fee_transaction_id }), onClick = { editTransfer(transfer, state.transactions.find { it.id == transfer.fee_transaction_id }) }) { Text("Изменить перевод ${transfer.note}") }
-            TextButton(enabled = enabled, onClick = { deleteTransfer(transfer, state.transactions.find { it.id == transfer.fee_transaction_id }) }) { Text("Удалить перевод ${transfer.note}") }
         }
     }
 }

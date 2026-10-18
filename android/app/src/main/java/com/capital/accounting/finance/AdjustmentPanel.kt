@@ -85,14 +85,22 @@ fun AdjustmentPanel(model: AuthViewModel) {
             accountId = state.transactions.find { it.id == editingId }?.entries?.singleOrNull()?.account_id
         }
     }
-    if (!editorOpen && LocalFinancialSection.current.value == "operations") {
-        Text("Корректировки", style = MaterialTheme.typography.titleLarge)
-        TextButton(enabled = enabled && !scope.saving, onClick = { navigation.value = "adjustment" }) { Text("Открыть черновик корректировки") }
-        DraftGuardControls(guard, "adjustment", enabled) { navigation.value = "adjustment" }
-        state.accounts.filter { it.archived_at == null && it.deleted_at == null }.forEach { item ->
-            TextButton(enabled = enabled, onClick = { createAdjustment(item) }) { Text("Корректировать счет ${item.name} · ${item.currency}") }
+    HandleOperationType("adjustment", editingId != null, enabled, guard) { _, wasEditing ->
+        if (wasEditing) reset()
+        if (accountId == null) state.accounts.firstOrNull { it.archived_at == null && it.deleted_at == null }?.let { item ->
+            accountId = item.id; balanceVersion = item.balance_version
+            target = Money.display(item.posted_balance_minor, item.currency).removeSuffix(" ${item.currency}").replace('−', '-')
         }
-    } else if (editorOpen) FinancialEditorScreen(model, "adjustment", guard, "Вернуться к истории корректировок", ::close) {
+    }
+    if (editorOpen) FinancialEditorScreen(model, "adjustment", guard, "Вернуться к истории корректировок", ::close) {
+        if (editingId == null) {
+            OperationTypeSelect(model, "adjustment", enabled)
+            CapitalSelect("Счет", accountId ?: "", state.accounts.filter { it.archived_at == null && it.deleted_at == null }.map { it.id to "${it.name} · ${it.currency}" }, enabled) { selected ->
+                val item = state.accounts.first { it.id == selected }; accountId = item.id; balanceVersion = item.balance_version
+                target = Money.display(item.posted_balance_minor, item.currency).removeSuffix(" ${item.currency}").replace('−', '-')
+                error = ""; validation.reset()
+            }
+        }
         Text(if (editingId == null) "Корректировка остатка" else "Изменение примечания корректировки", style = MaterialTheme.typography.titleLarge)
         if (editingId == null) {
             Text("Укажите фактический остаток. Сервер вычислит разницу и зафиксирует текущее время.")
@@ -125,7 +133,7 @@ fun AdjustmentPanel(model: AuthViewModel) {
             state.transactionConflict?.takeIf { it.kind == "adjustment" }?.let { Text("Корректировка на сервере: ${it.note}; версия ${it.version}") }
         }
         if (accountId != null || editingId != null) {
-            ValidatedTextField(note, { note = it }, "Примечание корректировки", "note", validation, enabled, singleLine = false)
+            ValidatedTextField(transactionNote(note), { note = it }, "Примечание корректировки", "note", validation, enabled, singleLine = false)
             if (error.isNotEmpty()) Text(error)
             Button(enabled = enabled && (editingId == null || edited != null) && account != null && account.archived_at == null && account.deleted_at == null, onClick = save@{
                 error = ""
@@ -142,21 +150,16 @@ fun AdjustmentPanel(model: AuthViewModel) {
                     } else model.submitTransaction(ApiClient.json.encodeToString(AdjustmentReplace("adjustment", editingVersion, note)), editingId)
                     error = ""
                 } catch (_: Exception) { error = "Проверьте остаток, причину, часовой пояс и длину текста. Остаток должен измениться." }
-            }) { Text(if (editingId == null) "Сохранить корректировку" else "Сохранить примечание корректировки") }
+            }) { Text(if (editingId == null) "Добавить" else "Сохранить примечание корректировки") }
             TextButton(enabled = enabled, onClick = { guard.request { reset(); navigation.value = null } }) { Text("Отменить корректировку") }
         }
     }
     if (LocalFinancialSection.current.value == "operations") {
         deleting?.let { item ->
-            Text("Удалить корректировку: ${item.note}")
+            Text("Удалить корректировку: ${transactionNote(item.note)}")
             Text("Разница корректировки будет исключена из остатка счета.")
             Button(enabled = enabled && state.transactions.any { it.id == item.id }, onClick = { model.submitTransaction(ApiClient.json.encodeToString(TransactionDelete(item.version, emptyList())), item.id, delete = true); deleting = null }) { Text("Подтвердить удаление корректировки") }
             TextButton(enabled = enabled, onClick = { deleting = null }) { Text("Отменить удаление корректировки") }
-        }
-        (state.historyItems ?: state.transactions).filter { it.kind == "adjustment" }.forEach { item ->
-            val active = state.accounts.any { it.id == item.entries.single().account_id && it.archived_at == null && it.deleted_at == null }
-            TextButton(enabled = enabled && active, onClick = { editAdjustment(item) }) { Text("Изменить корректировку ${item.note}") }
-            TextButton(enabled = enabled && active, onClick = { deleteAdjustment(item) }) { Text("Удалить корректировку ${item.note}") }
         }
     }
 }

@@ -85,13 +85,15 @@ def build(directory,sdk,verify_all=False):
                 match=re.search(rb'Signer #1 certificate SHA-256 digest: ([0-9a-fA-F]{64})',result.stdout)
                 if not match or match[1].decode().lower()!=identity['certificate_sha256']:raise RuntimeError('APK signer differs from private identity')
                 subprocess.run([sys.executable,str(ROOT/'scripts/check-android-release-trust.py'),str(sdk),str(apk)],cwd=ROOT,stdout=output,stderr=subprocess.STDOUT,check=True)
+                latest=ROOT/'android_latest.apk'
+                if not latest.is_file() or hashlib.sha256(latest.read_bytes()).digest()!=hashlib.sha256(apk.read_bytes()).digest():raise RuntimeError('Repository APK differs from verified release')
                 destination=artifacts/f'accounting-personal-{stamp}.apk'
                 with apk.open('rb') as source,destination.open('xb') as copy:
                     shutil.copyfileobj(source,copy);copy.flush();os.fsync(copy.fileno())
             except Exception:raise RuntimeError('Personal APK build failed; inspect protected build log. Existing signing key is unchanged') from None
         head=run(['git','-C',str(ROOT),'rev-parse','HEAD']).stdout.decode().strip()
         dirty=bool(run(['git','-C',str(ROOT),'status','--porcelain']).stdout)
-        proof={'apk':str(destination),'sha256':hashlib.sha256(destination.read_bytes()).hexdigest(),'certificate_sha256':identity['certificate_sha256'],'identity':identity['identity'],'source_head':head,'source_dirty':dirty,'verification_tasks':targets,'signature_verified':True,'system_tls_verified':True,'published':False,'device_runtime_tested':False,'protected_log':str(log)}
+        proof={'apk':str(destination),'repository_apk':str(ROOT/'android_latest.apk'),'sha256':hashlib.sha256(destination.read_bytes()).hexdigest(),'certificate_sha256':identity['certificate_sha256'],'identity':identity['identity'],'source_head':head,'source_dirty':dirty,'verification_tasks':targets,'signature_verified':True,'system_tls_verified':True,'published':False,'device_runtime_tested':False,'protected_log':str(log)}
         file=artifacts/f'accounting-personal-{stamp}.json'
         with file.open('x') as output:json.dump(proof,output,indent=2);output.write('\n')
         return proof

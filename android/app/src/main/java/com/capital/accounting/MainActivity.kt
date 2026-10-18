@@ -12,8 +12,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import com.capital.accounting.finance.*
+import androidx.compose.ui.graphics.Color
 import com.capital.accounting.finance.LocalFinancialSection
 import com.capital.accounting.finance.LocalFinancialCreateRouter
 import com.capital.accounting.finance.FinancialCreateRouter
@@ -52,16 +55,24 @@ class MainActivity : ComponentActivity() {
             val section = rememberSaveable(state.origin, state.auth?.profile?.id, state.auth?.workspace?.id) { mutableStateOf("accounts") }
             val createRouter = remember(state.origin, state.auth?.profile?.id, state.auth?.workspace?.id) { FinancialCreateRouter() }
             LaunchedEffect(state.auth) { if (state.auth != null) password = "" }
-            MaterialTheme(colorScheme = if (isSystemInDarkTheme()) darkColorScheme() else lightColorScheme()) {
-                CompositionLocalProvider(LocalFinancialSection provides section, LocalFinancialCreateRouter provides createRouter) {
+            var settingsGroup by rememberSaveable(state.origin, state.auth?.profile?.id, state.auth?.workspace?.id) { mutableStateOf("profile") }
+            val settingsState = rememberSaveableStateHolder()
+            var settingsMenu by remember { mutableStateOf(false) }
+            MaterialTheme(colorScheme = capitalColors(isSystemInDarkTheme())) {
+                CompositionLocalProvider(LocalFinancialSection provides section, LocalFinancialCreateRouter provides createRouter, LocalSettingsGroup provides settingsGroup) {
                     if (state.auth != null && state.recoveryOpen) QueueRecovery(model)
                     if (state.auth != null && state.detailStack.isNotEmpty()) TransactionDetails(model)
-                    Surface(Modifier.fillMaxSize()) {
+                    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                         Column(Modifier.fillMaxSize()) {
-                            Column(Modifier.weight(1f).safeDrawingPadding().imePadding().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                                Text("Capital", style = MaterialTheme.typography.headlineLarge)
-                                Text("Ручной учет финансов")
-                                Text("Доступны ручной ввод и CSV. Банковские подключения пока недоступны.")
+                            Surface(color = Color(0xff1f3155), contentColor = Color.White) {
+                                Row(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 20.dp, vertical = 8.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                                    Text("Capital", style = MaterialTheme.typography.headlineSmall)
+                                    if (state.auth != null) TextButton(enabled = !state.busy && (!state.financeBlocked || (state.offline && state.financialCommand == null && state.localPending == 0 && state.localBlocked == 0)), onClick = model::logout, colors = ButtonDefaults.textButtonColors(contentColor = Color.White)) { Text("Выход") }
+                                }
+                            }
+                            val scroll = rememberScrollState()
+                            LaunchedEffect(section.value, settingsGroup) { scroll.scrollTo(0) }
+                            Column(Modifier.weight(1f).windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)).imePadding().verticalScroll(scroll).padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 if (state.message.isNotEmpty()) Text(state.message)
                                 if (state.busy) CircularProgressIndicator()
                                 if (state.revokePendingId != null) {
@@ -70,10 +81,6 @@ class MainActivity : ComponentActivity() {
                                 } else if (state.logoutPending) {
                                     Button(enabled = !state.busy, onClick = model::logout) { Text("Повторить выход") }
                                 } else if (state.auth != null) {
-                                    Text("Вы вошли: ${state.auth.profile.email}")
-                                    Text("Пространство: ${state.auth.workspace.name}")
-                                    Text("Устройство: ${state.auth.session.device_name}")
-                                    Text("Сессия действует до: ${state.auth.session.expires_at}")
                                     if (state.offline) {
                                         Text("Нет соединения. Показаны сохраненные данные; они могут быть устаревшими. Доходы, расходы, переводы, возвраты и корректировки остатков, изменения счетов, категорий и тегов сохраняются на устройстве.")
                                         Button(enabled = !state.busy, onClick = model::loadOverview) { Text("Проверить соединение") }
@@ -85,7 +92,6 @@ class MainActivity : ComponentActivity() {
                                         onClick = model::synchronizeQueue) { Text("Синхронизировать изменения") }
                                     if (state.localPending + state.localBlocked > 0) Button(enabled = !state.busy && state.persisted,
                                         onClick = model::openQueueRecovery) { Text("Разобрать сохранённые изменения") }
-                                    Button(enabled = !state.busy && state.persisted, onClick = model::loadOverview) { Text("Обновить финансовые данные") }
                                     if (state.busy && !state.overviewLoaded) Text("Загрузка финансовых данных…")
                                     if (state.busy && state.overviewCached) Text("Показаны сохраненные финансовые данные. Выполняется синхронизация.")
                                     if (state.overviewError.isNotEmpty()) {
@@ -93,24 +99,46 @@ class MainActivity : ComponentActivity() {
                                         Button(enabled = !state.busy && state.persisted, onClick = model::loadOverview) { Text("Повторить загрузку финансовых данных") }
                                     }
                                     if (!state.persisted) Button(enabled = !state.busy, onClick = model::persist) { Text("Повторить сохранение сессии") }
-                                    Button(enabled = !state.busy && !state.financeBlocked, onClick = model::renew) { Text("Продлить сессию") }
-                                    Button(enabled = !state.busy && (!state.financeBlocked || (state.offline && state.financialCommand == null && state.localPending == 0 && state.localBlocked == 0)), onClick = model::logout) { Text("Выйти") }
                                     if (section.value == "more") {
-                                        com.capital.accounting.imports.NotificationPanel(model)
-                                        AnalyticsPanel(model)
-                                        CsvPanel(model)
-                                        PrivacyPanel(model)
-                                        Text("Профиль: ${state.auth.profile.email}")
-                                        Text("Часовой пояс профиля: ${state.auth.profile.timezone}")
-                                        Text("Устройства", style = MaterialTheme.typography.titleLarge)
-                                        Button(enabled = !state.busy && state.persisted, onClick = model::loadSessions) { Text("Обновить устройства") }
-                                        state.sessions.forEach { session ->
-                                            Text(session.device_name)
-                                            if (session.is_current) Text("Текущее устройство")
-                                            Text("Последняя активность: ${session.last_seen_at}")
-                                            Button(enabled = !state.busy && state.persisted && !state.financeBlocked, onClick = { model.revokeSession(session.id) }) {
-                                                Text(if (session.is_current) "Завершить текущую сессию" else "Отключить устройство ${session.device_name}")
+                                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                                            Text("Настройки", style = MaterialTheme.typography.titleLarge)
+                                            Box {
+                                                TextButton(onClick = { settingsMenu = true }, modifier = Modifier.semantics { contentDescription = "Группы настроек" }) { Text("☰", style = MaterialTheme.typography.titleLarge) }
+                                                DropdownMenu(expanded = settingsMenu, onDismissRequest = { settingsMenu = false }) {
+                                                    listOf("profile" to "Профиль", "classification" to "Категории и теги", "analytics" to "Бюджеты и отчеты", "data" to "Импорт и экспорт", "sources" to "Банковские предложения", "security" to "Безопасность и данные").forEach { (id, label) ->
+                                                        DropdownMenuItem(text = { Text((if (settingsGroup == id) "✓ " else "") + label) }, onClick = { settingsGroup = id; settingsMenu = false })
+                                                    }
+                                                }
                                             }
+                                        }
+                                        when (settingsGroup) {
+                                            "profile" -> {
+                                                Text("Профиль", style = MaterialTheme.typography.titleMedium)
+                                                Text(state.auth.profile.email)
+                                                Text("Пространство: ${state.auth.workspace.name}")
+                                                Text("Часовой пояс: ${state.auth.profile.timezone}")
+                                                TextButton(enabled = !state.busy && !state.financeBlocked, onClick = model::renew) { Text("Продлить сессию") }
+                                            }
+                                            "sources" -> com.capital.accounting.imports.NotificationPanel(model)
+                                            "security" -> {
+                                                PrivacyPanel(model)
+                                                Text("Устройства", style = MaterialTheme.typography.titleMedium)
+                                                TextButton(enabled = !state.busy && state.persisted, onClick = model::loadSessions) { Text("Обновить устройства") }
+                                                state.sessions.forEach { session ->
+                                                    OutlinedCard(Modifier.fillMaxWidth()) {
+                                                        Column(Modifier.padding(12.dp)) {
+                                                            Text(session.device_name)
+                                                            if (session.is_current) Text("Текущее устройство")
+                                                            Text("Последняя активность: ${session.last_seen_at}")
+                                                            TextButton(enabled = !state.busy && state.persisted && !state.financeBlocked, onClick = { model.revokeSession(session.id) }) { Text("Отключить устройство") }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        settingsState.SaveableStateProvider("${state.origin}:${state.auth.profile.id}:${state.auth.workspace.id}:$settingsGroup") {
+                                            if (settingsGroup == "analytics") AnalyticsPanel(model)
+                                            if (settingsGroup == "data") CsvPanel(model)
                                         }
                                     }
                                     key(state.origin, state.auth.profile.id, state.auth.workspace.id) {
@@ -145,7 +173,7 @@ class MainActivity : ComponentActivity() {
                             if (state.auth != null && !state.logoutPending && state.revokePendingId == null) {
                                 FinancialAddButton(model, createRouter)
                                 NavigationBar {
-                                    listOf(Triple("accounts", "Счета", "◫"), Triple("operations", "Операции", "⇄"), Triple("more", "Еще", "⋯")).forEach { (id, label, symbol) ->
+                                    listOf(Triple("accounts", "Счета", "◫"), Triple("operations", "Операции", "⇄"), Triple("more", "Настройки", "☰")).forEach { (id, label, symbol) ->
                                         NavigationBarItem(selected = section.value == id, onClick = { section.value = id }, icon = { Text(symbol) }, label = { Text(label) }, modifier = Modifier.semantics { contentDescription = "Раздел $label" })
                                     }
                                 }

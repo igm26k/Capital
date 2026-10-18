@@ -1,3 +1,6 @@
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
@@ -14,8 +17,8 @@ android {
         applicationId = "com.capital.accounting"
         minSdk = 23
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.2.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     if (releaseSecrets.all { !it.isNullOrEmpty() }) {
@@ -90,11 +93,12 @@ listOf("Debug", "Release").forEach { buildType ->
                 val apk = layout.buildDirectory.file("outputs/apk/${buildType.lowercase()}/app-${buildType.lowercase()}.apk").get().asFile
                 require(apk.isFile) { "Expected installable APK is missing: $apk" }
                 val destination = rootProject.file("../android_latest.apk").toPath()
-                val temporary = java.nio.file.Files.createTempFile(destination.parent, ".android-latest-", ".apk")
+                val temporary = Files.createTempFile(destination.parent, ".android-latest-", ".apk")
                 try {
-                    java.nio.file.Files.copy(apk.toPath(), temporary, java.nio.file.StandardCopyOption.REPLACE_EXISTING)
-                    java.nio.file.Files.move(temporary, destination, java.nio.file.StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE)
-                } finally { java.nio.file.Files.deleteIfExists(temporary) }
+                    Files.copy(apk.toPath(), temporary, StandardCopyOption.REPLACE_EXISTING)
+                    require(temporary.toFile().setReadable(true, false)) { "Cannot make repository APK readable" }
+                    Files.move(temporary, destination, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+                } finally { Files.deleteIfExists(temporary) }
                 logger.lifecycle("Updated ${destination.fileName} from ${buildType.lowercase()} APK")
             }
         }

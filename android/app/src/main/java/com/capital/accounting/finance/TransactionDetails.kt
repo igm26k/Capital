@@ -74,9 +74,9 @@ fun TransactionDetails(model: AuthViewModel) {
                     Text("Дата детали: ${openingLocal(item.occurred_at, item.occurred_timezone)}")
                     Text("Часовой пояс детали: ${item.occurred_timezone}")
                     Text("Время UTC: ${item.occurred_at}")
-                    Text("Примечание детали: ${item.note.ifEmpty { "Нет" }}")
+                    Text("Примечание детали: ${transactionNote(item.note).ifEmpty { "Нет" }}")
                     Text("Получатель детали: ${item.payee.ifEmpty { "Нет" }}")
-                    item.reason?.let { Text("Причина детали: $it") }
+                    transactionReason(item.reason)?.let { Text("Причина детали: $it") }
                     item.rate?.let { Text("Курс детали: ${it.numerator}/${it.denominator}") }
                     val currency = item.entries.singleOrNull()?.currency
                     if (item.allocations.isNotEmpty() && currency != null) {
@@ -115,4 +115,4 @@ fun TransactionDetails(model: AuthViewModel) {
     }
 }
 
-private fun detailName(item: Transaction) = item.note.ifEmpty { TransactionFilter.kinds[item.kind] ?: item.kind }
+private fun detailName(item: Transaction) = transactionNote(item.note).ifEmpty { TransactionFilter.kinds[item.kind] ?: item.kind }

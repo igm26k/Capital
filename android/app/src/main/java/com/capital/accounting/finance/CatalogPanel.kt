@@ -86,8 +86,8 @@ fun CatalogPanel(model: AuthViewModel) {
             }
         }
     }
-    if (navigation.value == null) Button(enabled = !state.busy, onClick = model::loadCatalog) { Text("Обновить категории и теги") }
-    if (!editorOpen && LocalFinancialSection.current.value == "more") {
+    if (navigation.value == null && LocalFinancialSection.current.value == "more" && LocalSettingsGroup.current == "classification") Button(enabled = !state.busy, onClick = model::loadCatalog) { Text("Обновить категории и теги") }
+    if (!editorOpen && LocalFinancialSection.current.value == "more" && LocalSettingsGroup.current == "classification") {
         Text("Категории и теги", style = MaterialTheme.typography.titleLarge)
         TextButton(enabled = enabled && !scope.saving, onClick = { createCatalog("categories") }) { Text("Новая категория") }
         TextButton(enabled = tagEnabled && !scope.saving, onClick = { createCatalog("tags") }) { Text("Новый тег") }
@@ -102,10 +102,9 @@ fun CatalogPanel(model: AuthViewModel) {
             TextButton(enabled = tagEnabled && (state.offline || ("tag" to item.id) !in state.localAffected), onClick = { guard.request { collection = "tags"; id = item.id; version = item.version; name = item.name; parentId = null; archived = item.archived_at != null; error = ""; validation.reset(); navigation.value = "catalog"  } }) { Text("Изменить тег ${item.name}") }
         }
     } else if (editorOpen) Dialog(onDismissRequest = ::close, properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)) {
-        Surface(Modifier.fillMaxSize()) {
-            Column(Modifier.safeDrawingPadding().imePadding().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Button(enabled = enabled && !scope.saving, onClick = ::close) { Text("Вернуться к категориям и тегам") }
-                state.auth?.let { Text("Вы вошли: ${it.profile.email}") }
+        Surface(Modifier.fillMaxWidth().heightIn(max = 760.dp), shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp)) {
+            Column(Modifier.imePadding().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Button(enabled = enabled && !scope.saving, onClick = ::close) { Text("Отмена") }
                 Button(enabled = !state.busy, onClick = model::loadCatalog) { Text("Обновить категории и теги") }
                 if (state.busy) CircularProgressIndicator()
                 if (state.message.isNotEmpty()) Text(state.message)

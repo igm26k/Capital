@@ -223,7 +223,7 @@ fun FinancialDraftContent(context: Context, origin: String, owner: String, works
             content()
             if (loaded.failed) androidx.compose.material3.Text("Не удалось сохранить черновики на устройстве. Повторите сохранение.")
             if (loaded.failed) androidx.compose.material3.Button(onClick = { loaded.persist(retry = true) }) { androidx.compose.material3.Text("Повторить сохранение черновиков") }
-            androidx.compose.material3.Text(if (loaded.saving) "Сохранение черновиков на устройстве…" else if (!loaded.failed) "Локальные черновики сохранены. Отправка операций выполняется отдельно." else "Черновики остаются в памяти.")
+            if (loaded.saving || loaded.failed) androidx.compose.material3.Text(if (loaded.saving) "Сохранение черновиков на устройстве…" else if (!loaded.failed) "Локальные черновики сохранены. Отправка операций выполняется отдельно." else "Черновики остаются в памяти.")
         }
     } else if (failed) {
         androidx.compose.material3.Text("Не удалось прочитать черновики. Исходный файл сохранен.")

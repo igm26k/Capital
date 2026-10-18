@@ -74,7 +74,7 @@ data class AuthState(
     val recoveryOpen: Boolean = false, val recoveryCommands: List<OutboxCommand> = emptyList(), val recoveryFailure: OutboxFailure? = null,
     val recoveryPlan: OutboxDismissalPlan? = null, val recoveryError: String = "",
     val historyDataset: LocalHistoryCursor? = null, val historyLocalCursor: LocalHistoryCursor? = null, val historyLocal: Boolean = false,
-    val historyLimit: Int = 50, val historyNextCursor: String? = null, val historyCursors: List<String> = emptyList(), val historyError: String = "",
+    val historyLimit: Int = 25, val historyNextCursor: String? = null, val historyCursors: List<String> = emptyList(), val historyError: String = "",
     val financeBlocked: Boolean = true, val accountConflict: Account? = null, val transactionConflict: Transaction? = null, val categoryConflict: Category? = null, val tagConflict: Tag? = null,
 
 ) {
@@ -558,7 +558,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         return candidate ?: saved
     }
 
-    fun applyHistoryFilter(filter: TransactionFilter, limit: Int = 50) {
+    fun applyHistoryFilter(filter: TransactionFilter, limit: Int = 25) {
         require(limit in 1..100)
         val saved = candidate ?: return
         if (state.busy || state.auth == null || !state.persisted || state.logoutPending || state.revokePendingId != null) return
@@ -599,8 +599,8 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
 
     fun clearHistoryFilters() {
         if (state.busy) return
-        state = state.copy(historyFilter = null, historyItems = null, historyDataset = null, historyLocalCursor = null, historyLocal = false, historyNextCursor = null, historyCursors = emptyList(), historyError = "")
-        loadTransactions()
+        state = state.copy(historyLimit = 25, historyFilter = null, historyItems = null, historyDataset = null, historyLocalCursor = null, historyLocal = false, historyNextCursor = null, historyCursors = emptyList(), historyError = "")
+        applyHistoryFilter(TransactionFilter(), 25)
     }
 
     fun openTransactionDetails(id: String) {

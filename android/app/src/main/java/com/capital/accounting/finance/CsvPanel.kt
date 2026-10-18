@@ -20,6 +20,7 @@ import java.nio.charset.CodingErrorAction
 @Composable
 fun CsvPanel(model:AuthViewModel){
     if(LocalFinancialSection.current.value!="more")return
+    if (LocalSettingsGroup.current != "data") return
     val state=model.state;val auth=state.auth?:return
     var expanded by rememberSaveable{mutableStateOf(false)}
     TextButton(onClick={expanded=!expanded}){Text("Импорт и экспорт CSV")};if(!expanded)return

@@ -17,13 +17,9 @@ fun FinancialEditorScreen(model: AuthViewModel, prefix: String, guard: DraftGuar
     val scope = LocalFinancialDraftScope.current
     val enabled = !state.busy && !state.financeBlocked && state.persisted
     Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)) {
-        Surface(Modifier.fillMaxSize()) {
-            Column(Modifier.safeDrawingPadding().imePadding().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Button(enabled = enabled && !scope.saving, onClick = onClose) { Text(backLabel) }
-                state.auth?.let { Text("Вы вошли: ${it.profile.email}") }
-                Button(enabled = !state.busy, onClick = model::loadAccounts) { Text("Обновить счета") }
-                Button(enabled = !state.busy, onClick = model::loadCatalog) { Text("Обновить категории и теги") }
-                Button(enabled = !state.busy, onClick = model::loadTransactions) { Text("Обновить историю") }
+        Surface(Modifier.fillMaxWidth().heightIn(max = 760.dp), shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp)) {
+            Column(Modifier.imePadding().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Button(enabled = enabled && !scope.saving, onClick = onClose) { Text("Отмена") }
                 if (state.busy) CircularProgressIndicator()
                 if (state.message.isNotEmpty()) Text(state.message)
                 if (scope.failed) {

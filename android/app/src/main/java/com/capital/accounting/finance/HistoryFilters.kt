@@ -6,7 +6,7 @@ import com.capital.accounting.api.TransactionFilter
 import com.capital.accounting.auth.AuthViewModel
 
 @Composable
-fun HistoryFilters(model: AuthViewModel) {
+fun HistoryFilters(model: AuthViewModel, onReset: () -> Unit = {}) {
     val state = model.state
     var expanded by remember { mutableStateOf(false) }
     var account by remember { mutableStateOf(state.historyFilter?.accountId) }
@@ -38,21 +38,11 @@ fun HistoryFilters(model: AuthViewModel) {
         ValidatedTextField(from, { from = it }, "История от (UTC)", "from", validation, enabled)
         ValidatedTextField(to, { to = it }, "История до (UTC)", "to", validation, enabled)
         ValidatedTextField(limit, { limit = it }, "Операций на странице (1–100)", "limit", validation, enabled)
-        Text("Счет: ${state.accounts.find { it.id == account }?.name ?: "Все счета"}")
-        TextButton(enabled = enabled, onClick = { account = null }) { Text("История: все счета") }
-        state.accounts.forEach { item -> TextButton(enabled = enabled, onClick = { account = item.id }) { Text("История: счет ${item.name}") } }
-        Text("Категория: ${if (category == null) "Все категории" else categoryPath(category, state.categories)}")
-        TextButton(enabled = enabled, onClick = { category = null }) { Text("История: все категории") }
-        state.categories.forEach { item -> TextButton(enabled = enabled, onClick = { category = item.id }) { Text("История: категория ${categoryPath(item.id, state.categories)}") } }
-        Text("Тег: ${state.tags.find { it.id == tag }?.name ?: "Все теги"}")
-        TextButton(enabled = enabled, onClick = { tag = null }) { Text("История: все теги") }
-        state.tags.forEach { item -> TextButton(enabled = enabled, onClick = { tag = item.id }) { Text("История: тег ${item.name}") } }
-        Text("Тип: ${TransactionFilter.kinds[kind] ?: "Все типы"}")
-        TextButton(enabled = enabled, onClick = { kind = null }) { Text("История: все типы") }
-        TransactionFilter.kinds.forEach { (value, label) -> TextButton(enabled = enabled, onClick = { kind = value }) { Text("Тип истории: $label") } }
-        Text("Статус: ${TransactionFilter.statuses[status] ?: "Все статусы"}")
-        TextButton(enabled = enabled, onClick = { status = null }) { Text("История: все статусы") }
-        TransactionFilter.statuses.forEach { (value, label) -> TextButton(enabled = enabled, onClick = { status = value }) { Text("Статус истории: $label") } }
+        CapitalSelect("Счет", account ?: "", listOf("" to "Все счета") + state.accounts.map { it.id to it.name }, enabled) { account = it.ifEmpty { null } }
+        CapitalSelect("Категория", category ?: "", listOf("" to "Все категории") + state.categories.map { it.id to categoryPath(it.id, state.categories) }, enabled) { category = it.ifEmpty { null } }
+        CapitalSelect("Тег", tag ?: "", listOf("" to "Все теги") + state.tags.map { it.id to it.name }, enabled) { tag = it.ifEmpty { null } }
+        CapitalSelect("Тип", kind ?: "", listOf("" to "Все типы") + TransactionFilter.kinds.toList(), enabled) { kind = it.ifEmpty { null } }
+        CapitalSelect("Статус", status ?: "", listOf("" to "Все статусы") + TransactionFilter.statuses.toList(), enabled) { status = it.ifEmpty { null } }
         if (error.isNotEmpty()) Text(error)
         Button(enabled = enabled, onClick = apply@{
             error = ""
@@ -64,10 +54,10 @@ fun HistoryFilters(model: AuthViewModel) {
             } catch (_: Exception) { error = "Проверьте UTC-период, длину поиска и размер страницы. Начало должно быть раньше окончания." }
         }) { Text("Применить фильтры истории") }
     }
-    if (expanded || state.historyFilter != null) TextButton(enabled = enabled, onClick = {
-        account = null; category = null; tag = null; kind = null; status = null; search = ""; from = ""; to = ""; error = ""; validation.reset()
-        model.clearHistoryFilters()
-    }) { Text("Сбросить фильтры истории") }
+    TextButton(enabled = enabled, onClick = {
+        account = null; category = null; tag = null; kind = null; status = null; search = ""; from = ""; to = ""; limit = "25"; expanded = false; error = ""; validation.reset()
+        onReset(); model.clearHistoryFilters()
+    }) { Text("Сбросить фильтры") }
     if (state.historyFilter != null) Text(if (state.historyFilter.active) "Фильтры истории применены" else "Все операции по страницам")
     if (state.historyError.isNotEmpty()) Text(state.historyError)
     if (state.historyItems != null) Text("Показано операций: ${state.historyItems.size}")

@@ -130,15 +130,7 @@ fun RefundPanel(model: AuthViewModel) {
             if (part == null) RefundDraft(original.id) else RefundDraft(original.id, part.id, Money.display(part.amount_minor, accountCurrency).removeSuffix(" $accountCurrency"))
         } + draft.allocations.filter { requestedPart -> originals.none { it.id == requestedPart.original_allocation_id } }.map { RefundDraft(it.original_allocation_id, it.id, Money.display(it.amount_minor, accountCurrency).removeSuffix(" $accountCurrency")) }
     }
-    if (!editorOpen && LocalFinancialSection.current.value == "operations") {
-        Text("Возвраты", style = MaterialTheme.typography.titleLarge)
-        TextButton(enabled = enabled && !scope.saving, onClick = { navigation.value = "refund" }) { Text("Открыть черновик возврата") }
-        DraftGuardControls(guard, "refund", enabled) { navigation.value = "refund" }
-        state.transactions.filter { it.kind == "expense" && it.status == "posted" }.forEach { expense ->
-            val linked = state.transactions.find { it.id == expense.parent_transaction_id }
-            TextButton(enabled = enabled && (expense.parent_transaction_id == null || linked?.kind == "transfer"), onClick = { createRefund(expense, linked) }) { Text(if (expense.parent_transaction_id == null) "Создать возврат расхода ${expense.note}" else "Создать возврат комиссии ${expense.note}") }
-        }
-    } else if (editorOpen) FinancialEditorScreen(model, "refund", guard, "Вернуться к истории возвратов", ::close) {
+    if (editorOpen) FinancialEditorScreen(model, "refund", guard, "Вернуться к истории возвратов", ::close) {
         Text(if (editingId == null) "Новый возврат" else "Изменение возврата", style = MaterialTheme.typography.titleLarge)
         if (parentId == null) Text("Выберите исходный расход или комиссию.")
         else {
@@ -157,7 +149,7 @@ fun RefundPanel(model: AuthViewModel) {
             ValidatedTextField(occurred, { occurred = it }, "Дата возврата (YYYY-MM-DDTHH:MM:SS)", "occurred", validation, enabled)
             ValidatedTextField(zone, { zone = it }, "Часовой пояс возврата", "zone", validation, enabled)
             ValidatedTextField(payee, { payee = it }, "Получатель возврата", "payee", validation, enabled)
-            ValidatedTextField(note, { note = it }, "Примечание возврата", "note", validation, enabled, singleLine = false)
+            ValidatedTextField(transactionNote(note), { note = it }, "Примечание возврата", "note", validation, enabled, singleLine = false)
             state.tags.filter { it.archived_at == null || it.id in tags }.forEach { tag ->
                 Row {
                     Checkbox(tag.id in tags, { checked -> tags = if (checked) (tags + tag.id).distinct() else tags - tag.id }, enabled = enabled, modifier = Modifier.semantics { contentDescription = "Тег возврата ${tag.name}" })
@@ -195,7 +187,7 @@ fun RefundPanel(model: AuthViewModel) {
     }
     if (LocalFinancialSection.current.value == "operations") {
         deleting?.let { refund ->
-            Text("Удалить возврат: ${refund.note}")
+            Text("Удалить возврат: ${transactionNote(refund.note)}")
             Text("Зачисление будет исключено из остатка, квота исходного расхода восстановится.")
             Button(enabled = enabled && state.transactions.any { it.id == refund.id } && deletingParent != null && (deletingParent?.parent_transaction_id == null || deletingTransfer != null), onClick = {
                 val related = listOfNotNull(deletingParent, deletingTransfer).map { VersionExpectation(it.id, it.version) }
@@ -203,13 +195,6 @@ fun RefundPanel(model: AuthViewModel) {
                 deleting = null; deletingParent = null; deletingTransfer = null
             }) { Text("Подтвердить удаление возврата") }
             TextButton(enabled = enabled, onClick = { deleting = null; deletingParent = null; deletingTransfer = null }) { Text("Отменить удаление возврата") }
-        }
-        (state.historyItems ?: state.transactions).filter { it.kind == "refund" }.forEach { refund ->
-            val original = state.transactions.find { it.id == refund.parent_transaction_id }
-            val linked = state.transactions.find { it.id == original?.parent_transaction_id }
-            val available = original != null && (original.parent_transaction_id == null || linked != null)
-            TextButton(enabled = enabled && available, onClick = { editRefund(refund, requireNotNull(original), linked) }) { Text("Изменить возврат ${refund.note}") }
-            TextButton(enabled = enabled && available, onClick = { deleteRefund(refund, original, linked) }) { Text("Удалить возврат ${refund.note}") }
         }
     }
 }
