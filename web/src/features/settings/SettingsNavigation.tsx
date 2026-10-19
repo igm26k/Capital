@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Icon } from '../../shared/Icon';
 export const settingsGroups = [
   ['profile', 'Профиль'], ['classification', 'Категории и теги'], ['analytics', 'Бюджеты и отчеты'],
-  ['data', 'Импорт и экспорт'], ['sources', 'Банковские предложения'], ['security', 'Безопасность и данные'],
+  ['data', 'Импорт и экспорт'], ['sources', 'Банки и уведомления'], ['security', 'Безопасность и данные'],
 ] as const;
 export type SettingsGroup = typeof settingsGroups[number][0];
 const storageKey = 'accounting.settings.group.v1';

@@ -13,6 +13,7 @@ test('rules reject foreign senders, wrong card/currency, OTP and invalid precisi
   expect(() => parseBankMessage(rule, { ...message(text), sender: 'OTHER' })).toThrow(/Отправитель/);
   expect(() => parseBankMessage({ ...rule, enabled: false }, message(text))).toThrow(/выключено/);
   expect(() => parseBankMessage(rule, { ...message(text), channel: 'push' })).toThrow(/тип сообщения/);
+  expect(() => validateBankRule({ ...rule, template: 'Оплата {amount} USD', cardLastFour: '' })).toThrow(/Валюта/);
 });
 test('templates escape regex literals and reject unknown, repeated or adjacent tokens', () => {
   for (const template of ['{amount}{currency}', '{amount} {amount}', '{amount} {password}', 'Без суммы', '{amount} {']) expect(() => validateBankRule({ ...rule, template })).toThrow();

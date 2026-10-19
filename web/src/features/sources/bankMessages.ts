@@ -9,6 +9,7 @@ export type ParsedBankMessage = { ruleId: string; accountId: string; kind: 'expe
 export type BankMessage = { channel: 'sms' | 'push'; sender: string; text: string; observedAt: string };
 export type SourceIntake = { id: string; connection_id: string; external_id: string; account_id: string; package_name: string; profile_id: string; parser_version: number; kind: string; amount_minor: string; currency: string; observed_at: string; observed_timezone: string; merchant: string; card_last_four: string | null };
 const token = /\{([a-zA-Z]+)\}/g;
+const currencySymbols: Record<string, string> = { '€': 'EUR', '$': 'USD', '£': 'GBP', '₽': 'RUB', '¥': 'JPY' };
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const secret = /\botp\b|one[ -]time|verification code|security code|код(?:ом)?[ :]*(?:подтверждения|входа|из смс)|одноразов|пароль/iu;
 const fullCard = /[0-9](?:[ -]?[0-9]){11,}/;
@@ -21,6 +22,7 @@ export function validateBankRule(rule: BankRule): void {
   if (!rule.bank.trim() || rule.bank.length > 80 || !rule.sender.trim() || rule.sender.length > 100 || /[\p{Cc}]/u.test(rule.bank + rule.sender)) throw new Error('Укажите банк и отправителя без переносов строк (до 80 и 100 символов).');
   const template = normalizedText(rule.template), tokens = [...template.matchAll(token)], names = tokens.map(t => t[1]);
   if (template.length < 3 || template.length > 1000 || !names.includes('amount') || new Set(names).size !== names.length || names.some(n => !['amount', 'currency', 'merchant', 'card'].includes(n)) || /[{}]/.test(template.replace(token, '')) || tokens.some((t, i) => i > 0 && t.index === tokens[i - 1].index! + tokens[i - 1][0].length)) throw new Error('В шаблоне нужен {amount}. Допустимы также {currency}, {merchant}, {card}: по одному разу, с текстом или пробелом между ними.');
+  if (!names.includes('currency') && [...template.matchAll(/\b(?:EUR|USD|GBP|RUB|JPY|KWD)\b|[€$£₽¥]/g)].some(m => (currencySymbols[m[0]] ?? m[0]) !== rule.currency)) throw new Error('Валюта в шаблоне отличается от валюты счета. Используйте {currency} для проверки валюты сообщения.');
   if (secret.test(template) || fullCard.test(template)) throw new Error('Используйте шаблон платежа без кодов подтверждения и полного номера карты.');
   if (rule.cardLastFour && (!/^\d{4}$/.test(rule.cardLastFour) || !names.includes('card'))) throw new Error('Для фильтра по карте нужны четыре цифры и {card} в шаблоне.');
 }
@@ -57,7 +59,7 @@ export function parseBankMessage(rule: BankRule, message: BankMessage): ParsedBa
   const result = new RegExp(pattern, 'u').exec(text);
   if (!result) throw new Error('Сообщение не совпало с шаблоном. Проверьте текст, пробелы и правило банка.');
   const fields = Object.fromEntries(tokens.map((t, index) => [t[1], result[index + 1]]));
-  const currency = ({ '€': 'EUR', '$': 'USD', '£': 'GBP', '₽': 'RUB', '¥': 'JPY' } as Record<string, string>)[fields.currency] ?? fields.currency ?? rule.currency;
+  const currency = currencySymbols[fields.currency] ?? fields.currency ?? rule.currency;
   if (currency !== rule.currency) throw new Error('Валюта сообщения отличается от валюты выбранного счета.');
   if (rule.cardLastFour && fields.card !== rule.cardLastFour) throw new Error('Сообщение относится к другой карте.');
   const merchant = fields.merchant?.trim() ?? '';

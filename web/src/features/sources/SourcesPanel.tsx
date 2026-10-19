@@ -12,7 +12,7 @@ const titles: Record<Decision,string> = { create_pending:'Создать пре�
 function reason(code: string|null): string {
   return ({ unauthenticated:'Прежняя сессия завершена. Продолжение требует нового явного подтверждения.', version_conflict:'Операция изменилась. Обновите данные и сверьте текущие значения.', account_archived:'Счет в архиве. Проверьте его состояние.', recovery_required:'Данные восстановлены. Проверьте историю перед продолжением.', action_result_expired:'Квитанция истекла. Результат требует сверки; новое действие автоматически не создается.', idempotency_conflict:'Сохраненный запрос требует сверки. Новый ключ не создается.', sync_generation_conflict:'Поколение данных изменилось. Сохраненный запрос требует сверки.' } as Record<string,string>)[code ?? ''] ?? 'Обновите данные и проверьте предложение.';
 }
-export function SourcesPanel({ auth, accounts, changed, fail }: { auth: Auth; accounts: Account[]; changed: () => void; fail: (e: unknown) => void }) {
+export function SourcesPanel({ auth, accounts, changed, fail, revision = 0, sourceNames = {} }: { auth: Auth; accounts: Account[]; changed: () => void; fail: (e: unknown) => void; revision?: number; sourceNames?: Record<string, string> }) {
   const root=`/workspaces/${auth.workspace.id}/source-events`;
   const storage=`accounting.sources.pending.v1:${auth.profile.id}:${auth.workspace.id}:${auth.session.id}`;
   const active=useRef(true), running=useRef(false);
@@ -36,6 +36,7 @@ export function SourcesPanel({ auth, accounts, changed, fail }: { auth: Auth; ac
     return()=>{active.current=false;};
   },[storage]);
   useEffect(()=>{const queued=items.filter(i=>i.state==='queued').slice(0,20);if(!queued.length)return;let cancelled=false;const timer=setTimeout(()=>void (async()=>{try{const values:SourceEvent[]=[];for(const item of queued)values.push(await request<SourceEvent>(`${root}/${item.id}`));if(cancelled||!active.current)return;setItems(old=>old.map(i=>values.find(v=>v.id===i.id&&BigInt(v.version)>=BigInt(i.version))??i));if(values.some(i=>i.state==='applied'))changed();}catch(e){if(!cancelled)show(e);}})(),2000);return()=>{cancelled=true;clearTimeout(timer);};},[items]);
+  useEffect(() => { if (ready) void refresh(); }, [revision]);
   async function persist(value:Command|null,expectedKey:string|null) {
     try{await compareAuxiliaryCommand(storage,expectedKey,value);}catch(e){if(e instanceof AuxiliaryCommandConflict&&active.current){const latest=await readCommand<Command>(storage);if(latest===null||valid(latest))setPending(latest);else setReady(false);}throw e;}
     if(active.current)setPending(value);
@@ -70,7 +71,7 @@ export function SourcesPanel({ auth, accounts, changed, fail }: { auth: Auth; ac
   const actual=(t:Transaction)=>`${({expense:'Расход',income:'Доход',transfer:'Перевод',refund:'Возврат',adjustment:'Корректировка'} as Record<string,string>)[t.kind]??t.kind} · ${new Date(t.occurred_at).toLocaleString()} · ${t.entries.map(e=>`${accounts.find(a=>a.id===e.account_id)?.name??e.account_id}: ${money(e.amount_minor,e.currency)}`).join('; ')}`;
   const enabled=ready&&!busy&&!pending&&navigator.onLine;
   return <section aria-label="Банковские предложения">
-    <h2>Банковские предложения</h2><p>Сюда поступают разобранные уведомления, отправленные с вашего Android. Полный текст не передается. Банковские API пока не подключены. Каждое финансовое действие требует подтверждения; одинаковые суммы сами по себе не объединяются.</p>
+    <h2>Банковские предложения</h2><p>Сюда поступают распознанные SMS и push-сообщения из веб-версии или Android. Полный текст не передается. Каждое финансовое действие требует подтверждения; одинаковые суммы сами по себе не объединяются.</p>
     <button disabled={busy} onClick={()=>void refresh()}>Обновить банковские предложения</button>
     {error&&<p role="alert">{error}</p>}
     {pending&&<div role="status"><p>Сохранен запрос банковского предложения. Новый запрос не создается до выяснения результата.</p>{pending.rejected?<button disabled={busy} onClick={()=>void persist(null,pending.key).catch(show)}>Закрыть отклоненный запрос предложения</button>:<button disabled={busy} onClick={()=>void retry()}>Повторить сохраненный запрос предложения</button>}</div>}
@@ -81,7 +82,7 @@ export function SourcesPanel({ auth, accounts, changed, fail }: { auth: Auth; ac
       return <article key={event.id} aria-label={`Предложение ${event.merchant||'без продавца'}`}>
         <h3>{event.merchant||'Без продавца'} · {money(event.amount_minor,event.currency)}</h3>
         <p>{accounts.find(a=>a.id===event.account_id)?.name??'Счет недоступен'} · {event.kind==='expense'?'расход':'доход'} · {new Date(event.observed_at).toLocaleString()}{event.card_last_four?` · карта *${event.card_last_four}`:''}</p>
-        <p>Источник: {event.package_name}. Время уведомления может отличаться от даты покупки.</p>
+        <p>Источник: {sourceNames[event.package_name] ?? (event.package_name.startsWith('web.sms.') ? 'SMS из веб-версии' : event.package_name.startsWith('web.push.') ? 'Push из веб-версии' : event.package_name)}. Время уведомления может отличаться от даты покупки.</p>
         {event.state==='queued'&&<p>Ожидает обработки</p>}
         {event.state==='failed'&&<p>Требуется проверка: {reason(event.error_code)}</p>}
         {(event.state==='review'||event.state==='failed'&&!event.transaction_id&&!unknown)&&<div><button disabled={!enabled} onClick={()=>setChoice({event,decision:'create_pending',transaction:null})}>Создать предварительную операцию</button><button disabled={!enabled} onClick={()=>void matches(event)}>Выбрать существующую операцию</button><button disabled={!enabled} onClick={()=>setChoice({event,decision:'dismiss',transaction:null})}>Исключить предложение</button></div>}

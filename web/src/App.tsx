@@ -14,7 +14,7 @@ import { AdjustmentForm } from './features/transactions/AdjustmentForm';
 import { RefundForm } from './features/transactions/RefundForm';
 import { TransactionConflict, type ProposedTransaction, type TransactionComparison } from './features/transactions/TransactionConflict';
 import { clearCSVCommandsForOwner } from './features/imports/commandStorage';
-import { SourcesPanel } from './features/sources/SourcesPanel';
+import { BankSourcesSettings } from './features/sources/BankSourcesSettings';
 import { WalletImportPanel } from './features/imports/WalletImportPanel';
 import { CSVPanel } from './features/imports/CSVPanel';
 import { AnalyticsPanel } from './features/analytics/AnalyticsPanel';
@@ -58,7 +58,7 @@ export function App() {
   const activeSession = useRef<string | null>(null);
  const [analyticsOpen,setAnalyticsOpen]=useState(false);
  const [csvOpen,setCSVOpen]=useState(false);
- const [sourcesOpen,setSourcesOpen]=useState(false);
+
  const [reportHistoryQuery,setReportHistoryQuery]=useState<string>();
   const [needsRefresh, setNeedsRefresh] = useState(false);
   const [auth, setAuth] = useState<Auth | null>(null), [starting, setStarting] = useState(true), [startupError, setStartupError] = useState('');
@@ -235,8 +235,7 @@ export function App() {
     <details onToggle={e=>setCSVOpen(e.currentTarget.open)}><summary>Экспорт CSV</summary>{csvOpen && <CSVPanel key={`${auth.session.id}:${auth.workspace.sync_generation_id}`} auth={auth} accounts={accounts} changed={()=>{void refresh(auth).catch(showError);}} fail={showError}/>}</details>
     </div>
     <div className="settings-group" hidden={settingsGroup !== 'sources'}>
-    <details onToggle={e=>setSourcesOpen(e.currentTarget.open)}><summary>Банковские предложения</summary>{sourcesOpen&&<SourcesPanel key={`${auth.session.id}:${auth.workspace.sync_generation_id}`} auth={auth} accounts={accounts} changed={()=>{void refresh(auth).catch(showError);}} fail={showError}/>}</details>
-    <p className="hint">Ручной учет и CSV. Банковские подключения пока недоступны.</p>
+    <BankSourcesSettings key={`${auth.profile.id}:${auth.workspace.id}:${auth.session.id}:${auth.workspace.sync_generation_id}`} auth={auth} accounts={accounts} blocked={busy || loading || !!pending || needsRefresh || !online} changed={() => { void refresh(auth).catch(showError); }} fail={showError} />
     </div>
     <div className="settings-group" hidden={settingsGroup !== 'profile'}>
     <section className="profile-card"><h2>Профиль</h2><p>{auth.profile.email}</p><button className="secondary" disabled={busy || loading || !online} onClick={() => { setError(''); void refresh(auth).catch(showError); }}>{loading ? 'Загрузка…' : 'Обновить данные'}</button></section>
