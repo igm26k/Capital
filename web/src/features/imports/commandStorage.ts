@@ -30,7 +30,7 @@ export async function clearCSVCommandsForOwner(owner: string): Promise<void> {
   try {
     await new Promise<void>((resolve, reject) => {
       const tx = db.transaction('commands', 'readwrite'), request = tx.objectStore('commands').openCursor();
-      request.onsuccess = () => { const cursor = request.result; if (!cursor) return; if ([`accounting.csv.pending.v1:${owner}:`,`accounting.sources.pending.v1:${owner}:`,`accounting.wallet.pending.v1:${owner}:`].some(prefix=>String(cursor.key).startsWith(prefix))) cursor.delete(); cursor.continue(); };
+      request.onsuccess = () => { const cursor = request.result; if (!cursor) return; if ([`accounting.csv.pending.v1:${owner}:`,`accounting.sources.pending.v1:${owner}:`,`accounting.bank-rules.v1:${owner}:`,`accounting.bank-intake.pending.v1:${owner}:`,`accounting.wallet.pending.v1:${owner}:`].some(prefix=>String(cursor.key).startsWith(prefix))) cursor.delete(); cursor.continue(); };
       tx.oncomplete = () => resolve(); tx.onabort = () => reject(new Error('Не удалось очистить локальное хранилище CSV.'));
     });
   } finally { db.close(); }
