@@ -105,7 +105,7 @@ class MainActivity : ComponentActivity() {
                                             Box {
                                                 TextButton(onClick = { settingsMenu = true }, modifier = Modifier.semantics { contentDescription = "Группы настроек" }) { Text("☰", style = MaterialTheme.typography.titleLarge) }
                                                 DropdownMenu(expanded = settingsMenu, onDismissRequest = { settingsMenu = false }) {
-                                                    listOf("profile" to "Профиль", "classification" to "Категории и теги", "analytics" to "Бюджеты и отчеты", "data" to "Импорт и экспорт", "sources" to "Банковские предложения", "security" to "Безопасность и данные").forEach { (id, label) ->
+                                                    listOf("profile" to "Профиль", "classification" to "Категории и теги", "analytics" to "Бюджеты и отчеты", "data" to "Импорт и экспорт", "sources" to "Банки и уведомления", "security" to "Безопасность и данные").forEach { (id, label) ->
                                                         DropdownMenuItem(text = { Text((if (settingsGroup == id) "✓ " else "") + label) }, onClick = { settingsGroup = id; settingsMenu = false })
                                                     }
                                                 }
@@ -119,7 +119,6 @@ class MainActivity : ComponentActivity() {
                                                 Text("Часовой пояс: ${state.auth.profile.timezone}")
                                                 TextButton(enabled = !state.busy && !state.financeBlocked, onClick = model::renew) { Text("Продлить сессию") }
                                             }
-                                            "sources" -> com.capital.accounting.imports.NotificationPanel(model)
                                             "security" -> {
                                                 PrivacyPanel(model)
                                                 Text("Устройства", style = MaterialTheme.typography.titleMedium)
@@ -139,6 +138,7 @@ class MainActivity : ComponentActivity() {
                                         settingsState.SaveableStateProvider("${state.origin}:${state.auth.profile.id}:${state.auth.workspace.id}:$settingsGroup") {
                                             if (settingsGroup == "analytics") AnalyticsPanel(model)
                                             if (settingsGroup == "data") CsvPanel(model)
+                                            if (settingsGroup == "sources") com.capital.accounting.imports.NotificationPanel(model)
                                         }
                                     }
                                     key(state.origin, state.auth.profile.id, state.auth.workspace.id) {

@@ -34,12 +34,14 @@ class BankNotificationListener : NotificationListenerService() {
     } } } }
     override fun onNotificationPosted(sbn:StatusBarNotification) {
         val inbox=app.notificationInbox.active ?: return
-        val profiles=inbox.configuredProfiles.filter {it.enabled&&it.packageName==sbn.packageName}
+        val profiles=inbox.configuredProfiles.filter {it.enabled&&it.channel=="push"&&it.packageName==sbn.packageName}
         if(!inbox.enabled || profiles.isEmpty() || sbn.notification.flags and Notification.FLAG_GROUP_SUMMARY != 0)return
         // Read no extras from unselected packages; no bulk/history scan or notification dismissal.
         val candidates=try {
-            val text=sbn.notification.extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?:sbn.notification.extras.getCharSequence(Notification.EXTRA_TEXT)
-            if(text==null||text.length !in 1..8192)emptyList() else NotificationParser.parseProfiles(profiles,NotificationEnvelope(sbn.packageName,sbn.key,sbn.postTime,text.toString()))
+            val extras=sbn.notification.extras
+            val title=extras.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty()
+            val body=(extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?:extras.getCharSequence(Notification.EXTRA_TEXT))?.toString().orEmpty()
+            parsePushParts(profiles,sbn.packageName,sbn.key,sbn.postTime,title,body)
         }catch(_:Exception){app.notificationInbox.captureErrors.incrementAndGet();emptyList()}
         if(incoming.trySend(inbox.binding to candidates).isFailure)app.notificationInbox.captureErrors.incrementAndGet()
     }

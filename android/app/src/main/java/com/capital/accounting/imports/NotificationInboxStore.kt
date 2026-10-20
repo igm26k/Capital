@@ -81,6 +81,17 @@ class NotificationInboxStore(context: Context) {
         write(AtomicFile(File(directory,"active")),ApiClient.json.encodeToString(binding).toByteArray())
         paused=false;cached=updated;updated
     } }
+    suspend fun removeProfile(binding:NotificationBinding,id:String):NotificationInbox=withContext(Dispatchers.IO){mutex.withLock {
+        val updated=load(binding).removeProfile(id);save(updated)
+        write(AtomicFile(File(directory,"profiles-${binding.configurationKey}.json")),ApiClient.json.encodeToString(NotificationConfiguration(binding,updated.configuredProfiles)).toByteArray())
+        write(AtomicFile(File(directory,"active")),ApiClient.json.encodeToString(binding).toByteArray());paused=false;cached=updated;updated
+    }}
+    suspend fun review(binding:NotificationBinding,candidate:NotificationCandidate):NotificationInbox=withContext(Dispatchers.IO){mutex.withLock {
+        val prior=load(binding)
+        // Manual preview must never turn on background capture or automatic financial delivery.
+        val accepted=prior.review(candidate)
+        save(accepted);accepted
+    }}
     suspend fun disable(binding: NotificationBinding): NotificationInbox = withContext(Dispatchers.IO) { mutex.withLock {
         val updated=load(binding).copy(enabled=false);save(updated);updated
     } }

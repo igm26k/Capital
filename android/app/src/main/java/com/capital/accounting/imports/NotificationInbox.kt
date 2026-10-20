@@ -23,11 +23,18 @@ data class NotificationInbox(
     fun configure(value:NotificationProfile):NotificationInbox {
         NotificationParser.validate(value)
         val prior=configuredProfiles.find {it.id==value.id}
-        require(prior==null || prior.copy(enabled=value.enabled,autoCreatePending=value.autoCreatePending)==value || items.isEmpty())
+        require(prior==null || prior.copy(enabled=value.enabled,autoCreatePending=value.autoCreatePending,bankName=value.bankName)==value || items.none {it.referencesProfile(value.id)})
         val configured=(configuredProfiles.filterNot {it.id==value.id}+value).sortedBy {it.id}
         require(configured.size<=20)
         return copy(profile=value,profiles=configured)
     }
+    fun removeProfile(id:String):NotificationInbox {
+        require(configuredProfiles.any {it.id==id})
+        val retained=configuredProfiles.filterNot {it.id==id}
+        return copy(profile=retained.firstOrNull(),profiles=retained,enabled=enabled&&retained.any {it.enabled})
+    }
+    fun review(candidate:NotificationCandidate):NotificationInbox =
+        copy(enabled=true).accept(candidate).manualOnly(candidate.eventId).copy(enabled=enabled)
     fun accept(candidate:NotificationCandidate):NotificationInbox=acceptMatches(listOf(candidate))
     fun acceptMatches(matches:List<NotificationCandidate>):NotificationInbox {
         require(format==1 && enabled && matches.isNotEmpty() && matches.size<=20 && matches.map {it.profileId}.distinct().size==matches.size)
@@ -69,3 +76,5 @@ data class NotificationInbox(
     }
     override fun toString() = "NotificationInbox([redacted])"
 }
+
+fun NotificationInboxItem.referencesProfile(id:String):Boolean=id in profileIds || candidate?.profileId==id || alternatives.any {it.profileId==id} || revisions.any {it.profileId==id}
