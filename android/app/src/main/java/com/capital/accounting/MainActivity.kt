@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.compose.setContent
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -52,12 +53,17 @@ class MainActivity : ComponentActivity() {
             var password by remember { mutableStateOf("") }
             var emailCode by remember { mutableStateOf("") }
             var device by remember { mutableStateOf("Android") }
-            val section = rememberSaveable(state.origin, state.auth?.profile?.id, state.auth?.workspace?.id) { mutableStateOf("accounts") }
+            val navigation = rememberSaveable(state.origin, state.auth?.profile?.id, state.auth?.workspace?.id, saver = AppNavigation.Saver) { AppNavigation() }
+            val section = navigation.section
             val createRouter = remember(state.origin, state.auth?.profile?.id, state.auth?.workspace?.id) { FinancialCreateRouter() }
             LaunchedEffect(state.auth) { if (state.auth != null) password = "" }
-            var settingsGroup by rememberSaveable(state.origin, state.auth?.profile?.id, state.auth?.workspace?.id) { mutableStateOf("profile") }
+            val settingsGroup = navigation.settingsGroup
             val settingsState = rememberSaveableStateHolder()
             var settingsMenu by remember { mutableStateOf(false) }
+            // Dialogs handle Back in their own windows before this root handler.
+            BackHandler {
+                if (state.auth != null) navigation.back()
+            }
             MaterialTheme(colorScheme = capitalColors(isSystemInDarkTheme())) {
                 CompositionLocalProvider(LocalFinancialSection provides section, LocalFinancialCreateRouter provides createRouter, LocalSettingsGroup provides settingsGroup) {
                     if (state.auth != null && state.recoveryOpen) QueueRecovery(model)
@@ -106,7 +112,7 @@ class MainActivity : ComponentActivity() {
                                                 TextButton(onClick = { settingsMenu = true }, modifier = Modifier.semantics { contentDescription = "Группы настроек" }) { Text("☰", style = MaterialTheme.typography.titleLarge) }
                                                 DropdownMenu(expanded = settingsMenu, onDismissRequest = { settingsMenu = false }) {
                                                     listOf("profile" to "Профиль", "classification" to "Категории и теги", "analytics" to "Бюджеты и отчеты", "data" to "Импорт и экспорт", "sources" to "Банки и уведомления", "security" to "Безопасность и данные").forEach { (id, label) ->
-                                                        DropdownMenuItem(text = { Text((if (settingsGroup == id) "✓ " else "") + label) }, onClick = { settingsGroup = id; settingsMenu = false })
+                                                        DropdownMenuItem(text = { Text((if (settingsGroup == id) "✓ " else "") + label) }, onClick = { navigation.settingsGroup = id; settingsMenu = false })
                                                     }
                                                 }
                                             }
