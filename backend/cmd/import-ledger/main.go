@@ -20,6 +20,7 @@ import (
 type operation struct {
 	Action  string          `json:"action_id"`
 	Type    string          `json:"type"`
+	Target  string          `json:"target_id,omitempty"`
 	Payload json.RawMessage `json:"payload"`
 }
 type plan struct {
@@ -37,6 +38,9 @@ func prepare(p plan) ([]commands.MaintenanceStep, error) {
 	steps := make([]commands.MaintenanceStep, 0, len(p.Operations))
 	seen := map[string]bool{}
 	for i, op := range p.Operations {
+		if (op.Type == "delete") != (op.Target != "") {
+			return nil, fmt.Errorf("step %d: target_id is required only for delete", i+1)
+		}
 		if seen[op.Action] {
 			return nil, fmt.Errorf("duplicate action")
 		}
@@ -44,6 +48,10 @@ func prepare(p plan) ([]commands.MaintenanceStep, error) {
 		var command commands.Command
 		var err error
 		switch op.Type {
+		case "delete":
+			var v ledger.TransactionDeleteInput
+			v, err = ledger.DecodeTransactionDelete(op.Payload)
+			command = ledger.DeleteTransaction(p.Workspace, op.Target, v)
 		case "basic":
 			var v ledger.BasicInput
 			v, err = ledger.DecodeBasic(op.Payload, false)
