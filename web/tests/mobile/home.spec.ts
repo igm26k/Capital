@@ -80,7 +80,7 @@ test('Wallet home supports dark mode and long names on a narrow screen', async (
   await expect(page.getByRole('region', { name: 'Структура расходов' })).toContainText('123,45 EUR');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   for (const selector of ['.tile-main', '.add-account-tile button', '.add-record-fab']) {
-    for (const element of await page.locator(selector).all()) expect((await element.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    for (const element of await page.locator(selector).filter({ visible: true }).all()) expect((await element.boundingBox())!.height).toBeGreaterThanOrEqual(44);
   }
   await page.screenshot({ path: test.info().outputPath('wallet-home-dark-320.png'), fullPage: true });
 });

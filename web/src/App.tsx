@@ -20,6 +20,7 @@ import { CSVPanel } from './features/imports/CSVPanel';
 import { AnalyticsPanel } from './features/analytics/AnalyticsPanel';
 import { TransactionHistory } from './features/transactions/TransactionHistory';
 import { HomeOverview } from './features/home/HomeOverview';
+import { LoadingOverlay } from './shared/LoadingOverlay';
 import { Icon } from './shared/Icon';
 import { OperationModal } from './features/transactions/OperationModal';
 import { SettingsNavigation, restoreSettingsGroup } from './features/settings/SettingsNavigation';
@@ -205,9 +206,9 @@ export function App() {
     {pending && <section className="notice"><h2>Команда ожидает подтверждения</h2><p>Проверьте результат повтором той же команды. Ее данные и ключ сохранены в этой вкладке.</p><button disabled={busy || !online} onClick={() => void execute(pending)}>{busy ? 'Сохраняем…' : 'Повторить ту же команду'}</button></section>}
     {resourceConflict && <ResourceConflict value={resourceConflict} categories={categories} disabled={busy || loading || !!pending || !online} reload={() => void reloadResources()} />}
     <div hidden={section !== "accounts"} className="screen" aria-label="Счета">
-    <AccountManager records={() => showRecords()} history={id => showRecords(`account_id=${encodeURIComponent(id)}`)} key={`accounts-${formVersion}-${resourceRevision}`} accounts={accounts} disabled={busy || loading || !!pending || needsRefresh || !online} loading={loading} submit={create} fail={setError} >
+    <AccountManager addOperation={() => { setError(''); setOperationOpen(true); }} records={() => showRecords()} history={id => showRecords(`account_id=${encodeURIComponent(id)}`)} key={`accounts-${formVersion}-${resourceRevision}`} accounts={accounts} disabled={busy || loading || !!pending || needsRefresh || !online} loading={loading} submit={create} fail={setError} >
       <HomeOverview workspace={auth.workspace.id} active={section === 'accounts'} revision={historyRevision} accounts={accounts} categories={categories} records={showRecords} openRecord={id => { navigate('operations'); void editTransaction(id); }} />
-      <button className="add-record-fab" aria-label="Добавить операцию" disabled={busy || loading || !!pending || needsRefresh || !online} onClick={() => { setError(''); setOperationOpen(true); navigate('operations'); }}><Icon name="plus" /></button>
+
     </AccountManager>
     </div>
     <div hidden={section !== "operations"} className="screen" aria-label="Операции">
@@ -224,6 +225,9 @@ export function App() {
     {operationOpen && <OperationModal accounts={accounts.filter(a => !a.archived_at)} categories={categories} tags={tags} disabled={busy || loading || !!pending || needsRefresh || !online} saving={busy} error={error} submit={create} cancel={() => setOperationOpen(false)} />}
     <div hidden={section !== "more"} className="screen" aria-label="Настройки">
     <SettingsNavigation value={settingsGroup} change={setSettingsGroup} active={section === 'more'} />
+    <div className="settings-group" hidden={settingsGroup !== 'accounts'}>
+    <AccountManager manage records={() => showRecords()} history={id => showRecords(`account_id=${encodeURIComponent(id)}`)} key={`manage-accounts-${formVersion}-${resourceRevision}`} accounts={accounts} disabled={busy || loading || !!pending || needsRefresh || !online} loading={loading} submit={create} fail={setError} />
+    </div>
     <div className="settings-group" hidden={settingsGroup !== 'classification'}>
     <ClassificationManager key={`classification-${formVersion}-${resourceRevision}`} categories={categories} tags={tags} disabled={busy || loading || !!pending || needsRefresh || !online} submit={create} fail={setError} />
     </div>
@@ -254,5 +258,6 @@ export function App() {
         <a key={id} href={`#${id}`} aria-current={section === id ? 'page' : undefined}><span className="nav-symbol" aria-hidden="true">{symbol}</span><span>{label}</span></a>)}
     </nav>
     </>}
+    <LoadingOverlay active={starting || busy || loading} />
   </main>;
 }

@@ -35,7 +35,7 @@ test('settings menu fits 320px and closes outside without losing the selected im
   const trigger = page.getByRole('button', { name: 'Группы настроек', exact: true });
   await trigger.click();
   const menu = page.getByRole('navigation', { name: 'Группы настроек' });
-  expect(await menu.getByRole('button').count()).toBe(6);
+  expect(await menu.getByRole('button').count()).toBe(7);
   const bounds = await menu.boundingBox(); expect(bounds!.x).toBeGreaterThanOrEqual(0); expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(320);
   await page.screenshot({ path: test.info().outputPath('settings-menu-320.png') });
   await page.getByRole('heading', { name: 'Capital', exact: true }).click(); await expect(menu).toHaveCount(0);

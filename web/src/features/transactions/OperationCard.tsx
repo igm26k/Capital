@@ -1,6 +1,7 @@
 import type { Account, Category, Tag, Transaction } from '../../api/client';
 import { categoryLabel } from '../../shared/categories';
 import { money } from '../../shared/money';
+import { CategoryIcon } from '../../shared/CategoryIcon';
 import { Icon } from '../../shared/Icon';
 const kinds: Record<string, string> = { opening: 'Начальный остаток', expense: 'Расход', income: 'Доход', transfer: 'Перевод', refund: 'Возврат', adjustment: 'Корректировка' };
 const symbols: Record<string, string> = { EUR: '€', USD: '$', RUB: '₽', GBP: '£', JPY: '¥' };
@@ -14,7 +15,7 @@ export function OperationCard({ transaction: t, accounts, categories, tags, disa
   const label = t.kind === 'expense' || t.kind === 'income' ? names || 'Без категории' : t.kind === 'transfer' || t.kind === 'adjustment' ? kind : t.payee || kind;
   return <li className={`operation-card${selected ? ' is-selected' : ''}`} data-testid={`transaction-${t.id}`}>
     <details className="operation-details"><summary>
-      <span className="operation-icon"><Icon name={t.kind === 'transfer' ? 'transfer' : t.kind === 'income' || t.kind === 'refund' ? 'income' : t.kind === 'opening' || t.kind === 'adjustment' ? 'bank' : 'expense'} /></span>
+      <span className="operation-icon">{['expense', 'income'].includes(t.kind) ? <CategoryIcon id={t.allocations[0]?.category_id} categories={categories} /> : <Icon name={t.kind === 'transfer' ? 'transfer' : t.kind === 'income' || t.kind === 'refund' ? 'income' : t.kind === 'opening' || t.kind === 'adjustment' ? 'bank' : 'expense'} />}</span>
       <span className="operation-copy"><strong title={label}>{label}</strong><span>{[t.payee !== label ? t.payee : '', entries.map(e => account(e.account_id)).join(' → ')].filter(Boolean).join(' · ')}</span>{t.note && <small className="operation-preview">{t.note}</small>}{t.status === 'pending' && <small className="pending-label">Предварительная</small>}</span>
       <span className="operation-values">{entries.map((e, i) => <strong key={i} className={t.kind === 'transfer' || t.kind === 'opening' || t.kind === 'adjustment' ? 'neutral-value' : BigInt(e.amount_minor) > 0n ? 'income-value' : 'expense-value'}>{money(e.amount_minor, e.currency).replace(e.currency, symbols[e.currency] ?? e.currency)}</strong>)}<time dateTime={t.occurred_at}>{new Date(t.occurred_at).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}</time></span>
       <span className="operation-chevron" aria-hidden="true">⌄</span>
@@ -22,7 +23,7 @@ export function OperationCard({ transaction: t, accounts, categories, tags, disa
       <div className="operation-detail-heading"><strong>{kind}</strong><time dateTime={t.occurred_at}>{new Date(t.occurred_at).toLocaleString('ru-RU')}</time></div>
       {t.payee && <p>{t.payee}</p>}{t.reason && <p>Причина: {t.reason}</p>}{t.note && <p className="operation-note">{t.note}</p>}
       <ul className="operation-movements">{entries.map((e, i) => <li key={i}><span>{account(e.account_id)}</span><strong>{money(e.amount_minor, e.currency)}</strong></li>)}</ul>
-      {t.allocations.map(p => <p className="operation-allocation" key={p.id}>{category(p.category_id)} · {money(p.amount_minor, t.entries[0]?.currency ?? 'EUR')}</p>)}
+      {t.allocations.map(p => <p className="operation-allocation" key={p.id}><CategoryIcon id={p.category_id} categories={categories} />{category(p.category_id)} · {money(p.amount_minor, t.entries[0]?.currency ?? 'EUR')}</p>)}
       {t.tag_ids.length > 0 && <p>Теги: {t.tag_ids.map(id => tags.find(tag => tag.id === id)?.name ?? 'Недоступный тег').join(', ')}</p>}
       {selectable && <label className="check operation-select"><input type="checkbox" aria-label={`Выбрать операцию ${t.payee || t.note || t.id}`} disabled={selectionDisabled} checked={selected} onChange={event => select(event.target.checked)} />Выбрать для классификации</label>}
       <div className="operation-actions">{['expense', 'income', 'transfer', 'refund', 'adjustment'].includes(t.kind) && <button className="secondary" disabled={disabled} onClick={edit} aria-label={`Изменить операцию ${t.payee || t.note || t.id}`}>Изменить</button>}

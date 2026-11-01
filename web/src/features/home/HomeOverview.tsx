@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import { request, type Account, type Category, type List, type Transaction } from '../../api/client';
 import { money } from '../../shared/money';
+import { CategoryIcon, categoryAppearance } from '../../shared/CategoryIcon';
 import { Icon } from '../../shared/Icon';
 type Report = { currencies: { currency: string; income_minor: string; expense_minor: string }[]; categories: { currency: string; category_id: string | null; expense_minor: string }[] };
 type Props = { workspace: string; active: boolean; revision: number; accounts: Account[]; categories: Category[]; records: (query?: string) => void; openRecord: (id: string) => void };
-const palette = ['#26a9de', '#ffad32', '#ff724c', '#8168cf', '#55b69b', '#db77ac'];
 function periodRange(period: string) {
   const now = new Date(), end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
   const start = period === 'month' ? new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)) : new Date(end.getTime() - 30 * 86400000);
@@ -37,7 +37,7 @@ export function HomeOverview({ workspace, active, revision, accounts, categories
   let offset = 0;
   const segments = expenses.map((row, index) => {
     const value = BigInt(row.expense_minor), share = total ? Number((value < 0n ? -value : value) * 100000n / total) / 1000 : 0;
-    const segment = { ...row, share, offset, color: palette[index % palette.length] }; offset += share; return segment;
+    const segment = { ...row, share, offset, color: categoryAppearance(row.category_id, categories).color }; offset += share; return segment;
   });
   return <div className="home-overview" aria-busy={loading}>
     <section className="overview-card" aria-label="Структура расходов">
@@ -48,7 +48,7 @@ export function HomeOverview({ workspace, active, revision, accounts, categories
       {loading ? <p role="status" className="overview-placeholder">Загружаем обзор…</p> : error ? <div className="overview-placeholder" role="alert"><p>Не удалось загрузить обзор.</p><button className="text-button" onClick={() => setRetry(v => v + 1)}>Повторить загрузку обзора</button></div> : <>
         <div className="flow-summary"><div><span>Расходы</span><strong>{money(totals?.expense_minor ?? '0', selected)}</strong></div><div><span>Доходы</span><strong className="income-value">{money(totals?.income_minor ?? '0', selected)}</strong></div></div>
         <div className="expense-chart"><svg viewBox="0 0 160 160" role="img" aria-label={`Расходы по категориям, ${selected}`}><circle cx="80" cy="80" r="61" fill="none" stroke="var(--chart-track)" strokeWidth="20" />{segments.map((s, i) => <circle key={i} cx="80" cy="80" r="61" fill="none" stroke={s.color} strokeWidth="20" pathLength="100" strokeDasharray={`${s.share} ${100 - s.share}`} strokeDashoffset={-s.offset} transform="rotate(-90 80 80)" />)}</svg><div className="chart-center"><span>{total ? 'Все расходы' : 'Нет расходов'}</span><strong>{money(totals?.expense_minor ?? '0', selected)}</strong></div></div>
-        {segments.length ? <ul className="chart-legend">{segments.map((s, i) => <li key={i}><i style={{ background: s.color }} /><span>{categories.find(c => c.id === s.category_id)?.name ?? 'Без категории'}</span><strong>{money(s.expense_minor, selected)}</strong></li>)}</ul> : <p className="chart-empty">За выбранный период расходов нет</p>}
+        {segments.length ? <ul className="chart-legend">{segments.map((s, i) => <li key={i}><CategoryIcon id={s.category_id} categories={categories} /><span>{categories.find(c => c.id === s.category_id)?.name ?? 'Без категории'}</span><strong>{money(s.expense_minor, selected)}</strong></li>)}</ul> : <p className="chart-empty">За выбранный период расходов нет</p>}
         {expenses.some(e => BigInt(e.expense_minor) < 0n) && <p className="hint">Возвраты вычтены из расходов. Доли диаграммы показаны по абсолютным суммам категорий.</p>}
         <button className="overview-footer" onClick={() => records(data?.query)}>Операции за период<Icon name="arrow" /></button>
       </>}
@@ -59,7 +59,7 @@ export function HomeOverview({ workspace, active, revision, accounts, categories
         const target = t.kind === 'transfer' ? t.entries.find(e => BigInt(e.amount_minor) > 0n) : null;
         const category = categories.find(c => c.id === t.allocations[0]?.category_id)?.name;
         const label = t.kind === 'transfer' ? 'Перевод между счетами' : t.kind === 'adjustment' ? 'Корректировка остатка' : category ?? (t.kind === 'income' ? 'Доход' : t.kind === 'refund' ? 'Возврат' : 'Расход');
-        return <li key={t.id}><button onClick={() => openRecord(t.id)}><span className={`record-icon ${t.kind}`}><Icon name={t.kind === 'transfer' ? 'transfer' : t.kind === 'income' || t.kind === 'refund' ? 'income' : 'expense'} /></span><span className="record-description"><strong>{t.payee || label}</strong><small>{accounts.find(a => a.id === entry?.account_id)?.name ?? label}</small></span><span className="record-values"><strong className={t.kind === 'transfer' ? 'transfer-value' : entry && BigInt(entry.amount_minor) > 0n ? 'income-value' : 'expense-value'}>{entry ? money(entry.amount_minor, entry.currency) : '—'}</strong>{target && <small>→ {money(target.amount_minor, target.currency)}</small>}<time dateTime={t.occurred_at}>{new Date(t.occurred_at).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' })}</time></span></button></li>;
+        return <li key={t.id}><button onClick={() => openRecord(t.id)}><span className={`record-icon ${t.kind}`}>{['expense', 'income'].includes(t.kind) ? <CategoryIcon id={t.allocations[0]?.category_id} categories={categories} /> : <Icon name={t.kind === 'transfer' ? 'transfer' : t.kind === 'income' || t.kind === 'refund' ? 'income' : 'expense'} />}</span><span className="record-description"><strong>{t.payee || label}</strong><small>{accounts.find(a => a.id === entry?.account_id)?.name ?? label}</small></span><span className="record-values"><strong className={t.kind === 'transfer' ? 'transfer-value' : entry && BigInt(entry.amount_minor) > 0n ? 'income-value' : 'expense-value'}>{entry ? money(entry.amount_minor, entry.currency) : '—'}</strong>{target && <small>→ {money(target.amount_minor, target.currency)}</small>}<time dateTime={t.occurred_at}>{new Date(t.occurred_at).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' })}</time></span></button></li>;
       })}</ul> : <p className="chart-empty">Здесь появятся ваши операции</p>}
       <button className="overview-footer" onClick={() => records()}>Все записи<Icon name="arrow" /></button>
     </section>

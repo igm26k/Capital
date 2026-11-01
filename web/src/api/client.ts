@@ -1,8 +1,18 @@
+let activeRequests = 0;
+const loadingListeners = new Set<() => void>();
+export const subscribeLoading = (listener: () => void) => { loadingListeners.add(listener); return () => { loadingListeners.delete(listener); }; };
+export const loadingSnapshot = () => activeRequests > 0;
+function notifyLoading() { loadingListeners.forEach(listener => listener()); }
+export async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  activeRequests++; notifyLoading();
+  try { return await performRequest<T>(path, init); }
+  finally { activeRequests--; notifyLoading(); }
+}
 import { presentTransactions } from '../shared/transactionText';
 export class RequestError extends Error {
   constructor(public status: number, public code: string, message: string) { super(message); }
 }
-export async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+async function performRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (!path.startsWith('/') || path.startsWith('//')) throw new Error('Invalid API path');
   const read=(init.method??'GET').toUpperCase()==='GET';
   async function fetchResponse():Promise<Response> {
