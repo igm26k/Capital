@@ -101,7 +101,7 @@ fun DraftGuardControls(guard: DraftGuard, prefix: String, enabled: Boolean, onRe
         TextButton(enabled = enabled && !scope.saving && !scope.failed, onClick = { guard.restore(item.id, onRestored) }) { Text("Восстановить черновик $noun ${index + 1}") }
         TextButton(enabled = enabled && !scope.saving, onClick = { guard.remove(item.id) }) { Text("Отбросить сохраненный черновик $noun ${index + 1}") }
     }
-    if (guard.pending != null) AlertDialog(
+    if (guard.pending != null) com.capital.accounting.finance.CapitalAlertDialog(
         onDismissRequest = guard::stay,
         title = { Text("Сохранить измененный черновик?") },
         text = { Text(if (guard.error.isEmpty()) "Черновик можно сохранить на устройстве и вернуть позже." else guard.error) },

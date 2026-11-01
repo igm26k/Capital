@@ -18,12 +18,9 @@ import java.math.BigInteger
 fun TransactionDetails(model: AuthViewModel) {
     val state = model.state
     val router = LocalFinancialCreateRouter.current
-    Dialog(onDismissRequest = { model.backTransactionDetails() }, properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)) {
+    Dialog(onDismissRequest = { if (!state.busy) model.closeTransactionDetails() }, properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)) {
         Surface(Modifier.fillMaxSize()) {
-            Column(Modifier.safeDrawingPadding().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Детали операции", style = MaterialTheme.typography.headlineLarge)
-                Button(enabled = !state.busy, onClick = model::closeTransactionDetails) { Text("Вернуться к истории") }
-                if (state.detailStack.size > 1) TextButton(enabled = !state.busy, onClick = model::backTransactionDetails) { Text("Назад к предыдущим деталям") }
+            ModalScrollContent("Детали операции", model::closeTransactionDetails, !state.busy, Modifier.safeDrawingPadding()) {
                 Button(enabled = !state.busy, onClick = model::refreshTransactionDetails) { Text("Обновить детали") }
 
                 if (state.detailMissing) Text("Операция удалена или недоступна.")

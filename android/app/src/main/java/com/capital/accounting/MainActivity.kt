@@ -82,7 +82,10 @@ class MainActivity : ComponentActivity() {
                             Column(Modifier.fillMaxSize()) {
                             Surface(color = if (isSystemInDarkTheme()) Color(0xff18263f) else Color(0xff1f3155), contentColor = Color.White) {
                                 Row(Modifier.fillMaxWidth().heightIn(min = 76.dp).statusBarsPadding().padding(start = 20.dp, end = 12.dp, top = 10.dp, bottom = 10.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                                    Text("Capital", fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
+                                    Row(Modifier.weight(1f), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                                        if (state.auth != null && section.value != "accounts") IconButton(onClick = navigation::back, enabled = !state.busy, modifier = Modifier.semantics { contentDescription = "Назад" }) { CapitalIcon("back") }
+                                        Text("Capital", fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
+                                    }
                                     if (state.auth != null) TextButton(enabled = !state.busy && (!state.financeBlocked || (state.offline && state.financialCommand == null && state.localPending == 0 && state.localBlocked == 0)), onClick = model::logout, colors = ButtonDefaults.textButtonColors(contentColor = Color.White)) { Text("Выход") }
                                 }
                             }

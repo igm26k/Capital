@@ -56,7 +56,7 @@ fun HandleFinancialTransaction(prefix: String, enabled: Boolean, act: (Financial
     LaunchedEffect(request, enabled, scope.saving, scope.failed) {
         if (request != null && request.prefix == prefix && enabled && !scope.saving && !scope.failed) {
             router.transactionRequest = null
-            section.value = "operations"
+            if (request.action == FinancialTransactionAction.DELETE) section.value = "operations"
             act(request)
         }
     }
@@ -73,7 +73,6 @@ fun HandleFinancialCreate(prefix: String, enabled: Boolean, create: (FinancialCr
     LaunchedEffect(request, enabled, scope.saving, scope.failed) {
         if (request != null && request.kind.prefix == prefix && enabled && !scope.saving && !scope.failed) {
             router.request = null
-            section.value = request.kind.section
             create(request)
         }
     }

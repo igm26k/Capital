@@ -199,14 +199,6 @@ fun FinancialDraftContent(context: Context, origin: String, owner: String, works
         catch (_: Exception) { failed = true }
     }
     val editor = rememberSaveable(origin, owner, workspace) { mutableStateOf<String?>(null) }
-    val section = LocalFinancialSection.current
-    LaunchedEffect(editor.value) {
-        when (editor.value) {
-            "account" -> section.value = "more"
-            "catalog" -> section.value = "more"
-            "transaction", "transfer", "refund", "adjustment" -> section.value = "operations"
-        }
-    }
     val loaded = scope
     val createRouter = LocalFinancialCreateRouter.current
     val canCreate = loaded != null && !loaded.saving && !loaded.failed

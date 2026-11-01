@@ -106,8 +106,7 @@ fun CatalogPanel(model: AuthViewModel) {
         }
     } else if (editorOpen) Dialog(onDismissRequest = ::close, properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)) {
         Surface(Modifier.padding(12.dp).widthIn(max = 560.dp).fillMaxWidth().heightIn(max = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp - 24).coerceAtLeast(100).dp), shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp)) {
-            Column(Modifier.imePadding().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Button(enabled = enabled && !scope.saving, onClick = ::close) { Text("Отмена") }
+            ModalScrollContent(if (collection == "categories") "Редактор категории" else "Редактор тега", ::close, enabled && !scope.saving) {
                 Button(enabled = !state.busy, onClick = model::loadCatalog) { Text("Обновить категории и теги") }
 
                 if (state.message.isNotEmpty()) Text(state.message)
@@ -120,7 +119,6 @@ fun CatalogPanel(model: AuthViewModel) {
                 TextButton(enabled = enabled && !scope.saving, onClick = { createCatalog("categories") }) { Text("Новая категория") }
                 TextButton(enabled = tagEnabled && !scope.saving, onClick = { createCatalog("tags") }) { Text("Новый тег") }
                 val category = collection == "categories"
-                Text(if (category) "Редактор категории" else "Редактор тега")
                 ValidatedTextField(name, { name = it }, if (category) "Название категории" else "Название тега", "name", validation, enabled)
                 if (category) {
                     Text("Родитель: ${if (parentId == null) "Корень" else categoryPath(parentId, state.categories)}")

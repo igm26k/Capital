@@ -154,9 +154,7 @@ fun AccountPanel(model: AuthViewModel) {
         if (managing) DraftGuardControls(guard, "account", enabled) { navigation.value = "account" }
     } else if (editorOpen) Dialog(onDismissRequest = ::close, properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)) {
         Surface(Modifier.padding(12.dp).widthIn(max = 560.dp).fillMaxWidth().heightIn(max = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp - 24).coerceAtLeast(100).dp), shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp)) {
-            Column(Modifier.imePadding().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Редактор счета", style = MaterialTheme.typography.headlineLarge)
-                Button(enabled = enabled && !scope.saving, onClick = ::close) { Text("Отмена") }
+            ModalScrollContent(if (editingId == null) "Новый счет" else "Изменить счет", ::close, enabled && !scope.saving) {
                 Button(enabled = !state.busy, onClick = model::loadAccounts) { Text("Обновить счета") }
 
                 if (state.message.isNotEmpty()) Text(state.message)
@@ -166,7 +164,6 @@ fun AccountPanel(model: AuthViewModel) {
                 }
                 DraftGuardControls(guard, "account", enabled)
                 FinancialCommandStatus(model, "Ваш черновик: $name, $type; ${if (archived) "в архив" else "активен"}")
-                Text(if (editingId == null) "Новый счет" else "Изменить счет", style = MaterialTheme.typography.titleMedium)
                 ValidatedTextField(name, { name = it }, if (editingId == null) "Название счета" else "Новое название счета", "name", validation, enabled)
                 HorizontalDivider()
                 Text("Тип счета", style = MaterialTheme.typography.titleSmall)

@@ -21,9 +21,7 @@ fun QueueRecovery(model: AuthViewModel) {
     val state = model.state
     Dialog(onDismissRequest = model::closeQueueRecovery, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(Modifier.fillMaxSize()) {
-            Column(Modifier.safeDrawingPadding().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Проверка сохранённых изменений", style = MaterialTheme.typography.headlineLarge)
-                Button(enabled = !state.busy, onClick = model::closeQueueRecovery) { Text("Закрыть проверку очереди") }
+            ModalScrollContent("Проверка сохранённых изменений", model::closeQueueRecovery, !state.busy, Modifier.safeDrawingPadding()) {
 
                 if (state.recoveryError.isNotEmpty()) Text(state.recoveryError)
                 val head = state.recoveryCommands.firstOrNull()

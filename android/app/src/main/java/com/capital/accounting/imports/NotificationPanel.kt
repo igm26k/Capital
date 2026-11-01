@@ -144,7 +144,7 @@ private fun BankMessagesContent(model:AuthViewModel,binding:NotificationBinding)
             FlowRow{TextButton(enabled=localEnabled,onClick={edit(value)}){Text("Изменить")};TextButton(enabled=localEnabled,onClick={mutate{store.configure(binding,value.copy(enabled=!value.enabled))}}){Text(if(value.enabled)"Выключить" else "Включить")};TextButton(enabled=localEnabled,onClick={deleting=value}){Text("Удалить")}}
         }
     }}
-    deleting?.let {value->AlertDialog(onDismissRequest={deleting=null},title={Text("Удалить правило банка?")},text={Text("Предложения, операции и защита от повторов сохранятся.")},confirmButton={TextButton(enabled=localEnabled,onClick={deleting=null;mutate {store.removeProfile(binding,value.id)}}){Text("Удалить правило")}},dismissButton={TextButton(onClick={deleting=null}){Text("Отмена")}})}
+    deleting?.let {value->com.capital.accounting.finance.CapitalAlertDialog(onDismissRequest={deleting=null},title={Text("Удалить правило банка?")},text={Text("Предложения, операции и защита от повторов сохранятся.")},confirmButton={TextButton(enabled=localEnabled,onClick={deleting=null;mutate {store.removeProfile(binding,value.id)}}){Text("Удалить правило")}},dismissButton={TextButton(onClick={deleting=null}){Text("Отмена")}})}
     if(editor){
         val known=profiles.find {it.id==profileId}
         val used=inbox?.items?.any {it.referencesProfile(profileId)}==true
@@ -171,7 +171,7 @@ private fun BankMessagesContent(model:AuthViewModel,binding:NotificationBinding)
             Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){OutlinedButton(enabled=!busy,onClick={editor=false;testText=""}){Text("Отмена")};Button(enabled=localEnabled,onClick=::saveRule){Text("Сохранить правило")}}
         }}
     }
-    if(autoConfirm)AlertDialog(onDismissRequest={autoConfirm=false},title={Text("Автоматические предварительные операции?")},text={Text("После успешной проверки шаблона новые однозначные сообщения будут отправляться на сервер и могут создавать предварительные операции. Окончательное подтверждение выполняется отдельно. Ручные примеры автоматически не отправляются.")},confirmButton={TextButton(onClick={automatic=true;autoConfirm=false}){Text("Включить для этого правила")}},dismissButton={TextButton(onClick={autoConfirm=false}){Text("Отмена")}})
+    if(autoConfirm)com.capital.accounting.finance.CapitalAlertDialog(onDismissRequest={autoConfirm=false},title={Text("Автоматические предварительные операции?")},text={Text("После успешной проверки шаблона новые однозначные сообщения будут отправляться на сервер и могут создавать предварительные операции. Окончательное подтверждение выполняется отдельно. Ручные примеры автоматически не отправляются.")},confirmButton={TextButton(onClick={automatic=true;autoConfirm=false}){Text("Включить для этого правила")}},dismissButton={TextButton(onClick={autoConfirm=false}){Text("Отмена")}})
     Card(Modifier.fillMaxWidth(),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surface)){Column(Modifier.padding(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
         Text("Распознать сообщение",style=MaterialTheme.typography.titleMedium)
         CapitalSelect("Банк и правило",selectedId,profiles.filter {it.enabled}.map {it.id to "${it.bankName.ifEmpty {it.packageName}} · ${if(it.channel=="sms")"SMS" else "Push"} · ${if(it.kind=="expense")"Расход" else "Доход"}"},localEnabled){selectedId=it;preview=null}

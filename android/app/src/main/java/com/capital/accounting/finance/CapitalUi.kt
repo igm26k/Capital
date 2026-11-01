@@ -102,7 +102,7 @@ fun CapitalSelect(label: String, value: String, options: List<Pair<String, Strin
                 LaunchedEffect(query) { scroll.scrollTo(0) }
                 Surface(Modifier.padding(12.dp).widthIn(max = 560.dp).fillMaxWidth().heightIn(max = (LocalConfiguration.current.screenHeightDp - 48).coerceAtLeast(160).dp), shape = RoundedCornerShape(16.dp)) {
                     Column(Modifier.imePadding().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text(label, style = MaterialTheme.typography.titleLarge)
+                        ModalHeader({ Text(label, style = MaterialTheme.typography.titleLarge) }, { expanded = false })
                         OutlinedTextField(query, { query = it }, label = { Text("Поиск: $label") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                         Text("Найдено: ${filtered.size}", style = MaterialTheme.typography.bodySmall)
                         Box(Modifier.weight(1f, fill = false).fillMaxWidth()) {
@@ -151,6 +151,8 @@ fun AccountSelect(label: String, value: String, options: List<Pair<String, Strin
 @Composable
 fun CapitalIcon(name: String, modifier: Modifier = Modifier.size(24.dp), color: Color = LocalContentColor.current) {
     val source = when (name) {
+        "close" -> "M6 6l12 12M18 6L6 18"
+        "back" -> "M15 5l-7 7 7 7"
         "drag" -> "M9 5h.01M15 5h.01M9 12h.01M15 12h.01M9 19h.01M15 19h.01"
         "food" -> "M4 3v6a2 2 0 0 0 4 0V3M6 3v18M16 3v18M16 3c5 4 5 9 0 9"
         "shop" -> "M4 7h16l1 14H3L4 7M8 7V5a4 4 0 0 1 8 0v2"

@@ -18,6 +18,22 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
 
+private fun AlertDialog.withCloseHeader(label: String): AlertDialog {
+    val density = context.resources.displayMetrics.density
+    val row = android.widget.LinearLayout(context).apply {
+        orientation = android.widget.LinearLayout.HORIZONTAL
+        gravity = android.view.Gravity.CENTER_VERTICAL
+        setPadding((16 * density).toInt(), (8 * density).toInt(), (8 * density).toInt(), 0)
+    }
+    row.addView(android.widget.TextView(context).apply { text = label; textSize = 20f }, android.widget.LinearLayout.LayoutParams(0, android.view.ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+    row.addView(android.widget.Button(context).apply {
+        text = "×"; textSize = 24f; contentDescription = "Закрыть окно"
+        setOnClickListener { dismiss() }
+    }, android.widget.LinearLayout.LayoutParams((48 * density).toInt(), (48 * density).toInt()))
+    setCustomTitle(row)
+    return this
+}
+
 @Composable
 fun OperationDateField(value: String, onChange: (String) -> Unit, enabled: Boolean) {
     val context = LocalContext.current
@@ -40,9 +56,9 @@ fun OperationDateField(value: String, onChange: (String) -> Unit, enabled: Boole
                         .setPositiveButton("Готово") { _, _ ->
                             calendar.set(Calendar.SECOND, seconds.value)
                             onChange(storage.format(calendar.time))
-                        }.setNegativeButton("Отмена", null).show()
-                }, calendar.get(Calendar.HOUR_OF_DAY), calendar.get(Calendar.MINUTE), true).show()
-            }, calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH)).show()
+                        }.setNegativeButton("Отмена", null).create().withCloseHeader("Секунды").show()
+                }, calendar.get(Calendar.HOUR_OF_DAY), calendar.get(Calendar.MINUTE), true).withCloseHeader("Время операции").show()
+            }, calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH)).withCloseHeader("Дата операции").show()
         })
     }
 }

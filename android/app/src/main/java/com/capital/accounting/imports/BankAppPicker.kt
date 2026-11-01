@@ -35,7 +35,7 @@ fun BankAppPicker(packageName:String,enabled:Boolean,selected:(String)->Unit) {
     if(message.isNotEmpty())Text(message)
     TextButton(enabled=enabled,onClick={manual=!manual}){Text("Указать пакет приложения вручную")}
     if(manual)OutlinedTextField(packageName,{selected(it.take(200))},enabled=enabled,label={Text("Пакет банковского приложения")})
-    if(open)AlertDialog(onDismissRequest={open=false},title={Text("Приложение для уведомлений")},text={Column(Modifier.heightIn(max=360.dp).verticalScroll(rememberScrollState())){
+    if(open)com.capital.accounting.finance.CapitalAlertDialog(onDismissRequest={open=false},title={Text("Приложение для уведомлений")},text={Column(Modifier.heightIn(max=360.dp).verticalScroll(rememberScrollState())){
         OutlinedTextField(query,{query=it},label={Text("Найти установленное приложение")})
         if(busy)CircularProgressIndicator()
         apps.filter {it.label.contains(query,true)||it.packageName.contains(query,true)}.take(100).forEach {app->TextButton(enabled=enabled,onClick={selected(app.packageName);open=false}){Column {Text(app.label);Text(app.packageName,style=MaterialTheme.typography.bodySmall)}}}

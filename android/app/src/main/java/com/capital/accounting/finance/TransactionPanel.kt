@@ -164,8 +164,7 @@ fun TransactionPanel(model: AuthViewModel) {
         DraftGuardControls(guard, "transaction", enabled) { navigation.value = "transaction" }
     } else if (editorOpen) Dialog(onDismissRequest = ::close, properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)) {
         Surface(Modifier.padding(12.dp).widthIn(max = 560.dp).fillMaxWidth().heightIn(max = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp - 24).coerceAtLeast(100).dp), shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp)) {
-            Column(Modifier.imePadding().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Button(enabled = enabled && !scope.saving, onClick = ::close) { Text("Отмена") }
+            ModalScrollContent(if (editingId == null) "Новая операция" else "Изменение операции", ::close, enabled && !scope.saving) {
 
                 if (state.message.isNotEmpty()) Text(state.message)
                 if (scope.failed) {
@@ -174,7 +173,6 @@ fun TransactionPanel(model: AuthViewModel) {
                 }
                 FinancialCommandStatus(model)
                 DraftGuardControls(guard, "transaction", enabled)
-                Text(if (editingId == null) "Новая операция" else "Изменение операции", style = MaterialTheme.typography.titleLarge)
                 if (editingId == null) OperationTypeSelect(model, kind, enabled)
                 AccountSelect("Счет", account?.id ?: "", eligible.map { it.id to "${it.name} · ${it.currency}" }, enabled) { accountId = it }
                 Text(if (account == null) "Добавьте активный счет в Настройки → Счета." else "Выбран счет: ${account.name} · ${account.currency}")
