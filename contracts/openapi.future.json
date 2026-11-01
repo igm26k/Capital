@@ -4880,6 +4880,54 @@
           "payee"
         ],
         "additionalProperties": false
+      },
+      "AccountOrder": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]{0,18})$",
+            "description": "Non-negative int64 encoded as a string; 0 denotes an unsaved order."
+          },
+          "account_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "version",
+          "account_ids"
+        ],
+        "additionalProperties": false
+      },
+      "AccountOrderUpdate": {
+        "type": "object",
+        "properties": {
+          "expected_version": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]{0,18})$",
+            "description": "Non-negative int64 encoded as a string; 0 denotes an unsaved order."
+          },
+          "account_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "maxItems": 2000,
+            "uniqueItems": true,
+            "minItems": 1
+          }
+        },
+        "required": [
+          "expected_version",
+          "account_ids"
+        ],
+        "additionalProperties": false
       }
     },
     "parameters": {

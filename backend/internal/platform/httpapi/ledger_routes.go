@@ -20,6 +20,11 @@ func MountLedger(mux *http.ServeMux, runner *commands.Runner, options AuthOption
 		v, _ := ledger.DecodeAccountCreate(body)
 		return ledger.CreateAccount(r.PathValue("workspace_id"), v)
 	}))
+	mux.HandleFunc("PUT /api/v1/workspaces/{workspace_id}/accounts/order", mutationHandler(runner, options, func(body []byte) error { _, e := ledger.DecodeAccountOrder(body); return e }, func(r *http.Request, body []byte) commands.Command {
+		v, _ := ledger.DecodeAccountOrder(body)
+		return ledger.ReorderAccounts(r.PathValue("workspace_id"), v)
+	}))
+
 	mux.HandleFunc("PUT /api/v1/workspaces/{workspace_id}/accounts/{id}", mutationHandler(runner, options, func(body []byte) error { _, e := ledger.DecodeAccountUpdate(body); return e }, func(r *http.Request, body []byte) commands.Command {
 		v, _ := ledger.DecodeAccountUpdate(body)
 		return ledger.UpdateAccount(r.PathValue("workspace_id"), r.PathValue("id"), v)
@@ -113,6 +118,15 @@ func MountLedger(mux *http.ServeMux, runner *commands.Runner, options AuthOption
 					return e
 				}
 			}
+			if strings.HasSuffix(r.URL.Path, "/accounts/order") {
+				if r.URL.RawQuery != "" {
+					return fail(400, "bad_request")
+				}
+				order, err := ledger.ReadAccountOrder(r.Context(), tx, workspace)
+				result = order
+				return err
+			}
+
 			if r.URL.Path == "/api/v1/currencies" {
 				if r.URL.RawQuery != "" {
 					return fail(400, "bad_request")
@@ -214,6 +228,7 @@ func MountLedger(mux *http.ServeMux, runner *commands.Runner, options AuthOption
 	mux.HandleFunc("GET /api/v1/workspaces/{workspace_id}/transactions/{id}", read)
 	mux.HandleFunc("GET /api/v1/workspaces/{workspace_id}/transactions", read)
 	mux.HandleFunc("GET /api/v1/currencies", read)
+	mux.HandleFunc("GET /api/v1/workspaces/{workspace_id}/accounts/order", read)
 	mux.HandleFunc("GET /api/v1/workspaces/{workspace_id}/accounts", read)
 	mux.HandleFunc("GET /api/v1/workspaces/{workspace_id}/accounts/{id}", read)
 	mux.HandleFunc("GET /api/v1/workspaces/{workspace_id}/accounts/{id}/opening", read)

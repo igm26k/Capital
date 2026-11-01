@@ -155,6 +155,9 @@ func accessTemplate(path string) string {
 	return strings.Replace(path, "/workspaces/{id}/", "/workspaces/{workspace_id}/", 1)
 }
 func accessSchema(method, path string, status int) string {
+	if method == "GET" && status == 200 && strings.HasSuffix(path, "/accounts/order") {
+		return "AccountOrder"
+	}
 	if status >= 400 {
 		return "Error"
 	}
@@ -329,7 +332,7 @@ func (f *accessFixture) account(a identity.Auth) string {
 	return id
 }
 func (f *accessFixture) digest() [32]byte {
-	tables := []string{"accounts", "categories", "tags", "transactions", "entries", "allocations", "transaction_tags", "actions", "sync_heads", "sync_groups", "sync_changes", "audit_events", "sync_snapshots", "sync_snapshot_items"}
+	tables := []string{"account_orders", "accounts", "categories", "tags", "transactions", "entries", "allocations", "transaction_tags", "actions", "sync_heads", "sync_groups", "sync_changes", "audit_events", "sync_snapshots", "sync_snapshot_items"}
 	parts := []string{}
 	for _, table := range tables {
 		parts = append(parts, "'"+table+"',(SELECT coalesce(jsonb_agg(to_jsonb(r) ORDER BY to_jsonb(r)::text),'[]'::jsonb) FROM "+table+" r)")
@@ -426,6 +429,9 @@ func TestAccess(t *testing.T) {
 	// mounted (a missing handler would be 404), then 404 tests membership first.
 	routes := []accessRequest{
 		{method: "GET", path: rb + "/reports?from=2026-10-01T00:00:00Z&to=2026-11-01T00:00:00Z"},
+		{method: "GET", path: rb + "/accounts/order"},
+		{method: "PUT", path: rb + "/accounts/order", body: map[string]any{"expected_version": "0", "account_ids": []string{foreign.account}}},
+
 		{method: "GET", path: rb + "/accounts"}, {method: "GET", path: rb + "/accounts/" + foreign.account},
 		{method: "GET", path: rb + "/accounts/" + foreign.account + "/opening"},
 		{method: "POST", path: rb + "/accounts", body: map[string]any{"id": f.id(), "name": "Denied", "type": "bank", "currency": "EUR", "opened_at": "2026-01-01T00:00:00Z", "occurred_timezone": "UTC", "opening_balance_minor": "0"}},

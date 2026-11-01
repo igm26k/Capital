@@ -14,6 +14,7 @@ func TestUserData(t *testing.T) {
 	b := f.b
 	account := f.account(a)
 	other := f.account(b)
+	f.call(accessRequest{method: "PUT", path: accessRoot(a) + "/accounts/order", actor: a, key: f.id(), body: map[string]any{"expected_version": "1", "account_ids": []string{account}}}, 200, "")
 	source := f.sourceEvent(account)
 	f.call(accessRequest{method: "POST", path: accessRoot(a) + "/source-events", actor: a, key: f.id(), body: source}, 201, "")
 	body := f.basic(account, "expense")

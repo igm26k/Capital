@@ -38,9 +38,11 @@ func ExportUserData(ctx context.Context, tx pgx.Tx, p Principal) (UserDataExport
 	}
 	for _, w := range spaces {
 		value := map[string]any{"id": w.id, "name": w.name}
-		for _, table := range []string{"accounts", "transactions", "entries", "allocations", "categories", "tags", "transaction_tags", "planning_resources", "csv_imports", "csv_rows", "csv_sources", "source_events", "transaction_sources"} {
+		for _, table := range []string{"account_orders", "accounts", "transactions", "entries", "allocations", "categories", "tags", "transaction_tags", "planning_resources", "csv_imports", "csv_rows", "csv_sources", "source_events", "transaction_sources"} {
 			expression := "to_jsonb(t)"
 			switch table {
+			case "account_orders":
+				expression += "||jsonb_build_object('version',t.version::text)"
 			case "accounts":
 				expression += "||jsonb_build_object('version',t.version::text,'balance_version',t.balance_version::text)"
 			case "categories", "tags", "planning_resources":
@@ -143,7 +145,7 @@ func (s *Service) DeleteUserData(ctx context.Context, tx pgx.Tx, p Principal, pa
 		if _, err := tx.Exec(ctx, `SELECT workspace_id FROM sync_heads WHERE workspace_id=$1 FOR UPDATE`, id); err != nil {
 			return err
 		}
-		for _, table := range []string{"transaction_sources", "source_events", "csv_sources", "csv_rows", "csv_imports", "planning_audit", "planning_actions", "planning_resources", "sync_snapshot_items", "sync_snapshots", "audit_events", "sync_changes", "sync_groups", "actions", "transaction_tags", "allocations", "entries", "transactions", "accounts", "categories", "tags", "sync_heads", "memberships"} {
+		for _, table := range []string{"account_orders", "transaction_sources", "source_events", "csv_sources", "csv_rows", "csv_imports", "planning_audit", "planning_actions", "planning_resources", "sync_snapshot_items", "sync_snapshots", "audit_events", "sync_changes", "sync_groups", "actions", "transaction_tags", "allocations", "entries", "transactions", "accounts", "categories", "tags", "sync_heads", "memberships"} {
 			if _, err := tx.Exec(ctx, `DELETE FROM `+table+` WHERE workspace_id=$1`, id); err != nil {
 				return err
 			}

@@ -30,10 +30,11 @@ test('accounts match Android, filters and history navigation preserve SPA and br
   await manageAccounts(page);
   await page.getByRole('button', { name: 'Архивные счета', exact: true }).click();
   await expect(page.getByLabel('Итоги счетов в настройках')).toContainText('7,00 USD');
-  await page.getByRole('button', { name: 'Операции счета Старая карта' }).click();
+  await expect(page.getByRole('button', { name: 'Изменить счет Старая карта', exact: true })).toBeVisible();
+  await page.getByRole('navigation', { name: 'Основная навигация' }).getByRole('link', { name: 'Операции', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'История операций' })).toBeVisible();
   await page.getByText('Фильтры операций', { exact: true }).click();
-  await expect(page.getByLabel('Счет истории', { exact: true })).toHaveValue('archive');
+  await page.getByLabel('Счет истории', { exact: true }).selectOption('archive');
   await page.getByRole('navigation').getByRole('link', { name: 'Настройки', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Группы настроек', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Управление счетами', exact: false })).toBeVisible();

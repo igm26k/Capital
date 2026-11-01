@@ -173,6 +173,9 @@ func CreateAccount(workspace string, input AccountCreate) commands.Command {
 				return commands.Mutation{}, e
 			}
 		}
+		if e = appendAccountOrder(ctx, tx, workspace, input.ID); e != nil {
+			return commands.Mutation{}, e
+		}
 		account, e := ReadAccount(ctx, tx, workspace, input.ID)
 		if e != nil {
 			return commands.Mutation{}, e

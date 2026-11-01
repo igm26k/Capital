@@ -4581,6 +4581,154 @@
           }
         }
       }
+    },
+    "/workspaces/{workspace_id}/accounts/order": {
+      "get": {
+        "operationId": "accounts_order_read",
+        "summary": "Read saved display order, including archived accounts; new accounts append",
+        "tags": [
+          "accounts"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountOrder"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        }
+      },
+      "put": {
+        "operationId": "accounts_order_update",
+        "summary": "Atomically replace display order of all accounts",
+        "tags": [
+          "accounts"
+        ],
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfToken": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          },
+          {
+            "$ref": "#/components/parameters/ActionId"
+          },
+          {
+            "$ref": "#/components/parameters/SyncGeneration"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MutationResult"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true for a retained replay response; false for first completion",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountOrderUpdate"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -9327,6 +9475,54 @@
           "reason",
           "note",
           "payee"
+        ],
+        "additionalProperties": false
+      },
+      "AccountOrder": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]{0,18})$",
+            "description": "Non-negative int64 encoded as a string; 0 denotes an unsaved order."
+          },
+          "account_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "version",
+          "account_ids"
+        ],
+        "additionalProperties": false
+      },
+      "AccountOrderUpdate": {
+        "type": "object",
+        "properties": {
+          "expected_version": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]{0,18})$",
+            "description": "Non-negative int64 encoded as a string; 0 denotes an unsaved order."
+          },
+          "account_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "maxItems": 2000,
+            "uniqueItems": true,
+            "minItems": 1
+          }
+        },
+        "required": [
+          "expected_version",
+          "account_ids"
         ],
         "additionalProperties": false
       }

@@ -3,6 +3,7 @@ import { request, listAll, RequestError, type Category, type Tag, type Auth, typ
 import { PrivacyPanel } from './features/auth/PrivacyPanel';
 import { SessionManager } from './features/auth/SessionManager';
 import { AuthForm } from './features/auth/AuthForm';
+import { orderAccounts, type AccountOrder } from './shared/accountOrder';
 import { AccountManager } from './features/accounts/AccountManager';
 import { TransferForm } from './features/transactions/TransferForm';
 import { TransactionForm } from './features/transactions/TransactionForm';
@@ -30,7 +31,7 @@ const storageKey = 'accounting.pending.v1';
 function restore(auth: Auth): Command | null {
   try {
     const value = JSON.parse(sessionStorage.getItem(storageKey) ?? 'null') as Command | null;
-    if (value?.owner === auth.profile.id && value.session === auth.session.id && value.workspace === auth.workspace.id && typeof value.body === 'string' && typeof value.key === 'string' && typeof value.generation === 'string' && (!value.method || ['POST', 'PUT', 'DELETE'].includes(value.method)) && new RegExp(`^/workspaces/${value.workspace}/(?:(?:accounts|transactions|categories|tags)(?:/[0-9a-f-]{36})?|accounts/[0-9a-f-]{36}/adjustments|transactions/classification)$`).test(value.path)) return value;
+    if (value?.owner === auth.profile.id && value.session === auth.session.id && value.workspace === auth.workspace.id && typeof value.body === 'string' && typeof value.key === 'string' && typeof value.generation === 'string' && (!value.method || ['POST', 'PUT', 'DELETE'].includes(value.method)) && new RegExp(`^/workspaces/${value.workspace}/(?:(?:accounts|transactions|categories|tags)(?:/[0-9a-f-]{36})?|accounts/[0-9a-f-]{36}/adjustments|accounts/order|transactions/classification)$`).test(value.path)) return value;
     sessionStorage.removeItem(storageKey);
   } catch { /* Storage unavailable: retries remain available while this page is open. */ }
   return null;
@@ -63,6 +64,7 @@ export function App() {
  const [reportHistoryQuery,setReportHistoryQuery]=useState<string>();
   const [needsRefresh, setNeedsRefresh] = useState(false);
   const [auth, setAuth] = useState<Auth | null>(null), [starting, setStarting] = useState(true), [startupError, setStartupError] = useState('');
+  const [accountOrder, setAccountOrder] = useState<AccountOrder>({ version: '0', account_ids: [] });
   const [accounts, setAccounts] = useState<Account[]>([]), [historyRevision, setHistoryRevision] = useState(0);
   const [resourceConflict, setResourceConflict] = useState<ResourceComparison | null>(null), [resourceRevision, setResourceRevision] = useState(0);
   const [bulkConflict, setBulkConflict] = useState<BulkComparison | null>(null);
@@ -85,11 +87,11 @@ export function App() {
     setLoading(true);
     try {
       const root = `/workspaces/${value.workspace.id}`;
-      const [a, w, c, tags] = await Promise.all([listAll<Account>(`${root}/accounts?archived=include`), request<List<Workspace>>('/workspaces'), listAll<Category>(`${root}/categories?archived=include`), listAll<Tag>(`${root}/tags?archived=include`)]);
+      const [a, w, c, tags, order] = await Promise.all([listAll<Account>(`${root}/accounts?archived=include`), request<List<Workspace>>('/workspaces'), listAll<Category>(`${root}/categories?archived=include`), listAll<Tag>(`${root}/tags?archived=include`), request<AccountOrder>(`${root}/accounts/order`)]);
       const workspace = w.items.find(item => item.id === value.workspace.id);
       if (!workspace) throw new Error('Пространство недоступно.');
       if (activeSession.current !== value.session.id) return;
-      setNeedsRefresh(false); setAccounts(a); setHistoryRevision(v => v + 1); setBulkConflict(null); setCategories(c); setTags(tags); setAuth(current => current && current.session.id === value.session.id ? { ...current, workspace } : current);
+      setNeedsRefresh(false); setAccountOrder({ version: order.version ?? '0', account_ids: order.account_ids ?? [] }); setAccounts(orderAccounts(a, order.account_ids)); setHistoryRevision(v => v + 1); setBulkConflict(null); setCategories(c); setTags(tags); setAuth(current => current && current.session.id === value.session.id ? { ...current, workspace } : current);
     } finally { setLoading(false); }
   }
   function showError(value: unknown) {
@@ -113,6 +115,10 @@ export function App() {
         if (error.code === 'sync_generation_conflict') { setNeedsRefresh(true); setError('Данные восстановлены или изменены на сервере. Обновите список и проверьте данные перед новой операцией.'); }
         else if (error.status === 409) {
           setError(`Конфликт: ${error.message}. Обновите данные перед повторным вводом.`);
+          if (command.path.endsWith('/accounts/order')) {
+            try { await refresh(auth); setError('Порядок или список счетов изменился. Отмените несохраненный порядок и расставьте счета заново.'); }
+            catch { setError('Не удалось обновить порядок счетов. Обновите данные перед повторным сохранением.'); }
+          }
           const resource = command.path.match(/\/(accounts|categories|tags)\/[0-9a-f-]{36}$/);
           if (error.code === 'version_conflict' && command.method === 'PUT' && resource) {
             try {
@@ -226,7 +232,7 @@ export function App() {
     <div hidden={section !== "more"} className="screen" aria-label="Настройки">
     <SettingsNavigation value={settingsGroup} change={setSettingsGroup} active={section === 'more'} />
     <div className="settings-group" hidden={settingsGroup !== 'accounts'}>
-    <AccountManager manage records={() => showRecords()} history={id => showRecords(`account_id=${encodeURIComponent(id)}`)} key={`manage-accounts-${formVersion}-${resourceRevision}`} accounts={accounts} disabled={busy || loading || !!pending || needsRefresh || !online} loading={loading} submit={create} fail={setError} />
+    <AccountManager manage orderVersion={accountOrder.version} records={() => showRecords()} history={id => showRecords(`account_id=${encodeURIComponent(id)}`)} key={`manage-accounts-${formVersion}-${resourceRevision}`} accounts={accounts} disabled={busy || loading || !!pending || needsRefresh || !online} loading={loading} submit={create} fail={setError} />
     </div>
     <div className="settings-group" hidden={settingsGroup !== 'classification'}>
     <ClassificationManager key={`classification-${formVersion}-${resourceRevision}`} categories={categories} tags={tags} disabled={busy || loading || !!pending || needsRefresh || !online} submit={create} fail={setError} />
