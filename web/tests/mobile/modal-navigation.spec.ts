@@ -60,3 +60,13 @@ test('a deep link still has dashboard as its first screen, and Back dismisses th
   await expect(operation).toHaveCount(0);
   await expect(page.getByRole('region', { name: 'Структура расходов', exact: true })).toBeVisible();
 });
+
+test('Back leaves no selector dialog open on the previous screen', async ({ page }) => {
+  await page.goto('/#operations');
+  await page.getByRole('button', { name: 'Добавить операцию', exact: true }).click();
+  await page.getByRole('dialog', { name: 'Новая операция' }).getByRole('button', { name: 'Счет', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Выбор: Счет' })).toBeVisible();
+  await page.goBack();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByRole('region', { name: 'Структура расходов', exact: true })).toBeVisible();
+});

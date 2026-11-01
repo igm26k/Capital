@@ -16,7 +16,15 @@ function SelectOptions({ label, value, options, choose, close }: { label: string
   useEffect(() => {
     const node = dialog.current!, previous = document.activeElement;
     node.showModal();
-    return () => { node.close(); if (previous instanceof HTMLElement && previous.isConnected) previous.focus(); };
+    const leaveScreen = () => close();
+    window.addEventListener('popstate', leaveScreen);
+    window.addEventListener('hashchange', leaveScreen);
+    return () => {
+      window.removeEventListener('popstate', leaveScreen);
+      window.removeEventListener('hashchange', leaveScreen);
+      node.close();
+      if (previous instanceof HTMLElement && previous.isConnected) previous.focus();
+    };
   }, []);
   useLayoutEffect(() => {
     if (list.current) list.current.scrollTop = 0;
