@@ -70,3 +70,13 @@ test('Back leaves no selector dialog open on the previous screen', async ({ page
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page.getByRole('region', { name: 'Структура расходов', exact: true })).toBeVisible();
 });
+
+test('Back from a modal opened on the dashboard returns to that dashboard', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Добавить операцию', exact: true }).click();
+  await page.getByRole('dialog', { name: 'Новая операция' }).getByRole('combobox', { name: 'Тип операции', exact: true }).selectOption('income');
+  await page.goBack();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByRole('region', { name: 'Структура расходов', exact: true })).toBeVisible();
+  expect(new URL(page.url()).hash).toBe('#accounts');
+});

@@ -9,13 +9,20 @@ type Props = { accounts: Account[]; categories: Category[]; tags: Tag[]; disable
 export function OperationModal({ accounts, categories, tags, disabled, saving, error, submit, cancel }: Props) {
   const [kind, setKind] = useState<Kind>('expense'), [validation, setValidation] = useState('');
   const dialog = useRef<HTMLDialogElement>(null), id = useId();
+  const savingRef = useRef(saving); savingRef.current = saving;
   const basicID = `${id}-basic`, transferID = `${id}-transfer`, adjustmentID = `${id}-adjustment`;
   const formID = kind === 'transfer' ? transferID : kind === 'adjustment' ? adjustmentID : basicID;
   useEffect(() => {
     const element = dialog.current!, previous = document.activeElement, overflow = document.body.style.overflow;
     element.showModal(); document.body.style.overflow = 'hidden';
+    const root = history.state?.capitalScreen && history.state.depth === 0;
+    if (root && history.state.capitalModal !== id) history.pushState({ ...history.state, capitalModal: id }, '', location.href);
+    const leave = () => { if (!savingRef.current) cancel(); };
+    window.addEventListener('popstate', leave);
     return () => {
+      window.removeEventListener('popstate', leave);
       element.close(); document.body.style.overflow = overflow;
+      queueMicrotask(() => { if (!element.open && history.state?.capitalModal === id) history.back(); });
       if (previous instanceof HTMLElement && previous.offsetParent !== null) previous.focus();
       else document.querySelector<HTMLButtonElement>('.operations-add')?.focus();
     };
