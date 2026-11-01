@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -88,12 +89,12 @@ fun FinancialAddButton(model: AuthViewModel, router: FinancialCreateRouter) {
     }
     if (!router.editorOpen && state.detailStack.isEmpty() && section != "more") {
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp), horizontalArrangement = Arrangement.End) {
-            FloatingActionButton(modifier = Modifier.semantics { contentDescription = if (section == "accounts") "Добавить счет" else "Добавить операцию" }, onClick = {
+            FloatingActionButton(shape = CircleShape, modifier = Modifier.size(58.dp).semantics { contentDescription = if (section == "accounts") "Добавить счет" else "Добавить операцию" }, onClick = {
                 if (enabled) {
                     if (section == "accounts") select(FinancialCreationRequest(FinancialCreation.ACCOUNT))
                     else if (!router.routeToFirstAccount(state)) select(FinancialCreationRequest(FinancialCreation.EXPENSE))
                 }
-            }, containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary) { Text("+", style = MaterialTheme.typography.headlineMedium) }
+            }, containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary) { CapitalIcon("plus", Modifier.size(28.dp)) }
         }
     }
 }

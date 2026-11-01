@@ -157,7 +157,7 @@ fun TransactionPanel(model: AuthViewModel) {
         if (bulkOpen && navigation.value == null) BulkClassificationControls(bulk)
         DraftGuardControls(guard, "transaction", enabled) { navigation.value = "transaction" }
     } else if (editorOpen) Dialog(onDismissRequest = ::close, properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)) {
-        Surface(Modifier.fillMaxWidth().heightIn(max = 760.dp), shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp)) {
+        Surface(Modifier.padding(12.dp).widthIn(max = 560.dp).fillMaxWidth().heightIn(max = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp - 24).coerceAtLeast(100).dp), shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp)) {
             Column(Modifier.imePadding().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Button(enabled = enabled && !scope.saving, onClick = ::close) { Text("Отмена") }
                 if (state.busy) CircularProgressIndicator()

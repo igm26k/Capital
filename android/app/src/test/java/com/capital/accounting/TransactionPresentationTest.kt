@@ -19,10 +19,10 @@ class TransactionPresentationTest {
         assertEquals("Переоценка", transactionReason("Переоценка"))
         assertNull(transactionReason(null))
     }
-    @Test fun compactAmountsPreserveEveryMinorUnitAndCurrency() {
+    @Test fun webAmountsPreserveEveryMinorUnitAndCurrency() {
         assertEquals("499,65 €", capitalMoney("49965", "EUR"))
         assertEquals("−0,01 $", capitalMoney("-1", "USD"))
-        assertEquals("2 800,00 ₽", capitalMoney("280000", "RUB"))
-        assertEquals("180 000 000 000 000,00 €", capitalMoney("18000000000000000", "EUR"))
+        assertEquals("2800,00 ₽", capitalMoney("280000", "RUB"))
+        assertEquals("180000000000000,00 €", capitalMoney("18000000000000000", "EUR"))
     }
 }

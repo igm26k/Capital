@@ -11,6 +11,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.shape.RoundedCornerShape
 import com.capital.accounting.api.*
 import com.capital.accounting.auth.AuthViewModel
 import kotlinx.serialization.encodeToString
@@ -86,9 +89,13 @@ fun AccountPanel(model: AuthViewModel) {
     if (navigation.value == null && section.value == "accounts") FinancialCommandStatus(model, "Ваш черновик: $name, $type; ${if (archived) "в архив" else "активен"}")
     if (!editorOpen && section.value == "accounts") {
         var settings by rememberSaveable { mutableStateOf(false) }
+        val visibleCount = state.accounts.count { it.deleted_at == null && when (accountFilter) { "archived" -> it.archived_at != null; "all" -> true; else -> it.archived_at == null } }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text("Счета", style = MaterialTheme.typography.titleLarge)
-            TextButton(onClick = { settings = !settings }) { Text("⚙", style = MaterialTheme.typography.titleLarge) }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                Text("Список счетов", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                Text("$visibleCount", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            FilledTonalIconButton(onClick = { settings = !settings }, modifier = Modifier.size(48.dp), shape = RoundedCornerShape(12.dp)) { CapitalIcon("settings") }
         }
         if (settings) {
             CapitalSelect("Показать счета", accountFilter, listOf("active" to "Активные", "archived" to "Архивные", "all" to "Все")) { accountFilter = it }
@@ -99,22 +106,20 @@ fun AccountPanel(model: AuthViewModel) {
         CapitalAccountGrid(visibleAccounts, enabled && !scope.saving, settings, ::createAccount,
             onOpen = { account -> model.applyHistoryFilter(TransactionFilter(accountId = account.id)); section.value = "operations" },
             onEdit = { account -> guard.request { editingId = account.id; editingVersion = account.version; currency = account.currency; editingBalance = account.posted_balance_minor; name = account.name; type = account.type; archived = account.archived_at != null; error = ""; validation.reset(); navigation.value = "account" } })
-        if (visibleAccounts.isNotEmpty()) Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("Всего по валютам", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                visibleAccounts.groupBy { it.currency }.toSortedMap().forEach { (currency, accounts) ->
-                    Text(Money.displayTotal(accounts.map { it.posted_balance_minor }, currency), style = MaterialTheme.typography.titleMedium)
-                }
+        if (visibleAccounts.isNotEmpty()) FlowRow(Modifier.fillMaxWidth().padding(start = 2.dp, top = 14.dp, bottom = 2.dp), horizontalArrangement = Arrangement.spacedBy(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("Всего", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            visibleAccounts.groupBy { it.currency }.toSortedMap().forEach { (currency, accounts) ->
+                Text(Money.displayTotal(accounts.map { it.posted_balance_minor }, currency), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
             }
         }
-        HomeOverview(model)
-        Text("Последние операции", style = MaterialTheme.typography.titleMedium)
-        state.transactions.filter { it.status == "posted" && it.deleted_at == null }.sortedByDescending { it.occurred_at }.take(5).forEach { CapitalOperationRow(model, it) }
-        TextButton(onClick = { section.value = "operations" }) { Text("Все операции") }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            TextButton(onClick = { section.value = "operations" }) { CapitalIcon("records", Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text("ЗАПИСИ", fontSize = 12.sp); Spacer(Modifier.width(8.dp)); CapitalIcon("arrow", Modifier.size(18.dp)) }
+        }
+        CapitalHomeOverview(model)
         if (settings) TextButton(enabled = enabled && !scope.saving, onClick = { navigation.value = "account" }) { Text("Открыть черновик счета") }
         DraftGuardControls(guard, "account", enabled) { navigation.value = "account" }
     } else if (editorOpen) Dialog(onDismissRequest = ::close, properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)) {
-        Surface(Modifier.fillMaxWidth().heightIn(max = 760.dp), shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp)) {
+        Surface(Modifier.padding(12.dp).widthIn(max = 560.dp).fillMaxWidth().heightIn(max = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp - 24).coerceAtLeast(100).dp), shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp)) {
             Column(Modifier.imePadding().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Редактор счета", style = MaterialTheme.typography.headlineLarge)
                 Button(enabled = enabled && !scope.saving, onClick = ::close) { Text("Отмена") }

@@ -26,6 +26,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.font.FontWeight
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.capital.accounting.auth.AuthViewModel
 import com.capital.accounting.finance.FinancialDraftContent
@@ -64,21 +66,22 @@ class MainActivity : ComponentActivity() {
             BackHandler {
                 if (state.auth != null) navigation.back()
             }
-            MaterialTheme(colorScheme = capitalColors(isSystemInDarkTheme())) {
+            MaterialTheme(colorScheme = capitalColors(isSystemInDarkTheme()), typography = capitalTypography) {
                 CompositionLocalProvider(LocalFinancialSection provides section, LocalFinancialCreateRouter provides createRouter, LocalSettingsGroup provides settingsGroup) {
                     if (state.auth != null && state.recoveryOpen) QueueRecovery(model)
                     if (state.auth != null && state.detailStack.isNotEmpty()) TransactionDetails(model)
                     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                        Column(Modifier.fillMaxSize()) {
-                            Surface(color = Color(0xff1f3155), contentColor = Color.White) {
-                                Row(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 20.dp, vertical = 8.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                                    Text("Capital", style = MaterialTheme.typography.headlineSmall)
+                        Box(Modifier.fillMaxSize()) {
+                            Column(Modifier.fillMaxSize()) {
+                            Surface(color = if (isSystemInDarkTheme()) Color(0xff18263f) else Color(0xff1f3155), contentColor = Color.White) {
+                                Row(Modifier.fillMaxWidth().heightIn(min = 76.dp).statusBarsPadding().padding(start = 20.dp, end = 12.dp, top = 10.dp, bottom = 10.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                                    Text("Capital", fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
                                     if (state.auth != null) TextButton(enabled = !state.busy && (!state.financeBlocked || (state.offline && state.financialCommand == null && state.localPending == 0 && state.localBlocked == 0)), onClick = model::logout, colors = ButtonDefaults.textButtonColors(contentColor = Color.White)) { Text("Выход") }
                                 }
                             }
                             val scroll = rememberScrollState()
                             LaunchedEffect(section.value, settingsGroup) { scroll.scrollTo(0) }
-                            Column(Modifier.weight(1f).windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)).imePadding().verticalScroll(scroll).padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Column(Modifier.weight(1f).windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)).imePadding().verticalScroll(scroll).padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 if (state.message.isNotEmpty()) Text(state.message)
                                 if (state.busy) CircularProgressIndicator()
                                 if (state.revokePendingId != null) {
@@ -177,13 +180,16 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                             if (state.auth != null && !state.logoutPending && state.revokePendingId == null) {
-                                FinancialAddButton(model, createRouter)
-                                NavigationBar {
-                                    listOf(Triple("accounts", "Счета", "◫"), Triple("operations", "Операции", "⇄"), Triple("more", "Настройки", "☰")).forEach { (id, label, symbol) ->
-                                        NavigationBarItem(selected = section.value == id, onClick = { section.value = id }, icon = { Text(symbol) }, label = { Text(label) }, modifier = Modifier.semantics { contentDescription = "Раздел $label" })
+                                NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
+                                    listOf(Triple("accounts", "Счета", "◫"), Triple("operations", "Операции", "⇄"), Triple("more", "Настройки", "⋯")).forEach { (id, label, symbol) ->
+                                        NavigationBarItem(selected = section.value == id, onClick = { section.value = id }, icon = { Text(symbol, fontSize = 22.sp) }, label = { Text(label) }, modifier = Modifier.semantics { contentDescription = "Раздел $label" })
                                     }
                                 }
                             }
+                        }
+                        Box(Modifier.align(androidx.compose.ui.Alignment.BottomEnd).navigationBarsPadding().padding(bottom = 104.dp)) {
+                            if (state.auth != null && !state.logoutPending && state.revokePendingId == null) FinancialAddButton(model, createRouter)
+                        }
                         }
                     }
                 }

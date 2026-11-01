@@ -102,7 +102,7 @@ fun CatalogPanel(model: AuthViewModel) {
             TextButton(enabled = tagEnabled && (state.offline || ("tag" to item.id) !in state.localAffected), onClick = { guard.request { collection = "tags"; id = item.id; version = item.version; name = item.name; parentId = null; archived = item.archived_at != null; error = ""; validation.reset(); navigation.value = "catalog"  } }) { Text("Изменить тег ${item.name}") }
         }
     } else if (editorOpen) Dialog(onDismissRequest = ::close, properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)) {
-        Surface(Modifier.fillMaxWidth().heightIn(max = 760.dp), shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp)) {
+        Surface(Modifier.padding(12.dp).widthIn(max = 560.dp).fillMaxWidth().heightIn(max = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp - 24).coerceAtLeast(100).dp), shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp)) {
             Column(Modifier.imePadding().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Button(enabled = enabled && !scope.saving, onClick = ::close) { Text("Отмена") }
                 Button(enabled = !state.busy, onClick = model::loadCatalog) { Text("Обновить категории и теги") }

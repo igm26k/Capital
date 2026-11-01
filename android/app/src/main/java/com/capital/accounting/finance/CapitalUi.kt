@@ -1,6 +1,13 @@
 package com.capital.accounting.finance
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.graphics.vector.PathParser
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -19,17 +26,36 @@ val LocalSettingsGroup = staticCompositionLocalOf { "profile" }
 val capitalAccountColors = listOf(0xff167b68, 0xff2463af, 0xff8545a4, 0xffb64a32, 0xff466d30, 0xff3c578d).map { Color(it) }
 fun capitalColors(dark: Boolean): ColorScheme = if (dark) darkColorScheme(
     primary = Color(0xffadc7ff), onPrimary = Color(0xff172c4f), primaryContainer = Color(0xff293e62), onPrimaryContainer = Color(0xffd8e5ff),
-    background = Color(0xff101722), surface = Color(0xff1a2433), surfaceVariant = Color(0xff202d41), onSurfaceVariant = Color(0xffaab9ce), outline = Color(0xff34445c)
+    onSurface = Color(0xffe6edf8), background = Color(0xff101722), surface = Color(0xff1a2433), surfaceVariant = Color(0xff202d41), onSurfaceVariant = Color(0xffaab9ce), outline = Color(0xff34445c)
 ) else lightColorScheme(
     primary = Color(0xff365b9d), onPrimary = Color.White, primaryContainer = Color(0xffe4ebf8), onPrimaryContainer = Color(0xff203c70),
-    background = Color(0xfff2f5fa), surface = Color.White, surfaceVariant = Color(0xffedf1f8), onSurfaceVariant = Color(0xff5e6f87), outline = Color(0xffdbe2ed)
+    background = Color(0xfff2f5fa), surface = Color.White, onSurface = Color(0xff26354a), surfaceVariant = Color(0xffeaf0f8), onSurfaceVariant = Color(0xff5e6f87), outline = Color(0xffdbe2ed)
 )
+// CSS uses normal line-height and no Material letter spacing. Explicit compact
+// font sizes must not inherit a 24sp body line box from the Material defaults.
+val capitalTypography = Typography().let { defaults ->
+    Typography(
+        displayLarge = defaults.displayLarge.copy(lineHeight = androidx.compose.ui.unit.TextUnit.Unspecified, letterSpacing = 0.sp),
+        displayMedium = defaults.displayMedium.copy(lineHeight = androidx.compose.ui.unit.TextUnit.Unspecified, letterSpacing = 0.sp),
+        displaySmall = defaults.displaySmall.copy(lineHeight = androidx.compose.ui.unit.TextUnit.Unspecified, letterSpacing = 0.sp),
+        headlineLarge = defaults.headlineLarge.copy(lineHeight = androidx.compose.ui.unit.TextUnit.Unspecified, letterSpacing = 0.sp),
+        headlineMedium = defaults.headlineMedium.copy(lineHeight = androidx.compose.ui.unit.TextUnit.Unspecified, letterSpacing = 0.sp),
+        headlineSmall = defaults.headlineSmall.copy(lineHeight = androidx.compose.ui.unit.TextUnit.Unspecified, letterSpacing = 0.sp),
+        titleLarge = defaults.titleLarge.copy(lineHeight = androidx.compose.ui.unit.TextUnit.Unspecified, letterSpacing = 0.sp),
+        titleMedium = defaults.titleMedium.copy(lineHeight = androidx.compose.ui.unit.TextUnit.Unspecified, letterSpacing = 0.sp),
+        titleSmall = defaults.titleSmall.copy(lineHeight = androidx.compose.ui.unit.TextUnit.Unspecified, letterSpacing = 0.sp),
+        bodyLarge = defaults.bodyLarge.copy(lineHeight = androidx.compose.ui.unit.TextUnit.Unspecified, letterSpacing = 0.sp),
+        bodyMedium = defaults.bodyMedium.copy(lineHeight = androidx.compose.ui.unit.TextUnit.Unspecified, letterSpacing = 0.sp),
+        bodySmall = defaults.bodySmall.copy(lineHeight = androidx.compose.ui.unit.TextUnit.Unspecified, letterSpacing = 0.sp),
+        labelLarge = defaults.labelLarge.copy(lineHeight = androidx.compose.ui.unit.TextUnit.Unspecified, letterSpacing = 0.sp),
+        labelMedium = defaults.labelMedium.copy(lineHeight = androidx.compose.ui.unit.TextUnit.Unspecified, letterSpacing = 0.sp),
+        labelSmall = defaults.labelSmall.copy(lineHeight = androidx.compose.ui.unit.TextUnit.Unspecified, letterSpacing = 0.sp)
+    )
+}
 fun capitalMoney(minor: String, currency: String): String {
     val raw = Money.displayAggregate(minor, currency).removeSuffix(" $currency")
-    val parts = raw.removePrefix("−").split(',')
-    val grouped = parts[0].reversed().chunked(3).joinToString(" ").reversed()
     val symbol = when(currency) { "EUR" -> "€"; "USD" -> "$"; "RUB" -> "₽"; "GBP" -> "£"; "JPY" -> "¥"; else -> currency }
-    return (if (raw.startsWith("−")) "−" else "") + grouped + (if (parts.size > 1) ",${parts[1]}" else "") + " $symbol"
+    return "$raw $symbol"
 }
 
 fun transactionNote(note: String): String {
@@ -51,16 +77,39 @@ fun operationTitle(item: Transaction, categories: List<Category>): String = when
 @Composable
 fun CapitalSelect(label: String, value: String, options: List<Pair<String, String>>, enabled: Boolean = true, onSelect: (String) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
-    Box(Modifier.fillMaxWidth()) {
-        OutlinedButton(onClick = { expanded = true }, enabled = enabled, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
-            Column(Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
-                Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(options.find { it.first == value }?.second ?: "Выберите", maxLines = 1, overflow = TextOverflow.Ellipsis)
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+        Text(label, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Box(Modifier.fillMaxWidth()) {
+            OutlinedButton(onClick = { expanded = true }, enabled = enabled, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp), shape = RoundedCornerShape(8.dp),
+                contentPadding = PaddingValues(14.dp), border = BorderStroke(1.dp, Color(0xff79747e)), colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface)) {
+                Text(options.find { it.first == value }?.second ?: "Выберите", modifier = Modifier.weight(1f), fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("▾")
             }
-            Text("▾")
+            DropdownMenu(expanded = expanded && enabled, onDismissRequest = { expanded = false }, modifier = Modifier.heightIn(max = 360.dp)) {
+                options.forEach { (id, title) -> DropdownMenuItem(text = { Text(title) }, onClick = { expanded = false; onSelect(id) }) }
+            }
         }
-        DropdownMenu(expanded = expanded && enabled, onDismissRequest = { expanded = false }, modifier = Modifier.heightIn(max = 360.dp)) {
-            options.forEach { (id, title) -> DropdownMenuItem(text = { Text(title) }, onClick = { expanded = false; onSelect(id) }) }
+    }
+}
+
+// Dimensions and paths mirror web/src/style.css and shared/Icon.tsx.
+@Composable
+fun CapitalIcon(name: String, modifier: Modifier = Modifier.size(24.dp), color: Color = LocalContentColor.current) {
+    val source = when (name) {
+        "settings" -> "M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8M9 3h6l1 3 3 1 2 5-2 5-3 1-1 3H9l-1-3-3-1-2-5 2-5 3-1z"
+        "plus" -> "M12 5v14M5 12h14"
+        "bank" -> "M3 9l9-6 9 6H3M5 10v8M10 10v8M14 10v8M19 10v8M3 21h18"
+        "records" -> "M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"
+        "arrow" -> "M5 12h14M14 7l5 5-5 5"
+        "transfer" -> "M4 8h16l-4-4M20 16H4l4 4"
+        "income", "refund" -> "M7 7l10 10M7 17V7h10"
+        "menu" -> "M4 6h16M4 12h16M4 18h16"
+        else -> "M7 7l10 10M7 17h10V7"
+    }
+    val path = remember(source) { PathParser().parsePathString(source).toPath() }
+    Canvas(modifier) {
+        scale(size.width / 24f, size.height / 24f, pivot = androidx.compose.ui.geometry.Offset.Zero) {
+            drawPath(path, color, style = Stroke(1.8f, cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
         }
     }
 }
@@ -68,20 +117,27 @@ fun CapitalSelect(label: String, value: String, options: List<Pair<String, Strin
 @Composable
 fun CapitalAccountGrid(accounts: List<Account>, enabled: Boolean, editing: Boolean, onAdd: () -> Unit, onOpen: (Account) -> Unit, onEdit: (Account) -> Unit) {
     BoxWithConstraints {
-        val columns = if (maxWidth >= 600.dp) 4 else 3
+        val columns = if (maxWidth >= 668.dp) 4 else 3
         val cells: List<Account?> = accounts + listOf(null)
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             cells.chunked(columns).forEach { row ->
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.height(IntrinsicSize.Min)) {
                     row.forEach { account ->
-                        if (account == null) OutlinedCard(onClick = onAdd, enabled = enabled, modifier = Modifier.weight(1f).heightIn(min = 60.dp), shape = RoundedCornerShape(10.dp)) {
-                            Box(Modifier.fillMaxWidth().heightIn(min = 60.dp), contentAlignment = Alignment.Center) { Text("+ Счет", style = MaterialTheme.typography.labelLarge) }
-                        } else Card(onClick = { if (editing) onEdit(account) else onOpen(account) }, enabled = enabled,
-                            modifier = Modifier.weight(1f).heightIn(min = 60.dp), shape = RoundedCornerShape(10.dp),
+                        if (account == null) OutlinedCard(onClick = onAdd, enabled = enabled, modifier = Modifier.weight(1f).fillMaxHeight().heightIn(min = 56.dp), shape = RoundedCornerShape(9.dp),
+                            border = BorderStroke(1.dp, Color(0xff9aaccb)), colors = CardDefaults.outlinedCardColors(containerColor = Color.Transparent)) {
+                            Row(Modifier.fillMaxWidth().heightIn(min = 56.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+                                CapitalIcon("plus", Modifier.size(16.dp), MaterialTheme.colorScheme.primary)
+                                Text("Добавить счет", fontSize = 10.sp, color = MaterialTheme.colorScheme.primary)
+                            }
+                        } else Card(modifier = Modifier.weight(1f).fillMaxHeight(), shape = RoundedCornerShape(9.dp),
                             colors = CardDefaults.cardColors(containerColor = capitalAccountColors[account.id.sumOf { it.code } % capitalAccountColors.size], contentColor = Color.White)) {
-                            Column(Modifier.padding(horizontal = 8.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Text((if (editing) "✎ " else "") + account.name, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Text(capitalMoney(account.posted_balance_minor, account.currency), style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Column(Modifier.fillMaxWidth().heightIn(min = 56.dp).clickable(enabled = enabled) { onOpen(account) }.padding(8.dp)) {
+                                Text(account.name, fontSize = 10.sp, lineHeight = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Spacer(Modifier.height(5.dp))
+                                Text(capitalMoney(account.posted_balance_minor, account.currency), fontSize = 12.sp, lineHeight = 14.4.sp, letterSpacing = (-0.3).sp, fontWeight = FontWeight.SemiBold)
+                            }
+                            if (editing) Box(Modifier.fillMaxWidth().heightIn(min = 44.dp).background(Color(0x15000000)).clickable(enabled = enabled) { onEdit(account) }, contentAlignment = Alignment.Center) {
+                                Text("Изменить", fontSize = 10.sp)
                             }
                         }
                     }
@@ -98,23 +154,30 @@ fun CapitalOperationRow(model: AuthViewModel, item: Transaction, expandedContent
     var expanded by remember(item.id) { mutableStateOf(false) }
     val title = operationTitle(item, state.categories)
     Card(onClick = { if (expandedContent == null) model.openTransactionDetails(item.id) else expanded = !expanded },
-        modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-        Row(Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Box(Modifier.size(32.dp).background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) {
-                Text(when(item.kind) { "transfer" -> "⇄"; "adjustment" -> "±"; "income", "refund" -> "↙"; else -> "↗" }, color = MaterialTheme.colorScheme.onPrimaryContainer)
+        modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(9.dp), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+        Row(Modifier.heightIn(min = 64.dp).padding(horizontal = 8.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+            Box(Modifier.width(24.dp).height(28.dp), contentAlignment = Alignment.Center) {
+                CapitalIcon(if (item.kind in listOf("opening", "adjustment")) "bank" else item.kind, Modifier.size(19.dp), MaterialTheme.colorScheme.primary)
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(title, fontSize = 12.sp, lineHeight = 15.6.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 val accounts = item.entries.sortedBy { BigInteger(it.amount_minor).signum() }.map { entry -> state.accounts.find { it.id == entry.account_id }?.name ?: entry.currency }.distinct().joinToString(" → ")
-                Text(listOf(item.payee, accounts).filter { it.isNotBlank() }.joinToString(" · "), style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                transactionNote(item.note).takeIf { it.isNotBlank() }?.let { Text(it, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                Text(listOf(item.payee, accounts).filter { it.isNotBlank() }.joinToString(" · "), fontSize = 10.sp, lineHeight = 12.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                transactionNote(item.note).takeIf { it.isNotBlank() }?.let { Text(it, fontSize = 10.sp, lineHeight = 12.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             }
-            Column(horizontalAlignment = Alignment.End) {
+            Column(Modifier.widthIn(max = 125.dp), horizontalAlignment = Alignment.End) {
                 item.entries.sortedBy { BigInteger(it.amount_minor).signum() }.forEach { entry ->
-                    Text(capitalMoney(entry.amount_minor, entry.currency), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                    val dark = androidx.compose.foundation.isSystemInDarkTheme()
+                    val amountColor = when {
+                        item.kind in listOf("transfer", "opening", "adjustment") -> MaterialTheme.colorScheme.primary
+                        BigInteger(entry.amount_minor).signum() > 0 -> Color(if (dark) 0xff6cd2a8 else 0xff16846a)
+                        else -> Color(if (dark) 0xfff69283 else 0xffc75345)
+                    }
+                    Text(capitalMoney(entry.amount_minor, entry.currency), fontSize = 12.sp, lineHeight = 15.sp, fontWeight = FontWeight.SemiBold, color = amountColor)
                 }
-                Text(openingLocal(item.occurred_at, item.occurred_timezone).take(10).split('-').reversed().joinToString("."), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(operationDate(item.occurred_at), fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
+            Text(if (expanded) "⌃" else "⌄", fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         if (expanded) Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             transactionNote(item.note).takeIf { it.isNotBlank() }?.let { Text(it) }
@@ -148,4 +211,47 @@ fun HandleOperationType(prefix: String, editing: Boolean, enabled: Boolean, guar
         }
     }
     if (guard.pending != null && navigation.value != prefix) DraftGuardControls(guard, prefix, enabled)
+}
+
+@Composable
+fun CapitalRecentRow(model: AuthViewModel, item: Transaction) {
+    val state = model.state
+    val dark = androidx.compose.foundation.isSystemInDarkTheme()
+    val positive = item.kind in listOf("income", "refund")
+    val background = when (item.kind) {
+        "income", "refund" -> if (dark) 0xff23473a else 0xffdef3e9
+        "transfer" -> if (dark) 0xff283e56 else 0xffe7edfd
+        "adjustment" -> if (dark) 0xff3d3351 else 0xffede9f5
+        else -> if (dark) 0xff423725 else 0xfffff0d8
+    }
+    val accent = when (item.kind) {
+        "income", "refund" -> if (dark) 0xff79dcb4 else 0xff16846a
+        "transfer" -> if (dark) 0xff8ebbf2 else 0xff4879bd
+        "adjustment" -> if (dark) 0xffc3a9eb else 0xff8164a9
+        else -> if (dark) 0xffe8b35e else 0xffbb7814
+    }
+    val entry = item.entries.find { BigInteger(it.amount_minor).signum() < 0 } ?: item.entries.firstOrNull()
+    val target = item.entries.find { BigInteger(it.amount_minor).signum() > 0 }.takeIf { item.kind == "transfer" }
+    Row(Modifier.fillMaxWidth().heightIn(min = 76.dp).clickable { model.openTransactionDetails(item.id) }.padding(vertical = 14.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(34.dp).background(Color(background), androidx.compose.foundation.shape.CircleShape), contentAlignment = Alignment.Center) {
+            CapitalIcon(item.kind, Modifier.size(18.dp), Color(accent))
+        }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            Text(item.payee.ifBlank { operationTitle(item, state.categories) }, fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(state.accounts.find { it.id == entry?.account_id }?.name.orEmpty(), fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Column(Modifier.widthIn(max = 135.dp), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            val valueColor = if (item.kind == "transfer") MaterialTheme.colorScheme.onSurfaceVariant else if (positive || entry?.let { BigInteger(it.amount_minor).signum() > 0 } == true) Color(if (dark) 0xff6cd2a8 else 0xff16846a) else Color(if (dark) 0xfff69283 else 0xffc75345)
+            Text(entry?.let { Money.displayAggregate(it.amount_minor, it.currency) } ?: "—", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = valueColor)
+            target?.let { Text("→ ${Money.displayAggregate(it.amount_minor, it.currency)}", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            Text(openingLocal(item.occurred_at, java.util.TimeZone.getDefault().id).take(10).split('-').reversed().take(2).joinToString("."), fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+private fun operationDate(instant: String): String {
+    val local = openingLocal(instant, java.util.TimeZone.getDefault().id)
+    val date = local.take(10).split('-')
+    return if (date.size == 3) "${date[2]}.${date[1]}.${date[0].takeLast(2)}, ${local.drop(11).take(5)}" else local
 }

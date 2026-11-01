@@ -6,6 +6,14 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import java.util.TimeZone
@@ -38,10 +46,14 @@ fun ValidatedTextField(value: String, onValueChange: (String) -> Unit, label: St
             location.bringIntoView()
         }
     }
-    OutlinedTextField(value, { onValueChange(it); validation.changed(key) }, label = { Text(label) },
-        modifier = Modifier.focusRequester(focus).bringIntoViewRequester(location),
-        enabled = enabled, singleLine = singleLine, isError = key in validation.errors,
-        supportingText = validation.errors[key]?.let { message -> { Text(message) } })
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+        Text(label, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        OutlinedTextField(value, { onValueChange(it); validation.changed(key) },
+            modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).focusRequester(focus).bringIntoViewRequester(location),
+            shape = RoundedCornerShape(8.dp), colors = OutlinedTextFieldDefaults.colors(unfocusedBorderColor = Color(0xff79747e)),
+            enabled = enabled, singleLine = singleLine, isError = key in validation.errors,
+            supportingText = validation.errors[key]?.let { message -> { Text(message) } })
+    }
 }
 
 fun nameFieldError(value: String, maximum: Int): String? =
