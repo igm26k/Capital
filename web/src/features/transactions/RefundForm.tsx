@@ -1,3 +1,4 @@
+import { AccountSelect } from '../../shared/AccountSelect';
 import { useState, type FormEvent } from 'react';
 import type { Account, Category, Tag, Transaction } from '../../api/client';
 import { decimal, minor, money } from '../../shared/money';
@@ -32,7 +33,7 @@ export function RefundForm({ parent, transferVersion, initial, accounts, categor
     } catch (error) { fail((error as Error).message); }
   }
   return <section><h2>{initial ? 'Изменить возврат' : 'Новый возврат'}</h2><p>Исходный расход: {parent.payee || parent.note || new Date(parent.occurred_at).toLocaleString('ru-RU')}. Категории наследуются от его частей.</p><form onSubmit={save}><fieldset disabled={disabled || !account}>
-    <label>Счет возврата<select aria-label="Счет возврата" value={account?.id ?? ''} onChange={event => setAccountID(event.target.value)}>{eligible.map(a => <option key={a.id} value={a.id}>{a.name} · {a.currency}</option>)}</select></label>
+    <AccountSelect label="Счет возврата" value={account?.id ?? ''} accounts={eligible} onChange={setAccountID} />
     {parts.map((part, index) => { const category = categories.find(c => c.id === part.original.category_id); return <div className="allocation" key={part.id}><p>{category ? categoryLabel(category, categories) : 'Без категории'} · Доступно: {money(part.maximum, currency)}</p><label>Возврат части {index + 1}<input value={part.amount} inputMode="decimal" placeholder="0" onChange={event => setParts(items => items.map(p => p.id === part.id ? { ...p, amount: event.target.value } : p))} /></label></div>; })}
     <OccurrenceFields label="Дата возврата" initial={initial?.occurred_at} />
     <label>Получатель возврата<input name="refund_payee" maxLength={200} defaultValue={initial?.payee} /></label><label>Описание возврата<textarea aria-label="Описание возврата" name="refund_note" maxLength={2000} defaultValue={initial?.note} /></label>

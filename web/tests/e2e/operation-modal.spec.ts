@@ -15,18 +15,22 @@ test('the unified modal creates expense, income, FX transfer and balance correct
   for (const kind of ['expense', 'income', 'transfer', 'adjustment']) {
     await page.getByRole('button', { name: 'Добавить операцию', exact: true }).click();
     const modal = page.getByRole('dialog', { name: 'Новая операция' });
+    async function selectAccount(label: string, currency: string) {
+      await modal.getByRole('button', { name: label, exact: true }).click();
+      await page.getByRole('dialog', { name: `Выбор: ${label}`, exact: true }).getByRole('option', { name: `${currency} · ${currency}`, exact: true }).click();
+    }
     await modal.getByRole('combobox', { name: 'Тип операции', exact: true }).selectOption(kind);
     if (kind === 'transfer') {
-      await modal.getByRole('combobox', { name: 'Со счета', exact: true }).selectOption(ids.EUR);
-      await modal.getByRole('combobox', { name: 'На счет', exact: true }).selectOption(ids.USD);
+      await selectAccount('Со счета', 'EUR');
+      await selectAccount('На счет', 'USD');
       await modal.getByLabel('Сумма списания, EUR', { exact: true }).fill('10.00');
       await modal.getByLabel('Сумма зачисления, USD', { exact: true }).fill('11.00');
     } else if (kind === 'adjustment') {
-      await modal.getByRole('combobox', { name: 'Счет корректировки', exact: true }).selectOption(ids.EUR);
+      await selectAccount('Счет корректировки', 'EUR');
       await modal.getByLabel('Фактический остаток, EUR', { exact: true }).fill('150.00');
       await modal.getByLabel('Причина корректировки', { exact: true }).fill('Сверка');
     } else {
-      await modal.getByRole('combobox', { name: 'Счет', exact: true }).selectOption(ids.EUR);
+      await selectAccount('Счет', 'EUR');
       await modal.getByLabel('Сумма', { exact: true }).fill(kind === 'expense' ? '12.34' : '20.00');
     }
     await modal.getByRole('button', { name: 'Добавить', exact: true }).click();

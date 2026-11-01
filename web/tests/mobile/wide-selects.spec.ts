@@ -40,3 +40,26 @@ for (const width of [320, 390]) test(`selectors use the phone width and show a p
     await expect(operation.getByRole('button', { name: label, exact: true })).toBeFocused();
   }
 });
+test('account picker colors match home cards, remain after searching and appear on the selected account and transfers', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('.screen[aria-label="Счета"] .account-tile')).toHaveCount(40);
+  const colors = await page.locator('.screen[aria-label="Счета"] .account-tile').evaluateAll(tiles => tiles.map(tile => getComputedStyle(tile).backgroundColor));
+  await page.getByRole('button', { name: 'Добавить операцию', exact: true }).click();
+  const operation = page.getByRole('dialog', { name: 'Новая операция', exact: true });
+  const account = operation.getByRole('button', { name: 'Счет', exact: true });
+  await expect(account.locator('.account-color-dot')).toHaveCSS('background-color', colors[0]);
+  await account.click();
+  const picker = page.getByRole('dialog', { name: 'Выбор: Счет', exact: true });
+  await expect(picker.getByRole('option', { name: 'Банковский счет 0 · EUR', exact: true }).locator('.account-color-dot')).toHaveCSS('background-color', colors[0]);
+  await expect(picker.getByRole('option', { name: 'Банковский счет 1 · EUR', exact: true }).locator('.account-color-dot')).toHaveCSS('background-color', colors[1]);
+  await picker.getByLabel('Поиск: Счет', { exact: true }).fill('39');
+  await expect(picker.getByRole('option').locator('.account-color-dot')).toHaveCSS('background-color', colors[39]);
+  await page.screenshot({ path: test.info().outputPath('account-color-search.png') });
+  await picker.getByRole('option').click();
+  await expect(account).toContainText('Банковский счет 39');
+  await expect(account.locator('.account-color-dot')).toHaveCSS('background-color', colors[39]);
+  await operation.getByRole('combobox', { name: 'Тип операции', exact: true }).selectOption('transfer');
+  for (const label of ['Со счета', 'На счет']) await expect(operation.getByRole('button', { name: label, exact: true }).locator('.account-color-dot')).toBeVisible();
+  await operation.getByLabel('Добавить комиссию', { exact: true }).check();
+  await expect(operation.getByRole('button', { name: 'Счет комиссии', exact: true }).locator('.account-color-dot')).toBeVisible();
+});

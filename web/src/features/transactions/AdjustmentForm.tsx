@@ -1,3 +1,4 @@
+import { AccountSelect } from '../../shared/AccountSelect';
 import { useState, type FormEvent } from 'react';
 import type { Account, Transaction } from '../../api/client';
 import { decimal, minor, money } from '../../shared/money';
@@ -20,7 +21,7 @@ export function AdjustmentForm({ accounts, initial, disabled, submit, fail, canc
   }
   return <section className={embedded ? 'embedded-operation' : undefined}>{!embedded && <h2>{initial ? 'Изменить примечание корректировки' : 'Корректировка остатка'}</h2>}<form id={formID} onSubmit={save}><fieldset disabled={disabled || (!initial && !account)}>
     {initial ? <p>Причина: {initial.reason}. Финансовое движение корректировки сохраняется.</p> : <>
-      <label>Счет корректировки<select aria-label="Счет корректировки" value={account?.id ?? ''} onChange={event => setAccountID(event.target.value)}>{accounts.map(a => <option key={a.id} value={a.id}>{a.name} · {a.currency}</option>)}</select></label>
+      <AccountSelect label="Счет корректировки" value={account?.id ?? ''} accounts={accounts} onChange={setAccountID} />
       {account && <p>Подтвержденный остаток сейчас: {money(account.posted_balance_minor, account.currency)}.</p>}
       <label>Фактический остаток, {account?.currency ?? 'EUR'}<input key={`${account?.id}-${account?.balance_version}`} name="target_balance" inputMode="decimal" required defaultValue={account ? decimal(account.posted_balance_minor, account.currency) : ''} /></label>
       <label>Причина корректировки<input name="reason" required maxLength={500} /></label><p className="hint">Разница будет сохранена отдельным движением с указанной причиной.</p>

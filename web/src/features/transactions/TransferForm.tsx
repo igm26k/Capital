@@ -1,9 +1,9 @@
+import { AccountSelect } from '../../shared/AccountSelect';
 import { useState, type FormEvent } from 'react';
 import type { Account, Category, Tag, Transaction } from '../../api/client';
 import { decimal, minor } from '../../shared/money';
 import { categoryLabel } from '../../shared/categories';
 import { occurrence } from '../../shared/time';
-import { SearchSelect } from '../../shared/SearchSelect';
 import { OccurrenceFields } from '../../shared/OccurrenceFields';
 type Part = { id: string; category: string; amount: string };
 type Props = { accounts: Account[]; categories: Category[]; tags: Tag[]; disabled: boolean; submit: (body: object) => void; fail: (message: string) => void; initial?: Transaction; initialFee?: Transaction | null; cancel?: () => void; embedded?: boolean; formID?: string };
@@ -42,14 +42,14 @@ export function TransferForm({ accounts, categories, tags, disabled, submit, fai
     } catch (error) { fail((error as Error).message); }
   }
   return <section className={embedded ? 'embedded-operation' : undefined}>{!embedded && <h2>{initial ? 'Изменить перевод' : 'Новый перевод'}</h2>}<form id={formID} onSubmit={save}><fieldset disabled={disabled || !target}>
-    <SearchSelect label="Со счета" value={source?.id ?? ''} options={sources.map(a => ({ value: a.id, label: a.name + ' · ' + a.currency }))} onChange={setSourceID} />
-    <SearchSelect label="На счет" value={target?.id ?? ''} options={targets.map(a => ({ value: a.id, label: a.name + ' · ' + a.currency }))} onChange={setTargetID} />
+    <AccountSelect label="Со счета" value={source?.id ?? ''} accounts={sources} onChange={setSourceID} />
+    <AccountSelect label="На счет" value={target?.id ?? ''} accounts={targets} onChange={setTargetID} />
     <label>Сумма списания, {source?.currency ?? 'EUR'}<input name="source_amount" inputMode="decimal" required defaultValue={originalSource ? decimal((-BigInt(originalSource.amount_minor)).toString(), originalSource.currency) : ''} /></label>
     {target && source?.currency !== target.currency && <label>Сумма зачисления, {target.currency}<input key={target.currency} name="target_amount" inputMode="decimal" required defaultValue={originalTarget ? decimal(originalTarget.amount_minor, originalTarget.currency) : ''} /></label>}
     <p className="hint">{source?.currency === target?.currency ? 'На второй счет поступит та же сумма.' : 'Укажите обе точные суммы. Курс рассчитает сервер.'}</p>
     <label className="check"><input type="checkbox" checked={withFee} onChange={event => setWithFee(event.target.checked)} />Добавить комиссию</label>
     {withFee && <>
-      <SearchSelect label="Счет комиссии" value={feeAccount?.id ?? ''} options={feeAccounts.map(a => ({ value: a.id, label: a.name + ' · ' + a.currency }))} onChange={setFeeAccountID} />
+      <AccountSelect label="Счет комиссии" value={feeAccount?.id ?? ''} accounts={feeAccounts} onChange={setFeeAccountID} />
       <label>Комиссия, {feeAccount?.currency}<input key={feeAccount?.currency} name="fee_amount" inputMode="decimal" required defaultValue={initialFee ? decimal(initialFee.allocations.reduce((sum, p) => sum + BigInt(p.amount_minor), 0n).toString(), initialFee.entries[0].currency) : ''} /></label>
       {parts.map((part, index) => <div key={part.id}><label>{parts.length === 1 ? 'Категория комиссии' : `Категория части комиссии ${index + 1}`}<select aria-label={parts.length === 1 ? 'Категория комиссии' : `Категория части комиссии ${index + 1}`} value={part.category} onChange={event => update(part.id, { category: event.target.value })}><option value="">Без категории</option>{categories.filter(c => !c.archived_at || initialFee?.allocations.find(p => p.id === part.id)?.category_id === c.id).map(c => <option key={c.id} value={c.id}>{categoryLabel(c, categories)}</option>)}</select></label>{parts.length > 1 && <><label>Сумма части комиссии {index + 1}<input value={part.amount} inputMode="decimal" required onChange={event => update(part.id, { amount: event.target.value })} /></label><button type="button" className="secondary" onClick={() => setParts(items => items.filter(p => p.id !== part.id))}>Удалить часть комиссии {index + 1}</button></>}</div>)}
       <button type="button" className="secondary" disabled={parts.length >= 100} onClick={event => { const total = String(new FormData(event.currentTarget.form!).get('fee_amount')); setParts(items => [...items.map(p => items.length === 1 ? { ...p, amount: total } : p), { id: crypto.randomUUID(), category: '', amount: '' }]); }}>Добавить часть комиссии</button>

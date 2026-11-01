@@ -2,6 +2,7 @@ import { useState, type FormEvent, type ReactNode, type CSSProperties } from 're
 import type { Account } from '../../api/client';
 import { orderAccounts } from '../../shared/accountOrder';
 import { money } from '../../shared/money';
+import { accountColor } from '../../shared/AccountSelect';
 import { AccountReorderList } from './AccountReorderList';
 import { AccountForm } from './AccountForm';
 import { Icon } from '../../shared/Icon';
@@ -42,8 +43,7 @@ export function AccountManager({ accounts, disabled, loading, submit, fail, hist
       {manage && <><button disabled={disabled} onClick={() => setCreating(true)}><Icon name="plus" /> Добавить счет</button>{changed && <div className="account-order-actions"><button disabled={disabled} onClick={() => submit('accounts/order', { expected_version: draftOrder!.version, account_ids: ordered.map(a => a.id) }, 'PUT')}>Сохранить порядок</button><button className="secondary" disabled={disabled} onClick={() => setDraftOrder(null)}>Отменить порядок</button></div>}
       <AccountReorderList accounts={visible} disabled={disabled} move={move} edit={setSelected} /></>}
       {!manage && <ul className="account-tiles">{visible.map(account => {
-        const colors = ['#167b68', '#2463af', '#8545a4', '#b64a32', '#466d30', '#3c578d'];
-        const color = colors[[...account.id].reduce((sum, char) => sum + char.charCodeAt(0), 0) % colors.length];
+        const color = accountColor(account.id);
         return <li className="account-tile" key={account.id} style={{ '--tile-color': color } as CSSProperties}>
           <button className="tile-main" disabled={disabled} aria-label={`Операции счета ${account.name}`} onClick={() => history(account.id)}>
             <span className="tile-name" title={account.name}>{account.name}</span>
