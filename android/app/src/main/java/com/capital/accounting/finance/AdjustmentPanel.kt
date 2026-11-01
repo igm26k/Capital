@@ -111,7 +111,6 @@ fun AdjustmentPanel(model: AuthViewModel) {
                 if (difference != null) Text("Разница нового остатка: $difference")
                 else Text("Введите допустимый остаток и разницу в пределах денежного лимита.")
                 ValidatedTextField(reason, { reason = it }, "Причина корректировки", "reason", validation, enabled, singleLine = false)
-                ValidatedTextField(zone, { zone = it }, "Часовой пояс корректировки", "zone", validation, enabled)
                 if (account.balance_version != balanceVersion) {
                     Text(if (("account" to account.id) in state.localAffected) "Ожидаемая версия остатка: ${account.balance_version}; черновика: $balanceVersion" else "Версия остатка на сервере: ${account.balance_version}; черновика: $balanceVersion")
                     Button(enabled = enabled, onClick = { balanceVersion = account.balance_version }) { Text("Использовать обновленную версию остатка") }
@@ -138,6 +137,7 @@ fun AdjustmentPanel(model: AuthViewModel) {
             Button(enabled = enabled && (editingId == null || edited != null) && account != null && account.archived_at == null && account.deleted_at == null, onClick = save@{
                 error = ""
                 val selected = account ?: return@save
+                zone = TimeZone.getDefault().id
                 if (!validation.submit(adjustmentFieldErrors(target, selected.posted_balance_minor, selected.currency, reason, zone, note, editingId == null))) return@save
                 try {
                     require(note.length <= 2000)

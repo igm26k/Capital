@@ -77,16 +77,24 @@ fun operationTitle(item: Transaction, categories: List<Category>): String = when
 @Composable
 fun CapitalSelect(label: String, value: String, options: List<Pair<String, String>>, enabled: Boolean = true, onSelect: (String) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
+    var query by remember { mutableStateOf("") }
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(7.dp)) {
         Text(label, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Box(Modifier.fillMaxWidth()) {
-            OutlinedButton(onClick = { expanded = true }, enabled = enabled, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp), shape = RoundedCornerShape(8.dp),
+            OutlinedButton(onClick = { query = ""; expanded = true }, enabled = enabled, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp), shape = RoundedCornerShape(8.dp),
                 contentPadding = PaddingValues(14.dp), border = BorderStroke(1.dp, Color(0xff79747e)), colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface)) {
                 Text(options.find { it.first == value }?.second ?: "Выберите", modifier = Modifier.weight(1f), fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text("▾")
             }
             DropdownMenu(expanded = expanded && enabled, onDismissRequest = { expanded = false }, modifier = Modifier.heightIn(max = 360.dp)) {
-                options.forEach { (id, title) -> DropdownMenuItem(text = { Text(title) }, onClick = { expanded = false; onSelect(id) }) }
+                OutlinedTextField(query, { query = it }, label = { Text("Поиск: $label") }, singleLine = true, modifier = Modifier.padding(8.dp))
+                val filtered = options.filter { it.second.contains(query, ignoreCase = true) }
+                if (filtered.isEmpty()) Text("Ничего не найдено", modifier = Modifier.padding(16.dp))
+                var previousGroup = ""
+                filtered.forEach { (id, title) ->
+                    val group = if (label.startsWith("Категория")) title.substringBefore(" / ") else ""
+                    if (group.isNotEmpty() && group != previousGroup) { Text(group, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(12.dp)); previousGroup = group }
+                    DropdownMenuItem(text = { Text(title) }, onClick = { expanded = false; onSelect(id) }) }
             }
         }
     }

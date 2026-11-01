@@ -70,7 +70,7 @@ fun TransactionPanel(model: AuthViewModel) {
         amount = Money.display(transaction.allocations.fold(BigInteger.ZERO) { sum, item -> sum + BigInteger(item.amount_minor) }.toString(), transaction.entries.first().currency).removeSuffix(" ${transaction.entries.first().currency}")
         parts = transaction.allocations.map { AllocationDraft(it.id, it.category_id, Money.display(it.amount_minor, transaction.entries.first().currency).removeSuffix(" ${transaction.entries.first().currency}")) }
         selectedTags = transaction.tag_ids
-        note = transaction.note; payee = transaction.payee; zone = transaction.occurred_timezone; occurred = openingLocal(transaction.occurred_at, zone); error = ""; navigation.value = "transaction"
+        note = transaction.note; payee = transaction.payee; zone = TimeZone.getDefault().id; occurred = openingLocal(transaction.occurred_at, zone); error = ""; navigation.value = "transaction"
     } }
     fun deleteOperation(transaction: Transaction) { deleting = transaction }
     HandleFinancialTransaction("transaction", enabled) { if (it.action == FinancialTransactionAction.EDIT) editOperation(it.transaction) else deleteOperation(it.transaction) }
@@ -110,7 +110,7 @@ fun TransactionPanel(model: AuthViewModel) {
             }
             kind = ApiClient.json.parseToJsonElement(command.body).jsonObject.getValue("kind").jsonPrimitive.content
             fun restore(id: String, minor: String, instant: String, timezone: String, memo: String, recipient: String) {
-                accountId = id; note = memo; payee = recipient; zone = timezone; occurred = openingLocal(instant, timezone)
+                accountId = id; note = memo; payee = recipient; zone = TimeZone.getDefault().id; occurred = openingLocal(instant, zone)
                 val currency = state.accounts.find { it.id == id }?.currency
                 if (currency != null) amount = Money.display(minor, currency).removeSuffix(" $currency").replace('−', '-')
             }
@@ -178,14 +178,9 @@ fun TransactionPanel(model: AuthViewModel) {
                 if (editingId == null) OperationTypeSelect(model, kind, enabled)
                 CapitalSelect("Счет", account?.id ?: "", eligible.map { it.id to "${it.name} · ${it.currency}" }, enabled) { accountId = it }
                 Text(if (account == null) "Обновите счета и выберите активный счет." else "Выбран счет: ${account.name} · ${account.currency}")
-                ValidatedTextField(amount, { amount = it }, "Сумма операции", "amount", validation, enabled)
-                ValidatedTextField(occurred, { occurred = it }, "Дата операции (YYYY-MM-DDTHH:MM:SS)", "occurred", validation, enabled)
-                ValidatedTextField(zone, { zone = it }, "Часовой пояс операции", "zone", validation, enabled)
-                ValidatedTextField(payee, { payee = it }, "Получатель операции", "payee", validation, enabled)
-                ValidatedTextField(transactionNote(note), { note = it }, "Примечание операции", "note", validation, enabled, singleLine = false)
                 parts.forEachIndexed { index, part ->
                     CapitalSelect("Категория${if (parts.size > 1) " части ${index + 1}" else ""}", part.categoryId ?: "",
-                        listOf("" to "Без категории") + state.categories.filter { it.archived_at == null || it.id == part.categoryId }.map { it.id to categoryPath(it.id, state.categories) }, enabled) { chosen ->
+                        listOf("" to "Без категории") + state.categories.filter { it.archived_at == null || it.id == part.categoryId }.map { it.id to categoryPath(it.id, state.categories) }.sortedBy { it.second }, enabled) { chosen ->
                         parts = parts.map { if (it.id == part.id) it.copy(categoryId = chosen.ifEmpty { null }) else it }
                     }
                     if (parts.size > 1) {
@@ -195,6 +190,10 @@ fun TransactionPanel(model: AuthViewModel) {
                 }
                 AllocationSummaryView(amount, account?.currency, parts)
                 TextButton(enabled = enabled && parts.size < 100, onClick = { parts = parts + AllocationDraft() }) { Text("Добавить часть операции") }
+                ValidatedTextField(amount, { amount = it }, "Сумма операции", "amount", validation, enabled)
+                OperationDateField(occurred, { occurred = it }, enabled)
+                ValidatedTextField(payee, { payee = it }, "Получатель операции", "payee", validation, enabled)
+                ValidatedTextField(transactionNote(note), { note = it }, "Примечание операции", "note", validation, enabled, singleLine = false)
                 state.tags.filter { it.archived_at == null || it.id in selectedTags }.forEach { tag ->
                     Row {
                         Checkbox(tag.id in selectedTags, { checked -> selectedTags = if (checked) (selectedTags + tag.id).distinct() else selectedTags - tag.id }, enabled = enabled, modifier = Modifier.semantics { contentDescription = "Выбрать тег ${tag.name}" })
@@ -204,6 +203,7 @@ fun TransactionPanel(model: AuthViewModel) {
                 if (error.isNotEmpty()) Text(error)
                 Button(enabled = enabled && account != null && (editingId == null || state.transactions.any { it.id == editingId }), onClick = save@{
                     error = ""
+                    zone = TimeZone.getDefault().id
                     val currency = account?.currency ?: return@save
                     if (!validation.submit(transactionFieldErrors(amount, occurred, zone, payee, note, currency, parts))) return@save
                     try {

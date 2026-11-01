@@ -31,7 +31,9 @@ for (const kind of ['expense', 'income', 'transfer', 'adjustment']) test(`modal 
     await modal.getByLabel('Причина корректировки', { exact: true }).fill('Сверка наличных');
   } else {
     await modal.getByLabel('Сумма', { exact: true }).fill('12.34');
-    await modal.getByRole('combobox', { name: 'Категория', exact: true }).selectOption('food');
+    await modal.getByRole('button', { name: 'Категория', exact: true }).click();
+    await modal.getByLabel('Поиск: Категория', { exact: true }).fill('оду');
+    await modal.getByRole('option', { name: 'Продукты', exact: true }).click();
   }
   await modal.getByRole('button', { name: 'Добавить', exact: true }).click();
   await expect(modal).toHaveCount(0);
@@ -92,4 +94,20 @@ test('modal without accounts permits cancellation but cannot submit', async ({ p
   await expect(modal.getByRole('button', { name: 'Добавить', exact: true })).toBeDisabled();
   await modal.getByRole('button', { name: 'Отмена' }).click();
   await expect(modal).toHaveCount(0);
+});
+
+test('operation date uses local calendar, seconds and current timezone; account search matches a substring', async ({ page }) => {
+  await page.getByRole('button', { name: 'Добавить операцию' }).click();
+  const modal = page.getByRole('dialog');
+  await expect(modal.getByLabel('Дата операции', { exact: true })).toHaveValue(/^\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}:\d{2}$/);
+  await modal.getByLabel('Календарь: Дата операции', { exact: true }).fill('2026-10-20T12:34:56');
+  await expect(modal.getByLabel('Дата операции', { exact: true })).toHaveValue('20.10.2026 12:34:56');
+  await modal.getByRole('button', { name: 'Счет', exact: true }).click();
+  await modal.getByLabel('Поиск: Счет', { exact: true }).fill('олла');
+  await expect(modal.getByRole('listbox', { name: 'Счет', exact: true }).getByRole('option')).toHaveCount(1);
+  await modal.getByRole('option', { name: 'Доллары · USD' }).click();
+  await expect(modal.getByRole('button', { name: 'Счет', exact: true })).toContainText('Доллары');
+  const category = await modal.getByRole('button', { name: 'Категория', exact: true }).boundingBox();
+  const amount = await modal.getByLabel('Сумма', { exact: true }).boundingBox();
+  expect(category!.y).toBeLessThan(amount!.y);
 });

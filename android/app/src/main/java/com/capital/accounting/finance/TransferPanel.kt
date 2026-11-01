@@ -81,7 +81,7 @@ fun TransferPanel(model: AuthViewModel) {
         sourceId = from.account_id; targetId = to.account_id; sourceCurrency = from.currency; targetCurrency = to.currency
         sourceAmount = Money.display(from.amount_minor.removePrefix("-"), from.currency).removeSuffix(" ${from.currency}")
         targetAmount = Money.display(to.amount_minor, to.currency).removeSuffix(" ${to.currency}")
-        note = transfer.note; payee = transfer.payee; tags = transfer.tag_ids; zone = transfer.occurred_timezone; occurred = openingLocal(transfer.occurred_at, zone)
+        note = transfer.note; payee = transfer.payee; tags = transfer.tag_ids; zone = TimeZone.getDefault().id; occurred = openingLocal(transfer.occurred_at, zone)
         preservedInstant = transfer.occurred_at; preservedZone = zone
         feeEnabled = fee != null; feeCurrency = fee?.entries?.single()?.currency; feeDraftId = fee?.id ?: UUID.randomUUID().toString()
         feeAccountId = fee?.entries?.single()?.account_id; feeAmount = if (fee == null) "" else Money.display(fee.entries.single().amount_minor.removePrefix("-"), fee.entries.single().currency).removeSuffix(" ${fee.entries.single().currency}")
@@ -148,7 +148,7 @@ fun TransferPanel(model: AuthViewModel) {
         }
         sourceId = draft.source_account_id; targetId = draft.target_account_id
         note = draft.note; payee = draft.payee; tags = draft.tag_ids
-        zone = draft.occurred_timezone; occurred = openingLocal(draft.occurred_at, zone)
+        zone = TimeZone.getDefault().id; occurred = openingLocal(draft.occurred_at, zone)
         fun decimal(minor: String, accountId: String): String? {
             val currency = state.accounts.find { it.id == accountId }?.currency ?: return null
             return Money.display(minor, currency).removeSuffix(" $currency")
@@ -179,8 +179,7 @@ fun TransferPanel(model: AuthViewModel) {
             if (source == null || target == null) null else transferRate(Money.minor(sourceAmount, source.currency), Money.minor(receivingAmount, target.currency), source.currency, target.currency)
         } catch (_: Exception) { null }
         rate?.let { Text("Точный курс: ${it.numerator}/${it.denominator} ${target?.currency} за ${source?.currency}") }
-        ValidatedTextField(occurred, { occurred = it }, "Дата перевода (YYYY-MM-DDTHH:MM:SS)", "occurred", validation, enabled)
-        ValidatedTextField(zone, { zone = it }, "Часовой пояс перевода", "zone", validation, enabled)
+        OperationDateField(occurred, { occurred = it }, enabled)
         ValidatedTextField(payee, { payee = it }, "Получатель перевода", "payee", validation, enabled)
         ValidatedTextField(transactionNote(note), { note = it }, "Примечание перевода", "note", validation, enabled, singleLine = false)
         state.tags.filter { it.archived_at == null || it.id in tags }.forEach { tag ->
@@ -222,6 +221,7 @@ fun TransferPanel(model: AuthViewModel) {
             error = ""
             val fromCurrency = source?.currency ?: return@save
             val toCurrency = target?.currency ?: return@save
+            zone = TimeZone.getDefault().id
             if (!validation.submit(transferFieldErrors(sourceAmount, targetAmount, fromCurrency, toCurrency, occurred, zone, payee, note, feeEnabled, feeAccount?.currency ?: fromCurrency, feeAmount, feeNote, feeParts))) return@save
             try {
                 val from = requireNotNull(source); val to = requireNotNull(target)
