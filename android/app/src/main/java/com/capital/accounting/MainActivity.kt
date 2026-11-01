@@ -1,5 +1,7 @@
 package com.capital.accounting
 
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.enableEdgeToEdge
@@ -84,6 +86,8 @@ class MainActivity : ComponentActivity() {
                                 Row(Modifier.fillMaxWidth().heightIn(min = 76.dp).statusBarsPadding().padding(start = 20.dp, end = 12.dp, top = 10.dp, bottom = 10.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                                     Row(Modifier.weight(1f), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                                         if (state.auth != null && section.value != "accounts") IconButton(onClick = navigation::back, enabled = !state.busy, modifier = Modifier.semantics { contentDescription = "Назад" }) { CapitalIcon("back") }
+                                        Image(painterResource(R.drawable.capital_logo), contentDescription = null, modifier = Modifier.size(36.dp))
+                                        Spacer(Modifier.width(8.dp))
                                         Text("Capital", fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
                                     }
                                     if (state.auth != null) TextButton(enabled = !state.busy && (!state.financeBlocked || (state.offline && state.financialCommand == null && state.localPending == 0 && state.localBlocked == 0)), onClick = model::logout, colors = ButtonDefaults.textButtonColors(contentColor = Color.White)) { Text("Выход") }
