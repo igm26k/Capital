@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import type { Account, Category, Tag } from '../../api/client';
+import { ModalClose } from '../../shared/ModalClose';
 import { TransactionForm } from './TransactionForm';
 import { TransferForm } from './TransferForm';
 import { AdjustmentForm } from './AdjustmentForm';
@@ -31,7 +32,7 @@ export function OperationModal({ accounts, categories, tags, disabled, saving, e
       if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
       else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
     }}>
-    <div className="modal-heading"><h2 id={`${id}-title`}>Новая операция</h2></div>
+    <div className="modal-heading"><h2 id={`${id}-title`}>Новая операция</h2><ModalClose close={cancel} disabled={saving} /></div>
     <div className="modal-content">
       <label>Тип операции<select autoFocus aria-label="Тип операции" value={kind} disabled={disabled} onChange={event => { setKind(event.target.value as Kind); setValidation(''); }}><option value="expense">Расход</option><option value="income">Доход</option><option value="transfer">Перевод</option><option value="adjustment">Корректировка</option></select></label>
       {(validation || error) && <p role="alert" className="notice">{validation || error}</p>}

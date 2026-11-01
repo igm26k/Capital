@@ -23,6 +23,7 @@ import { TransactionHistory } from './features/transactions/TransactionHistory';
 import { HomeOverview } from './features/home/HomeOverview';
 import { LoadingOverlay } from './shared/LoadingOverlay';
 import { Icon } from './shared/Icon';
+import { useScreenNavigation } from './shared/screenNavigation';
 import { OperationModal } from './features/transactions/OperationModal';
 import { SettingsNavigation, restoreSettingsGroup } from './features/settings/SettingsNavigation';
 // A single unfinished command survives reload in this tab. No credentials are persisted.
@@ -37,26 +38,12 @@ function restore(auth: Auth): Command | null {
   return null;
 }
 function persist(command: Command | null) { try { command ? sessionStorage.setItem(storageKey, JSON.stringify(command)) : sessionStorage.removeItem(storageKey); } catch { /* In-memory fallback. */ } }
-type Section = 'accounts' | 'operations' | 'more';
-function currentSection(): Section {
-  const value = window.location.hash.slice(1);
-  return value === 'operations' || value === 'more' ? value : 'accounts';
-}
 export function App() {
   const [settingsGroup, setSettingsGroup] = useState(restoreSettingsGroup);
   const [historyNavigation, setHistoryNavigation] = useState(0);
   const [operationOpen, setOperationOpen] = useState(false);
-  const [section, setSection] = useState<Section>(currentSection);
-  useEffect(() => {
-    const update = () => { setSection(currentSection()); window.scrollTo(0, 0); };
-    window.addEventListener('hashchange', update);
-    return () => window.removeEventListener('hashchange', update);
-  }, []);
-  function navigate(next: Section) {
-    window.location.hash = next;
-    setSection(next);
-    window.scrollTo(0, 0);
-  }
+  const { section, navigate, back } = useScreenNavigation();
+  useEffect(() => { setOperationOpen(false); }, [section]);
   const activeSession = useRef<string | null>(null);
  const [analyticsOpen,setAnalyticsOpen]=useState(false);
  const [csvOpen,setCSVOpen]=useState(false);
@@ -205,7 +192,7 @@ export function App() {
     catch (error) { showError(error); } finally { setBusy(false); }
   }
   function showRecords(query?: string) { setReportHistoryQuery(query ? `${query}&limit=25` : 'limit=25'); setHistoryNavigation(v => v + 1); navigate('operations'); }
-  return <main className={auth ? "app-shell wallet-shell" : "login-shell"}><header className="app-header">{auth ? <><div className="header-title"><h1>Capital</h1></div><button className="header-logout" disabled={busy || !!pending} onClick={() => void logout()}>Выход</button></> : <div><span className="eyebrow">ЛИЧНЫЕ ФИНАНСЫ</span><h1>Capital</h1></div>}</header>
+  return <main className={auth ? "app-shell wallet-shell" : "login-shell"}><header className="app-header">{auth ? <><div className="header-title">{section !== 'accounts' && <button type="button" className="header-back" aria-label="Назад" disabled={busy || loading} onClick={back}>‹</button>}<h1>Capital</h1></div><button className="header-logout" disabled={busy || !!pending} onClick={() => void logout()}>Выход</button></> : <div><span className="eyebrow">ЛИЧНЫЕ ФИНАНСЫ</span><h1>Capital</h1></div>}</header>
     {!online && <p role="status" className="notice">Нет соединения. Данные на экране могут быть устаревшими; новые операции недоступны.</p>}
     {starting ? <p role="status">Проверяем сессию…</p> : startupError ? <section><p role="alert">{startupError}</p><button onClick={() => void session()}>Повторить проверку сессии</button></section> : !auth ? <><AuthForm onAuth={authenticated} />{error && <p role="alert">{error}</p>}</> : <>
     {message && <p role="status" className="notice success">{message}</p>}{error && <p role="alert" className="notice">{error}</p>}
@@ -261,7 +248,7 @@ export function App() {
     </div>
     <nav className="bottom-nav" aria-label="Основная навигация">
       {([['accounts', 'Счета', '◫'], ['operations', 'Операции', '⇄'], ['more', 'Настройки', '⋯']] as const).map(([id, label, symbol]) =>
-        <a key={id} href={`#${id}`} aria-current={section === id ? 'page' : undefined}><span className="nav-symbol" aria-hidden="true">{symbol}</span><span>{label}</span></a>)}
+        <a key={id} href={`#${id}`} onClick={event => { event.preventDefault(); navigate(id); }} aria-current={section === id ? 'page' : undefined}><span className="nav-symbol" aria-hidden="true">{symbol}</span><span>{label}</span></a>)}
     </nav>
     </>}
     <LoadingOverlay active={starting || busy || loading} />
