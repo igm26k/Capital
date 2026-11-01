@@ -1,6 +1,18 @@
 package com.capital.accounting.finance
 
 import androidx.compose.material3.*
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.runtime.*
 import com.capital.accounting.api.TransactionFilter
 import com.capital.accounting.auth.AuthViewModel
@@ -28,40 +40,62 @@ fun HistoryFilters(model: AuthViewModel, onReset: () -> Unit = {}) {
         limit = state.historyLimit.toString(); error = ""; validation.reset()
     }
     val enabled = !state.busy && state.persisted
-    state.historyFilter?.accountId?.let { id ->
-        Text("История счета: ${state.accounts.find { it.id == id }?.name ?: id}")
-    }
-    TextButton(onClick = { expanded = !expanded }) { Text(if (expanded) "Скрыть фильтры истории" else "Фильтры истории") }
-    if (expanded) {
-        Text("Период: от включительно, до не включительно. Время UTC, например 2026-10-06T08:00:00Z.")
-        ValidatedTextField(search, { search = it }, "Поиск по примечанию и получателю", "search", validation, enabled)
-        ValidatedTextField(from, { from = it }, "История от (UTC)", "from", validation, enabled)
-        ValidatedTextField(to, { to = it }, "История до (UTC)", "to", validation, enabled)
-        ValidatedTextField(limit, { limit = it }, "Операций на странице (1–100)", "limit", validation, enabled)
-        CapitalSelect("Счет", account ?: "", listOf("" to "Все счета") + state.accounts.map { it.id to it.name }, enabled) { account = it.ifEmpty { null } }
-        CapitalSelect("Категория", category ?: "", listOf("" to "Все категории") + state.categories.map { it.id to categoryPath(it.id, state.categories) }, enabled) { category = it.ifEmpty { null } }
-        CapitalSelect("Тег", tag ?: "", listOf("" to "Все теги") + state.tags.map { it.id to it.name }, enabled) { tag = it.ifEmpty { null } }
-        CapitalSelect("Тип", kind ?: "", listOf("" to "Все типы") + TransactionFilter.kinds.toList(), enabled) { kind = it.ifEmpty { null } }
-        CapitalSelect("Статус", status ?: "", listOf("" to "Все статусы") + TransactionFilter.statuses.toList(), enabled) { status = it.ifEmpty { null } }
-        if (error.isNotEmpty()) Text(error)
-        Button(enabled = enabled, onClick = apply@{
-            error = ""
-            if (!validation.submit(historyFieldErrors(search, from, to, limit))) return@apply
-            try {
-                val pageSize = limit.toInt(); require(pageSize in 1..100)
-                val filter = TransactionFilter(account, category, tag, from.takeIf { it.isNotEmpty() }, to.takeIf { it.isNotEmpty() }, kind, status, search)
-                error = ""; model.applyHistoryFilter(filter, pageSize)
-            } catch (_: Exception) { error = "Проверьте UTC-период, длину поиска и размер страницы. Начало должно быть раньше окончания." }
-        }) { Text("Применить фильтры истории") }
-    }
-    TextButton(enabled = enabled, onClick = {
-        account = null; category = null; tag = null; kind = null; status = null; search = ""; from = ""; to = ""; limit = "25"; expanded = false; error = ""; validation.reset()
+    val active = state.historyFilter?.active == true
+    fun reset() {
+        account = null; category = null; tag = null; kind = null; status = null
+        search = ""; from = ""; to = ""; limit = "25"; expanded = false; error = ""; validation.reset()
         onReset(); model.clearHistoryFilters()
-    }) { Text("Сбросить фильтры") }
-    if (state.historyFilter != null) Text(if (state.historyFilter.active) "Фильтры истории применены" else "Все операции по страницам")
-    if (state.historyError.isNotEmpty()) Text(state.historyError)
-    if (state.historyItems != null) Text("Показано операций: ${state.historyItems.size}")
-    if (state.historyLocal) Text("История на устройстве${if (state.offline) " · сохранённые данные" else ""}")
-    if (state.historyLocalCursor != null) Button(enabled = enabled, onClick = model::nextHistoryPage) { Text("Следующая страница истории") }
-    if ((state.historyItems ?: state.transactions).isEmpty()) Text(if (state.historyFilter?.active == true) "По фильтрам операций нет. Измените или сбросьте фильтры." else "Операций пока нет. Добавьте доход или расход.")
+    }
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+        TextButton(onClick = { expanded = true }, modifier = Modifier.semantics { contentDescription = "Открыть фильтры операций" }) {
+            Text(if (active) "Фильтры · применены" else "Фильтры", fontSize = 12.sp)
+            Spacer(Modifier.width(8.dp))
+            Text("⌄")
+        }
+        if (active) TextButton(enabled = enabled, onClick = ::reset) { Text("Сбросить", fontSize = 12.sp) }
+    }
+    if (expanded) Dialog(onDismissRequest = { expanded = false }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(Modifier.padding(12.dp).widthIn(max = 560.dp).fillMaxWidth().heightIn(max = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp - 48).coerceAtLeast(100).dp), shape = RoundedCornerShape(20.dp)) {
+            Column(Modifier.imePadding()) {
+                Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("Фильтры операций", style = MaterialTheme.typography.titleMedium)
+                    TextButton(onClick = { expanded = false }, modifier = Modifier.semantics { contentDescription = "Закрыть фильтры" }) { Text("✕") }
+                }
+                Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Период: от включительно, до не включительно. Время UTC, например 2026-10-06T08:00:00Z.")
+                    ValidatedTextField(search, { search = it }, "Поиск по примечанию и получателю", "search", validation, enabled)
+                    ValidatedTextField(from, { from = it }, "История от (UTC)", "from", validation, enabled)
+                    ValidatedTextField(to, { to = it }, "История до (UTC)", "to", validation, enabled)
+                    ValidatedTextField(limit, { limit = it }, "Операций на странице (1–100)", "limit", validation, enabled)
+                    CapitalSelect("Счет", account ?: "", listOf("" to "Все счета") + state.accounts.map { it.id to it.name }, enabled) { account = it.ifEmpty { null } }
+                    CapitalSelect("Категория", category ?: "", listOf("" to "Все категории") + state.categories.map { it.id to categoryPath(it.id, state.categories) }, enabled) { category = it.ifEmpty { null } }
+                    CapitalSelect("Тег", tag ?: "", listOf("" to "Все теги") + state.tags.map { it.id to it.name }, enabled) { tag = it.ifEmpty { null } }
+                    CapitalSelect("Тип", kind ?: "", listOf("" to "Все типы") + TransactionFilter.kinds.toList(), enabled) { kind = it.ifEmpty { null } }
+                    CapitalSelect("Статус", status ?: "", listOf("" to "Все статусы") + TransactionFilter.statuses.toList(), enabled) { status = it.ifEmpty { null } }
+                    if (error.isNotEmpty()) Text(error)
+                }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(enabled = enabled, onClick = ::reset, modifier = Modifier.weight(1f)) { Text("Сбросить") }
+                    Button(enabled = enabled, modifier = Modifier.weight(1f), onClick = apply@{
+                        error = ""
+                        if (!validation.submit(historyFieldErrors(search, from, to, limit))) return@apply
+                        try {
+                            val pageSize = limit.toInt(); require(pageSize in 1..100)
+                            val filter = TransactionFilter(account, category, tag, from.takeIf { it.isNotEmpty() }, to.takeIf { it.isNotEmpty() }, kind, status, search)
+                            error = ""; model.applyHistoryFilter(filter, pageSize); expanded = false
+                        } catch (_: Exception) { error = "Проверьте UTC-период, длину поиска и размер страницы. Начало должно быть раньше окончания." }
+                    }) { Text("Применить") }
+                }
+            }
+        }
+    }
+    if (state.historyError.isNotEmpty()) Text(state.historyError, color = MaterialTheme.colorScheme.error)
+    if ((state.historyItems ?: state.transactions).isEmpty()) Text(if (active) "По фильтрам операций нет. Измените или сбросьте фильтры." else "Операций пока нет. Добавьте доход или расход.")
+}
+
+@Composable
+fun HistoryFooter(model: AuthViewModel) {
+    val state = model.state
+    if (state.historyLocalCursor != null) TextButton(enabled = !state.busy && state.persisted, onClick = model::nextHistoryPage, modifier = Modifier.fillMaxWidth()) { Text("Показать ещё") }
 }

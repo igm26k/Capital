@@ -148,12 +148,18 @@ fun TransactionPanel(model: AuthViewModel) {
         if (wasEditing) reset(selected) else kind = selected
     }
     if (!editorOpen && LocalFinancialSection.current.value == "operations") {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text("Операции", style = MaterialTheme.typography.titleLarge)
-            TextButton(enabled = !state.busy, onClick = model::loadTransactions) { Text("Обновить") }
-        }
         var bulkOpen by remember { mutableStateOf(false) }
-        TextButton(onClick = { bulkOpen = !bulkOpen }) { Text(if (bulkOpen) "Скрыть групповое изменение" else "Групповое изменение") }
+        var actionsOpen by remember { mutableStateOf(false) }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            Text("Операции", style = MaterialTheme.typography.titleLarge)
+            Box {
+                IconButton(onClick = { actionsOpen = true }, modifier = Modifier.semantics { contentDescription = "Действия с операциями" }) { Text("⋮", style = MaterialTheme.typography.titleLarge) }
+                DropdownMenu(expanded = actionsOpen, onDismissRequest = { actionsOpen = false }) {
+                    DropdownMenuItem(text = { Text("Обновить") }, enabled = !state.busy, onClick = { actionsOpen = false; model.loadTransactions() })
+                    DropdownMenuItem(text = { Text(if (bulkOpen) "Скрыть групповое изменение" else "Групповое изменение") }, onClick = { actionsOpen = false; bulkOpen = !bulkOpen })
+                }
+            }
+        }
         if (bulkOpen && navigation.value == null) BulkClassificationControls(bulk)
         DraftGuardControls(guard, "transaction", enabled) { navigation.value = "transaction" }
     } else if (editorOpen) Dialog(onDismissRequest = ::close, properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)) {
@@ -254,5 +260,6 @@ fun TransactionPanel(model: AuthViewModel) {
                 }
             }
         }
+        HistoryFooter(model)
     }
 }
