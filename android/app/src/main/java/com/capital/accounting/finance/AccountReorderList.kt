@@ -1,5 +1,7 @@
 package com.capital.accounting.finance
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.scrollBy
@@ -89,6 +91,8 @@ fun AccountReorderList(accounts: List<Account>, enabled: Boolean, move: (String,
                     elevation = CardDefaults.outlinedCardElevation(defaultElevation = if (active) 8.dp else 0.dp),
                 ) {
                     Row(Modifier.padding(12.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.size(16.dp).background(capitalAccountColor(account.id), CircleShape))
+                        Spacer(Modifier.width(8.dp))
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text(account.name, fontWeight = FontWeight.SemiBold)
                             Text(Money.display(account.posted_balance_minor, account.currency), style = MaterialTheme.typography.bodySmall)

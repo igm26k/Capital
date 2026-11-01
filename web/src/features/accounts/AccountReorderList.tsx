@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState, type PointerEvent } from 'react';
 import { createPortal } from 'react-dom';
 import type { Account } from '../../api/client';
 import { money } from '../../shared/money';
+import { accountColor } from '../../shared/AccountSelect';
 import { Icon } from '../../shared/Icon';
 type Drag = { id: string; pointer: number; startY: number; y: number; left: number; top: number; width: number; target: number; active: boolean; handle: HTMLButtonElement };
 export function AccountReorderList({ accounts, disabled, move, edit }: { accounts: Account[]; disabled: boolean; move: (id: string, index: number) => void; edit: (account: Account) => void }) {
@@ -63,7 +64,7 @@ export function AccountReorderList({ accounts, disabled, move, edit }: { account
     <span className="sr-only" role="status">{announcement}</span>
     <ul ref={list} className={`account-management-list${drag?.active ? ' is-reordering' : ''}`} aria-label="Порядок счетов">
       {accounts.map((account, index) => <li key={account.id} data-account-id={account.id} className={drag?.active && drag.id === account.id ? 'account-drag-source' : drag?.active && drag.target === index ? (index < accounts.findIndex(a => a.id === drag.id) ? 'account-drop-before' : 'account-drop-after') : undefined}>
-        <div className="account-list-copy"><strong>{account.name}</strong><span>{money(account.posted_balance_minor, account.currency)}{account.archived_at && ' · В архиве'}</span></div>
+        <span className="account-color-dot" aria-hidden="true" style={{ backgroundColor: accountColor(account.id) }} /><div className="account-list-copy"><strong>{account.name}</strong><span>{money(account.posted_balance_minor, account.currency)}{account.archived_at && ' · В архиве'}</span></div>
         <div className="account-list-actions">
           <button className="secondary account-drag-handle" disabled={disabled} aria-label={`Перетащить счет ${account.name}`} aria-describedby={instruction} onPointerDown={event => start(event, account.id)} onPointerMove={update} onPointerUp={event => { if (session.current?.pointer === event.pointerId) stop(); }} onPointerCancel={event => { if (session.current?.pointer === event.pointerId) stop(true); }} onLostPointerCapture={event => { if (session.current?.pointer === event.pointerId) stop(true); }} onKeyDown={event => {
             if (event.key === 'Escape') { stop(true); return; }
@@ -77,6 +78,6 @@ export function AccountReorderList({ accounts, disabled, move, edit }: { account
         </div>
       </li>)}
     </ul>
-    {drag?.active && dragged && createPortal(<div className="account-drag-ghost" aria-hidden="true" style={{ left: drag.left, top: drag.top, width: drag.width, transform: `translateY(${drag.y - drag.startY}px)` }}><Icon name="drag" /><div className="account-list-copy"><strong>{dragged.name}</strong><span>{money(dragged.posted_balance_minor, dragged.currency)}</span></div></div>, document.body)}
+    {drag?.active && dragged && createPortal(<div className="account-drag-ghost" aria-hidden="true" style={{ left: drag.left, top: drag.top, width: drag.width, transform: `translateY(${drag.y - drag.startY}px)` }}><Icon name="drag" /><span className="account-color-dot" style={{ backgroundColor: accountColor(dragged.id) }} /><div className="account-list-copy"><strong>{dragged.name}</strong><span>{money(dragged.posted_balance_minor, dragged.currency)}</span></div></div>, document.body)}
   </>;
 }
