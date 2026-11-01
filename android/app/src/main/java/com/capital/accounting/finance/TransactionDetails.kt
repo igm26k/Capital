@@ -25,7 +25,7 @@ fun TransactionDetails(model: AuthViewModel) {
                 Button(enabled = !state.busy, onClick = model::closeTransactionDetails) { Text("Вернуться к истории") }
                 if (state.detailStack.size > 1) TextButton(enabled = !state.busy, onClick = model::backTransactionDetails) { Text("Назад к предыдущим деталям") }
                 Button(enabled = !state.busy, onClick = model::refreshTransactionDetails) { Text("Обновить детали") }
-                if (state.busy) CircularProgressIndicator()
+
                 if (state.detailMissing) Text("Операция удалена или недоступна.")
                 if (state.detailError.isNotEmpty()) Text(state.detailError)
                 state.detailTransaction?.let { item ->

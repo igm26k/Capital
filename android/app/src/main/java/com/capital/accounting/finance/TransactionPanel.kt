@@ -61,7 +61,7 @@ fun TransactionPanel(model: AuthViewModel) {
     fun close() {
         if (enabled && !scope.saving) guard.request { reset(); navigation.value = null }
     }
-    fun createOperation(targetKind: String) { if (state.accountsLoaded && !createRouter.routeToFirstAccount(state)) guard.request { reset(targetKind); navigation.value = "transaction" } }
+    fun createOperation(targetKind: String) { if (state.accountsLoaded) guard.request { reset(targetKind); navigation.value = "transaction" } }
     HandleFinancialCreate("transaction", enabled) { createOperation(if (it.kind == FinancialCreation.INCOME) "income" else "expense") }
     fun editOperation(transaction: Transaction) { guard.request {
         validation.reset()
@@ -166,7 +166,7 @@ fun TransactionPanel(model: AuthViewModel) {
         Surface(Modifier.padding(12.dp).widthIn(max = 560.dp).fillMaxWidth().heightIn(max = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp - 24).coerceAtLeast(100).dp), shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp)) {
             Column(Modifier.imePadding().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Button(enabled = enabled && !scope.saving, onClick = ::close) { Text("Отмена") }
-                if (state.busy) CircularProgressIndicator()
+
                 if (state.message.isNotEmpty()) Text(state.message)
                 if (scope.failed) {
                     Text("Не удалось сохранить черновики на устройстве. Повторите сохранение.")
@@ -177,10 +177,10 @@ fun TransactionPanel(model: AuthViewModel) {
                 Text(if (editingId == null) "Новая операция" else "Изменение операции", style = MaterialTheme.typography.titleLarge)
                 if (editingId == null) OperationTypeSelect(model, kind, enabled)
                 CapitalSelect("Счет", account?.id ?: "", eligible.map { it.id to "${it.name} · ${it.currency}" }, enabled) { accountId = it }
-                Text(if (account == null) "Обновите счета и выберите активный счет." else "Выбран счет: ${account.name} · ${account.currency}")
+                Text(if (account == null) "Добавьте активный счет в Настройки → Счета." else "Выбран счет: ${account.name} · ${account.currency}")
                 parts.forEachIndexed { index, part ->
                     CapitalSelect("Категория${if (parts.size > 1) " части ${index + 1}" else ""}", part.categoryId ?: "",
-                        listOf("" to "Без категории") + state.categories.filter { it.archived_at == null || it.id == part.categoryId }.map { it.id to categoryPath(it.id, state.categories) }.sortedBy { it.second }, enabled) { chosen ->
+                        listOf("" to "Без категории") + state.categories.filter { it.archived_at == null || it.id == part.categoryId }.map { it.id to categoryPath(it.id, state.categories) }.sortedBy { it.second }, enabled, optionIcon = { CategoryIcon(it.ifEmpty { null }, state.categories) }, optionColor = { categoryAppearance(it.ifEmpty { null }, state.categories).color }) { chosen ->
                         parts = parts.map { if (it.id == part.id) it.copy(categoryId = chosen.ifEmpty { null }) else it }
                     }
                     if (parts.size > 1) {

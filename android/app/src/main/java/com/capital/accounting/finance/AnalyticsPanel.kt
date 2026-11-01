@@ -38,7 +38,7 @@ fun AnalyticsPanel(model: AuthViewModel) {
     val mutable = enabled && analytics.pending == null
     Text("Предварительные операции включены; валюты раздельно. Период [от, до), UTC. Для загрузки и изменения настроек нужно соединение.")
     if(analytics.message.isNotEmpty())Text(analytics.message)
-    if(analytics.busy)CircularProgressIndicator()
+
     OutlinedTextField(from,{from=it},label={Text("Отчет от (UTC)")},enabled=enabled)
     OutlinedTextField(to,{to=it},label={Text("Отчет до (UTC)")},enabled=enabled)
     TextButton(enabled=enabled,onClick={account=null;category=null;tag=null}){Text("Отчет: все счета, категории и теги")}

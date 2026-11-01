@@ -2,6 +2,8 @@ package com.capital.accounting.api
 
 import com.capital.accounting.auth.StoredSession
 import com.capital.accounting.normalizedOrigin
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.serialization.json.Json
 import okhttp3.Call
@@ -27,6 +29,11 @@ class ApiFailure(val status: Int, val code: String, requestId: String? = null) :
 class ApiClient(origin: String) {
     val origin = normalizedOrigin(origin)
     suspend fun request(path: String, method: String = "GET", body: String? = null, session: StoredSession? = null, commandId: String? = null, generationId: String? = null, maxResponseBytes: Int = 2 * 1024 * 1024): String {
+        activeRequests.update { it + 1 }
+        try { return performRequest(path, method, body, session, commandId, generationId, maxResponseBytes) }
+        finally { activeRequests.update { it - 1 } }
+    }
+    private suspend fun performRequest(path: String, method: String = "GET", body: String? = null, session: StoredSession? = null, commandId: String? = null, generationId: String? = null, maxResponseBytes: Int = 2 * 1024 * 1024): String {
         require(path.startsWith('/') && !path.startsWith("//") && !path.contains('\\'))
         require(maxResponseBytes in 1..65 * 1024 * 1024)
         require(maxResponseBytes <= 2 * 1024 * 1024 ||
@@ -76,6 +83,7 @@ class ApiClient(origin: String) {
         }
     }
     companion object {
+        val activeRequests = MutableStateFlow(0)
         val json = Json { ignoreUnknownKeys = false }
         private val client = OkHttpClient.Builder().cookieJar(CookieJar.NO_COOKIES)
             // Retire idle sockets before the API/proxy idle deadlines; never retry a write implicitly.

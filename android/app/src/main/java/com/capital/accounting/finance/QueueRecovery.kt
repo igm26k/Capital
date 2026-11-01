@@ -24,7 +24,7 @@ fun QueueRecovery(model: AuthViewModel) {
             Column(Modifier.safeDrawingPadding().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Проверка сохранённых изменений", style = MaterialTheme.typography.headlineLarge)
                 Button(enabled = !state.busy, onClick = model::closeQueueRecovery) { Text("Закрыть проверку очереди") }
-                if (state.busy) CircularProgressIndicator()
+
                 if (state.recoveryError.isNotEmpty()) Text(state.recoveryError)
                 val head = state.recoveryCommands.firstOrNull()
                 if (head == null) Text("Нет изменений, ожидающих отправки.")

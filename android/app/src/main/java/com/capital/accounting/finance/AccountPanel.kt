@@ -28,6 +28,8 @@ fun AccountPanel(model: AuthViewModel) {
     val scope = LocalFinancialDraftScope.current
     val navigation = LocalFinancialEditor.current
     val section = LocalFinancialSection.current
+    val router = LocalFinancialCreateRouter.current
+    val managing = section.value == "more" && LocalSettingsGroup.current == "accounts"
     var accountFilter by rememberSaveable(state.origin, state.auth?.profile?.id, state.auth?.workspace?.id) { mutableStateOf("active") }
     val editorOpen = navigation.value == "account"
     var handledLocalReceipt by remember { mutableStateOf(state.localCollectionReceipt?.actionId) }
@@ -87,23 +89,23 @@ fun AccountPanel(model: AuthViewModel) {
         }
     }
     if (navigation.value == null && section.value == "accounts") FinancialCommandStatus(model, "Ваш черновик: $name, $type; ${if (archived) "в архив" else "активен"}")
-    if (!editorOpen && section.value == "accounts") {
-        var settings by rememberSaveable { mutableStateOf(false) }
-        val visibleCount = state.accounts.count { it.deleted_at == null && when (accountFilter) { "archived" -> it.archived_at != null; "all" -> true; else -> it.archived_at == null } }
+    if (!editorOpen && (section.value == "accounts" || managing)) {
+        val settings = managing
+        val visibleCount = state.accounts.count { it.deleted_at == null && when (if (managing) accountFilter else "active") { "archived" -> it.archived_at != null; "all" -> true; else -> it.archived_at == null } }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                Text("Список счетов", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                Text(if (managing) "Управление счетами" else "Список счетов", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                 Text("$visibleCount", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            FilledTonalIconButton(onClick = { settings = !settings }, modifier = Modifier.size(48.dp), shape = RoundedCornerShape(12.dp)) { CapitalIcon("settings") }
+
         }
         if (settings) {
             CapitalSelect("Показать счета", accountFilter, listOf("active" to "Активные", "archived" to "Архивные", "all" to "Все")) { accountFilter = it }
             Text("Нажмите счет, чтобы изменить его", style = MaterialTheme.typography.bodySmall)
             TextButton(enabled = !state.busy, onClick = model::loadAccounts) { Text("Обновить счета") }
         }
-        val visibleAccounts = state.accounts.filter { it.deleted_at == null && when (accountFilter) { "archived" -> it.archived_at != null; "all" -> true; else -> it.archived_at == null } }
-        CapitalAccountGrid(visibleAccounts, enabled && !scope.saving, settings, ::createAccount,
+        val visibleAccounts = state.accounts.filter { it.deleted_at == null && when (if (managing) accountFilter else "active") { "archived" -> it.archived_at != null; "all" -> true; else -> it.archived_at == null } }
+        CapitalAccountGrid(visibleAccounts, enabled && !scope.saving, settings, { if (managing) createAccount() else run { router.request = FinancialCreationRequest(FinancialCreation.EXPENSE) } },
             onOpen = { account -> model.applyHistoryFilter(TransactionFilter(accountId = account.id)); section.value = "operations" },
             onEdit = { account -> guard.request { editingId = account.id; editingVersion = account.version; currency = account.currency; editingBalance = account.posted_balance_minor; name = account.name; type = account.type; archived = account.archived_at != null; error = ""; validation.reset(); navigation.value = "account" } })
         if (visibleAccounts.isNotEmpty()) FlowRow(Modifier.fillMaxWidth().padding(start = 2.dp, top = 14.dp, bottom = 2.dp), horizontalArrangement = Arrangement.spacedBy(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -115,16 +117,16 @@ fun AccountPanel(model: AuthViewModel) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
             TextButton(onClick = { section.value = "operations" }) { CapitalIcon("records", Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text("ЗАПИСИ", fontSize = 12.sp); Spacer(Modifier.width(8.dp)); CapitalIcon("arrow", Modifier.size(18.dp)) }
         }
-        CapitalHomeOverview(model)
+        if (!managing) CapitalHomeOverview(model)
         if (settings) TextButton(enabled = enabled && !scope.saving, onClick = { navigation.value = "account" }) { Text("Открыть черновик счета") }
-        DraftGuardControls(guard, "account", enabled) { navigation.value = "account" }
+        if (managing) DraftGuardControls(guard, "account", enabled) { navigation.value = "account" }
     } else if (editorOpen) Dialog(onDismissRequest = ::close, properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)) {
         Surface(Modifier.padding(12.dp).widthIn(max = 560.dp).fillMaxWidth().heightIn(max = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp - 24).coerceAtLeast(100).dp), shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp)) {
             Column(Modifier.imePadding().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Редактор счета", style = MaterialTheme.typography.headlineLarge)
                 Button(enabled = enabled && !scope.saving, onClick = ::close) { Text("Отмена") }
                 Button(enabled = !state.busy, onClick = model::loadAccounts) { Text("Обновить счета") }
-                if (state.busy) CircularProgressIndicator()
+
                 if (state.message.isNotEmpty()) Text(state.message)
                 if (scope.failed) {
                     Text("Не удалось сохранить черновики на устройстве. Повторите сохранение.")

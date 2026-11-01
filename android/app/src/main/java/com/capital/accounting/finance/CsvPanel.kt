@@ -38,7 +38,7 @@ fun CsvPanel(model:AuthViewModel){
     var delimiter by rememberSaveable{mutableStateOf(",")};var decimal by rememberSaveable{mutableStateOf(".")};var format by rememberSaveable{mutableStateOf("YYYY-MM-DD")}
     val enabled=!csv.busy&&!state.busy&&!state.offline&&state.persisted
     Text("UTF-8 CSV, до 10 MiB и 1000 строк. Положительная сумма — доход, отрицательная — расход. Импорт работает при соединении с сервером.")
-    if(error.isNotEmpty())Text(error);if(csv.message.isNotEmpty())Text(csv.message);if(csv.busy)CircularProgressIndicator()
+    if(error.isNotEmpty())Text(error);if(csv.message.isNotEmpty())Text(csv.message);
     Button(enabled=enabled&&csv.pending==null,onClick={picker.launch(arrayOf("text/*","application/csv","application/octet-stream"))}){Text(if(content==null)"Выбрать CSV файл" else "CSV файл выбран")}
     state.accounts.filter{it.archived_at==null}.forEach{a->TextButton(enabled=enabled,onClick={account=a.id}){Text("Счет CSV: ${a.name} · ${a.currency}${if(account==a.id)" ✓" else ""}")}}
     OutlinedTextField(date,{date=it},label={Text("Колонка даты CSV")},enabled=enabled);OutlinedTextField(amount,{amount=it},label={Text("Колонка суммы CSV")},enabled=enabled);OutlinedTextField(payee,{payee=it},label={Text("Колонка получателя CSV (необязательно)")},enabled=enabled);OutlinedTextField(zone,{zone=it},label={Text("Часовой пояс CSV")},enabled=enabled)

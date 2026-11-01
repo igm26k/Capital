@@ -20,7 +20,7 @@ fun FinancialEditorScreen(model: AuthViewModel, prefix: String, guard: DraftGuar
         Surface(Modifier.padding(12.dp).widthIn(max = 560.dp).fillMaxWidth().heightIn(max = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp - 24).coerceAtLeast(100).dp), shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp)) {
             Column(Modifier.imePadding().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Button(enabled = enabled && !scope.saving, onClick = onClose) { Text("Отмена") }
-                if (state.busy) CircularProgressIndicator()
+
                 if (state.message.isNotEmpty()) Text(state.message)
                 if (scope.failed) {
                     Text("Не удалось сохранить черновики на устройстве. Повторите сохранение.")

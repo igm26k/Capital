@@ -119,7 +119,7 @@ fun HomeOverview(model: AuthViewModel) {
                     var angle = -90f
                     if (sum.signum() > 0) categories.forEachIndexed { index, item ->
                         val sweep = BigDecimal(BigInteger(item.expense_minor).abs()).divide(BigDecimal(sum), MathContext.DECIMAL64).toFloat() * 360f
-                        drawArc(palette[index % palette.size], angle, sweep, false, topLeft = origin, size = bounds, style = stroke)
+                        drawArc(categoryAppearance(item.category_id, state.categories).color, angle, sweep, false, topLeft = origin, size = bounds, style = stroke)
                         angle += sweep
                     }
                 }
@@ -131,7 +131,7 @@ fun HomeOverview(model: AuthViewModel) {
             Column(Modifier.padding(bottom = 20.dp), verticalArrangement = Arrangement.spacedBy(11.dp)) {
                 categories.forEachIndexed { index, category ->
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Box(Modifier.size(8.dp).background(palette[index % palette.size], CircleShape))
+                        CategoryIcon(category.category_id, state.categories)
                         Text(state.categories.find { it.id == category.category_id }?.name ?: "Без категории", modifier = Modifier.weight(1f), fontSize = 12.sp)
                         Text(Money.displayAggregate(category.expense_minor, selected), fontSize = 11.sp)
                     }

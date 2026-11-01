@@ -19,7 +19,7 @@ enum class FinancialCreation(val prefix: String, val section: String, val label:
     TRANSFER("transfer", "operations", "Создать перевод"),
     REFUND("refund", "operations", "Создать возврат"),
     ADJUSTMENT("adjustment", "operations", "Создать корректировку"),
-    ACCOUNT("account", "accounts", "Создать счет"),
+    ACCOUNT("account", "more", "Создать счет"),
     CATEGORY("catalog", "more", "Создать категорию"),
     TAG("catalog", "more", "Создать тег"),
 }
@@ -38,6 +38,8 @@ class FinancialCreateRouter {
     var transactionRequest by mutableStateOf<FinancialTransactionRequest?>(null)
     var canCreate by mutableStateOf(false)
     var editorOpen by mutableStateOf(false)
+    var editorPrefix by mutableStateOf<String?>(null)
+    var loadingDrafts by mutableStateOf(false)
     fun routeToFirstAccount(state: AuthState): Boolean {
         if (!state.accountsLoaded || state.accounts.any { it.archived_at == null && it.deleted_at == null }) return false
         request = FinancialCreationRequest(FinancialCreation.ACCOUNT)
@@ -81,7 +83,7 @@ fun HandleFinancialCreate(prefix: String, enabled: Boolean, create: (FinancialCr
 fun FinancialAddButton(model: AuthViewModel, router: FinancialCreateRouter) {
     val state = model.state
     val section = LocalFinancialSection.current.value
-    val canQueue = if (section == "accounts") state.canQueueAccounts else state.canQueueBasicCreates
+    val canQueue = state.canQueueBasicCreates
     val enabled = !state.busy && state.persisted && (!state.financeBlocked || canQueue) && router.canCreate && router.request == null && router.transactionRequest == null
     fun select(request: FinancialCreationRequest) { router.request = request }
     LaunchedEffect(state.financeBlocked, canQueue, state.logoutPending, state.revokePendingId) {
@@ -89,10 +91,9 @@ fun FinancialAddButton(model: AuthViewModel, router: FinancialCreateRouter) {
     }
     if (!router.editorOpen && state.detailStack.isEmpty() && section != "more") {
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp), horizontalArrangement = Arrangement.End) {
-            FloatingActionButton(shape = CircleShape, modifier = Modifier.size(58.dp).semantics { contentDescription = if (section == "accounts") "Добавить счет" else "Добавить операцию" }, onClick = {
+            FloatingActionButton(shape = CircleShape, modifier = Modifier.size(58.dp).semantics { contentDescription = "Добавить операцию" }, onClick = {
                 if (enabled) {
-                    if (section == "accounts") select(FinancialCreationRequest(FinancialCreation.ACCOUNT))
-                    else if (!router.routeToFirstAccount(state)) select(FinancialCreationRequest(FinancialCreation.EXPENSE))
+                    select(FinancialCreationRequest(FinancialCreation.EXPENSE))
                 }
             }, containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary) { CapitalIcon("plus", Modifier.size(28.dp)) }
         }

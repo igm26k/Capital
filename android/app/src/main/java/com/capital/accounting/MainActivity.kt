@@ -50,6 +50,9 @@ class MainActivity : ComponentActivity() {
         setContent {
             val model: AuthViewModel = viewModel()
             val state = model.state
+            val networkRequests by com.capital.accounting.api.ApiClient.activeRequests.collectAsState()
+            val analytics: AnalyticsModel = viewModel()
+            val csv: CsvModel = viewModel()
             var origin by remember(state.origin) { mutableStateOf(state.origin) }
             var email by remember { mutableStateOf("") }
             var password by remember { mutableStateOf("") }
@@ -59,6 +62,9 @@ class MainActivity : ComponentActivity() {
             val section = navigation.section
             val createRouter = remember(state.origin, state.auth?.profile?.id, state.auth?.workspace?.id) { FinancialCreateRouter() }
             LaunchedEffect(state.auth) { if (state.auth != null) password = "" }
+            LaunchedEffect(createRouter.request, createRouter.editorPrefix) {
+                if (createRouter.request?.kind == FinancialCreation.ACCOUNT || createRouter.editorPrefix == "account") navigation.settingsGroup = "accounts"
+            }
             val settingsGroup = navigation.settingsGroup
             val settingsState = rememberSaveableStateHolder()
             var settingsMenu by remember { mutableStateOf(false) }
@@ -83,7 +89,7 @@ class MainActivity : ComponentActivity() {
                             LaunchedEffect(section.value, settingsGroup) { scroll.scrollTo(0) }
                             Column(Modifier.weight(1f).windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)).imePadding().verticalScroll(scroll).padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 if (state.message.isNotEmpty()) Text(state.message)
-                                if (state.busy) CircularProgressIndicator()
+
                                 if (state.revokePendingId != null) {
                                     Text("Устройство: ${state.revokePendingId}")
                                     Button(enabled = !state.busy, onClick = { model.revokeSession(state.revokePendingId) }) { Text("Повторить отзыв устройства") }
@@ -114,7 +120,7 @@ class MainActivity : ComponentActivity() {
                                             Box {
                                                 TextButton(onClick = { settingsMenu = true }, modifier = Modifier.semantics { contentDescription = "Группы настроек" }) { Text("☰", style = MaterialTheme.typography.titleLarge) }
                                                 DropdownMenu(expanded = settingsMenu, onDismissRequest = { settingsMenu = false }) {
-                                                    listOf("profile" to "Профиль", "classification" to "Категории и теги", "analytics" to "Бюджеты и отчеты", "data" to "Импорт и экспорт", "sources" to "Банки и уведомления", "security" to "Безопасность и данные").forEach { (id, label) ->
+                                                    listOf("profile" to "Профиль", "accounts" to "Счета", "classification" to "Категории и теги", "analytics" to "Бюджеты и отчеты", "data" to "Импорт и экспорт", "sources" to "Банки и уведомления", "security" to "Безопасность и данные").forEach { (id, label) ->
                                                         DropdownMenuItem(text = { Text((if (settingsGroup == id) "✓ " else "") + label) }, onClick = { navigation.settingsGroup = id; settingsMenu = false })
                                                     }
                                                 }
@@ -190,6 +196,13 @@ class MainActivity : ComponentActivity() {
                         Box(Modifier.align(androidx.compose.ui.Alignment.BottomEnd).navigationBarsPadding().padding(bottom = 104.dp)) {
                             if (state.auth != null && !state.logoutPending && state.revokePendingId == null) FinancialAddButton(model, createRouter)
                         }
+                        }
+                    }
+                    if (state.busy || state.queueRunning || networkRequests > 0 || analytics.busy || csv.busy || createRouter.loadingDrafts) {
+                        androidx.compose.ui.window.Dialog(onDismissRequest = {}, properties = androidx.compose.ui.window.DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false)) {
+                            Box(Modifier.fillMaxWidth().height(96.dp), contentAlignment = androidx.compose.ui.Alignment.Center) {
+                                CircularProgressIndicator(modifier = Modifier.semantics { contentDescription = "Загрузка" })
+                            }
                         }
                     }
                 }

@@ -75,7 +75,7 @@ fun operationTitle(item: Transaction, categories: List<Category>): String = when
 }
 
 @Composable
-fun CapitalSelect(label: String, value: String, options: List<Pair<String, String>>, enabled: Boolean = true, onSelect: (String) -> Unit) {
+fun CapitalSelect(label: String, value: String, options: List<Pair<String, String>>, enabled: Boolean = true, optionIcon: (@Composable (String) -> Unit)? = null, optionColor: ((String) -> Color)? = null, onSelect: (String) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(7.dp)) {
@@ -83,6 +83,7 @@ fun CapitalSelect(label: String, value: String, options: List<Pair<String, Strin
         Box(Modifier.fillMaxWidth()) {
             OutlinedButton(onClick = { query = ""; expanded = true }, enabled = enabled, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp), shape = RoundedCornerShape(8.dp),
                 contentPadding = PaddingValues(14.dp), border = BorderStroke(1.dp, Color(0xff79747e)), colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface)) {
+                optionIcon?.invoke(value)
                 Text(options.find { it.first == value }?.second ?: "Выберите", modifier = Modifier.weight(1f), fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text("▾")
             }
@@ -93,8 +94,8 @@ fun CapitalSelect(label: String, value: String, options: List<Pair<String, Strin
                 var previousGroup = ""
                 filtered.forEach { (id, title) ->
                     val group = if (label.startsWith("Категория")) title.substringBefore(" / ") else ""
-                    if (group.isNotEmpty() && group != previousGroup) { Text(group, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(12.dp)); previousGroup = group }
-                    DropdownMenuItem(text = { Text(title) }, onClick = { expanded = false; onSelect(id) }) }
+                    if (group.isNotEmpty() && group != previousGroup) { Text(group, color = optionColor?.invoke(id) ?: MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(12.dp)); previousGroup = group }
+                    DropdownMenuItem(leadingIcon = if (optionIcon != null) { { optionIcon(id) } } else null, text = { Text(title) }, onClick = { expanded = false; onSelect(id) }) }
             }
         }
     }
@@ -104,6 +105,16 @@ fun CapitalSelect(label: String, value: String, options: List<Pair<String, Strin
 @Composable
 fun CapitalIcon(name: String, modifier: Modifier = Modifier.size(24.dp), color: Color = LocalContentColor.current) {
     val source = when (name) {
+        "food" -> "M4 3v6a2 2 0 0 0 4 0V3M6 3v18M16 3v18M16 3c5 4 5 9 0 9"
+        "shop" -> "M4 7h16l1 14H3L4 7M8 7V5a4 4 0 0 1 8 0v2"
+        "home" -> "M3 11l9-8 9 8M5 10v11h14V10M10 21v-7h4v7"
+        "transport" -> "M4 15l1-7h14l1 7M3 15h18v5H3zM6 20v2M18 20v2M6 17h2M16 17h2"
+        "health" -> "M9 3h6v6h6v6h-6v6H9v-6H3V9h6z"
+        "travel" -> "M3 10l7 2 5-9 3 1-3 9 6 4-1 2-8-2-5 4-2-1 2-5-5-3z"
+        "education" -> "M2 8l10-5 10 5-10 5-10-5M6 10v7q6 5 12 0v-7M22 8v9"
+        "leisure" -> "M5 7h14l3 13h-5l-3-4h-4l-3 4H2L5 7M6 11v4M4 13h4M16 12h.01M19 14h.01"
+        "work" -> "M3 7h18v14H3zM8 7V3h8v4M3 12h18M10 12v3h4v-3"
+        "category" -> "M12 2l10 10-10 10L2 12 12 2M12 8v8M8 12h8"
         "settings" -> "M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8M9 3h6l1 3 3 1 2 5-2 5-3 1-1 3H9l-1-3-3-1-2-5 2-5 3-1z"
         "plus" -> "M12 5v14M5 12h14"
         "bank" -> "M3 9l9-6 9 6H3M5 10v8M10 10v8M14 10v8M19 10v8M3 21h18"
@@ -135,7 +146,7 @@ fun CapitalAccountGrid(accounts: List<Account>, enabled: Boolean, editing: Boole
                             border = BorderStroke(1.dp, Color(0xff9aaccb)), colors = CardDefaults.outlinedCardColors(containerColor = Color.Transparent)) {
                             Row(Modifier.fillMaxWidth().heightIn(min = 56.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
                                 CapitalIcon("plus", Modifier.size(16.dp), MaterialTheme.colorScheme.primary)
-                                Text("Добавить счет", fontSize = 10.sp, color = MaterialTheme.colorScheme.primary)
+                                Text(if (editing) "Добавить счет" else "Добавить операцию", fontSize = 10.sp, color = MaterialTheme.colorScheme.primary)
                             }
                         } else Card(modifier = Modifier.weight(1f).fillMaxHeight(), shape = RoundedCornerShape(9.dp),
                             colors = CardDefaults.cardColors(containerColor = capitalAccountColors[account.id.sumOf { it.code } % capitalAccountColors.size], contentColor = Color.White)) {
@@ -165,7 +176,7 @@ fun CapitalOperationRow(model: AuthViewModel, item: Transaction, expandedContent
         modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(9.dp), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         Row(Modifier.heightIn(min = 64.dp).padding(horizontal = 8.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
             Box(Modifier.width(24.dp).height(28.dp), contentAlignment = Alignment.Center) {
-                CapitalIcon(if (item.kind in listOf("opening", "adjustment")) "bank" else item.kind, Modifier.size(19.dp), MaterialTheme.colorScheme.primary)
+                if (item.kind in listOf("expense", "income")) CategoryIcon(item.allocations.firstOrNull()?.category_id, state.categories) else CapitalIcon(if (item.kind in listOf("opening", "adjustment")) "bank" else item.kind, Modifier.size(19.dp), MaterialTheme.colorScheme.primary)
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(title, fontSize = 12.sp, lineHeight = 15.6.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -243,7 +254,7 @@ fun CapitalRecentRow(model: AuthViewModel, item: Transaction) {
     Row(Modifier.fillMaxWidth().heightIn(min = 76.dp).clickable { model.openTransactionDetails(item.id) }.padding(vertical = 14.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(34.dp).background(Color(background), androidx.compose.foundation.shape.CircleShape), contentAlignment = Alignment.Center) {
-            CapitalIcon(item.kind, Modifier.size(18.dp), Color(accent))
+            if (item.kind in listOf("expense", "income")) CategoryIcon(item.allocations.firstOrNull()?.category_id, state.categories) else CapitalIcon(item.kind, Modifier.size(18.dp), Color(accent))
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
             Text(item.payee.ifBlank { operationTitle(item, state.categories) }, fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)

@@ -202,7 +202,7 @@ fun FinancialDraftContent(context: Context, origin: String, owner: String, works
     val section = LocalFinancialSection.current
     LaunchedEffect(editor.value) {
         when (editor.value) {
-            "account" -> section.value = "accounts"
+            "account" -> section.value = "more"
             "catalog" -> section.value = "more"
             "transaction", "transfer", "refund", "adjustment" -> section.value = "operations"
         }
@@ -214,9 +214,11 @@ fun FinancialDraftContent(context: Context, origin: String, owner: String, works
     SideEffect {
         createRouter.canCreate = canCreate
         createRouter.editorOpen = editorOpen
+        createRouter.editorPrefix = editor.value
+        createRouter.loadingDrafts = loaded == null && !failed
     }
     DisposableEffect(createRouter) {
-        onDispose { createRouter.canCreate = false; createRouter.editorOpen = false; createRouter.request = null; createRouter.transactionRequest = null }
+        onDispose { createRouter.canCreate = false; createRouter.editorOpen = false; createRouter.editorPrefix = null; createRouter.loadingDrafts = false; createRouter.request = null; createRouter.transactionRequest = null }
     }
     if (loaded != null) {
         CompositionLocalProvider(LocalFinancialDraftScope provides loaded, LocalFinancialEditor provides editor) {
@@ -228,5 +230,5 @@ fun FinancialDraftContent(context: Context, origin: String, owner: String, works
     } else if (failed) {
         androidx.compose.material3.Text("Не удалось прочитать черновики. Исходный файл сохранен.")
         androidx.compose.material3.Button(onClick = { attempt++ }) { androidx.compose.material3.Text("Повторить чтение черновиков") }
-    } else androidx.compose.material3.CircularProgressIndicator()
+    }
 }

@@ -93,8 +93,11 @@ fun CatalogPanel(model: AuthViewModel) {
         TextButton(enabled = tagEnabled && !scope.saving, onClick = { createCatalog("tags") }) { Text("Новый тег") }
         TextButton(enabled = enabled && !scope.saving, onClick = { navigation.value = "catalog" }) { Text("Открыть черновик классификации") }
         DraftGuardControls(guard, "catalog", enabled) { navigation.value = "catalog" }
-        state.categories.forEach { item ->
+        state.categories.sortedBy { categoryPath(it.id, state.categories) }.forEach { item ->
+            androidx.compose.foundation.layout.Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            CategoryIcon(item.id, state.categories)
             Text("Категория: ${categoryPath(item.id, state.categories)}${if (item.archived_at != null) " · В архиве" else ""}")
+            }
             TextButton(enabled = enabled && (state.offline || ("category" to item.id) !in state.localAffected), onClick = { guard.request { collection = "categories"; id = item.id; version = item.version; name = item.name; parentId = item.parent_id; archived = item.archived_at != null; error = ""; validation.reset(); navigation.value = "catalog"  } }) { Text("Изменить категорию ${categoryPath(item.id, state.categories)}") }
         }
         state.tags.forEach { item ->
@@ -106,7 +109,7 @@ fun CatalogPanel(model: AuthViewModel) {
             Column(Modifier.imePadding().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Button(enabled = enabled && !scope.saving, onClick = ::close) { Text("Отмена") }
                 Button(enabled = !state.busy, onClick = model::loadCatalog) { Text("Обновить категории и теги") }
-                if (state.busy) CircularProgressIndicator()
+
                 if (state.message.isNotEmpty()) Text(state.message)
                 if (scope.failed) {
                     Text("Не удалось сохранить черновики на устройстве. Повторите сохранение.")
