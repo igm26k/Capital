@@ -1,5 +1,13 @@
 package com.capital.accounting.finance
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
@@ -87,15 +95,42 @@ fun CapitalSelect(label: String, value: String, options: List<Pair<String, Strin
                 Text(options.find { it.first == value }?.second ?: "Выберите", modifier = Modifier.weight(1f), fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text("▾")
             }
-            DropdownMenu(expanded = expanded && enabled, onDismissRequest = { expanded = false }, modifier = Modifier.heightIn(max = 360.dp)) {
-                OutlinedTextField(query, { query = it }, label = { Text("Поиск: $label") }, singleLine = true, modifier = Modifier.padding(8.dp))
+            if (expanded && enabled) Dialog(onDismissRequest = { expanded = false }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+                val scroll = rememberScrollState()
                 val filtered = options.filter { it.second.contains(query, ignoreCase = true) }
-                if (filtered.isEmpty()) Text("Ничего не найдено", modifier = Modifier.padding(16.dp))
-                var previousGroup = ""
-                filtered.forEach { (id, title) ->
-                    val group = if (label.startsWith("Категория")) title.substringBefore(" / ") else ""
-                    if (group.isNotEmpty() && group != previousGroup) { Text(group, color = optionColor?.invoke(id) ?: MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(12.dp)); previousGroup = group }
-                    DropdownMenuItem(leadingIcon = if (optionIcon != null) { { optionIcon(id) } } else null, text = { Text(title) }, onClick = { expanded = false; onSelect(id) }) }
+                LaunchedEffect(query) { scroll.scrollTo(0) }
+                Surface(Modifier.padding(12.dp).widthIn(max = 560.dp).fillMaxWidth().heightIn(max = (LocalConfiguration.current.screenHeightDp - 48).coerceAtLeast(160).dp), shape = RoundedCornerShape(16.dp)) {
+                    Column(Modifier.imePadding().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text(label, style = MaterialTheme.typography.titleLarge)
+                        OutlinedTextField(query, { query = it }, label = { Text("Поиск: $label") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                        Text("Найдено: ${filtered.size}", style = MaterialTheme.typography.bodySmall)
+                        Box(Modifier.weight(1f, fill = false).fillMaxWidth()) {
+                            Column(Modifier.fillMaxWidth().verticalScroll(scroll).padding(end = 16.dp)) {
+                                if (filtered.isEmpty()) Text("Ничего не найдено", modifier = Modifier.padding(16.dp))
+                                var previousGroup = ""
+                                filtered.forEach { (id, title) ->
+                                    val group = if (label.startsWith("Категория")) title.substringBefore(" / ") else ""
+                                    if (group.isNotEmpty() && group != previousGroup) {
+                                        Text(group, color = optionColor?.invoke(id) ?: MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(12.dp))
+                                        previousGroup = group
+                                    }
+                                    DropdownMenuItem(modifier = Modifier.fillMaxWidth(), leadingIcon = if (optionIcon != null) { { optionIcon(id) } } else null, text = { Text(title) }, onClick = { expanded = false; onSelect(id) })
+                                }
+                            }
+                            val trackColor = MaterialTheme.colorScheme.outline.copy(alpha = .35f)
+                            val thumbColor = MaterialTheme.colorScheme.primary
+                            if (scroll.maxValue > 0) Canvas(Modifier.matchParentSize()) {
+                                val trackWidth = 6.dp.toPx()
+                                val viewport = scroll.viewportSize.toFloat()
+                                val thumbHeight = (size.height * viewport / (viewport + scroll.maxValue)).coerceIn(24.dp.toPx().coerceAtMost(size.height), size.height)
+                                val top = (size.height - thumbHeight) * scroll.value.toFloat() / scroll.maxValue
+                                drawRoundRect(trackColor, Offset(size.width - trackWidth, 0f), Size(trackWidth, size.height), CornerRadius(trackWidth))
+                                drawRoundRect(thumbColor, Offset(size.width - trackWidth, top), Size(trackWidth, thumbHeight), CornerRadius(trackWidth))
+                            }
+                        }
+                        TextButton(onClick = { expanded = false }, modifier = Modifier.fillMaxWidth()) { Text("Закрыть") }
+                    }
+                }
             }
         }
     }
