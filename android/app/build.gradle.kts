@@ -17,8 +17,8 @@ android {
         applicationId = "com.capital.accounting"
         minSdk = 23
         targetSdk = 36
-        versionCode = 7
-        versionName = "0.4.3"
+        versionCode = 8
+        versionName = "0.4.4"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     if (releaseSecrets.all { !it.isNullOrEmpty() }) {
