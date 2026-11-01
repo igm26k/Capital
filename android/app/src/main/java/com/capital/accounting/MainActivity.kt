@@ -65,6 +65,7 @@ class MainActivity : ComponentActivity() {
             LaunchedEffect(createRouter.request, createRouter.editorPrefix) {
                 if (createRouter.request?.kind == FinancialCreation.ACCOUNT || createRouter.editorPrefix == "account") navigation.settingsGroup = "accounts"
             }
+            val scroll = rememberScrollState()
             val settingsGroup = navigation.settingsGroup
             val settingsState = rememberSaveableStateHolder()
             var settingsMenu by remember { mutableStateOf(false) }
@@ -73,7 +74,7 @@ class MainActivity : ComponentActivity() {
                 if (state.auth != null) navigation.back()
             }
             MaterialTheme(colorScheme = capitalColors(isSystemInDarkTheme()), typography = capitalTypography) {
-                CompositionLocalProvider(LocalFinancialSection provides section, LocalFinancialCreateRouter provides createRouter, LocalSettingsGroup provides settingsGroup) {
+                CompositionLocalProvider(LocalFinancialSection provides section, LocalFinancialCreateRouter provides createRouter, LocalSettingsGroup provides settingsGroup, LocalFinancialScrollState provides scroll) {
                     if (state.auth != null && state.recoveryOpen) QueueRecovery(model)
                     if (state.auth != null && state.detailStack.isNotEmpty()) TransactionDetails(model)
                     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
@@ -85,7 +86,6 @@ class MainActivity : ComponentActivity() {
                                     if (state.auth != null) TextButton(enabled = !state.busy && (!state.financeBlocked || (state.offline && state.financialCommand == null && state.localPending == 0 && state.localBlocked == 0)), onClick = model::logout, colors = ButtonDefaults.textButtonColors(contentColor = Color.White)) { Text("Выход") }
                                 }
                             }
-                            val scroll = rememberScrollState()
                             LaunchedEffect(section.value, settingsGroup) { scroll.scrollTo(0) }
                             Column(Modifier.weight(1f).windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)).imePadding().verticalScroll(scroll).padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 if (state.message.isNotEmpty()) Text(state.message)

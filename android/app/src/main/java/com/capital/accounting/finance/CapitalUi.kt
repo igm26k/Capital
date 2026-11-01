@@ -140,6 +140,7 @@ fun CapitalSelect(label: String, value: String, options: List<Pair<String, Strin
 @Composable
 fun CapitalIcon(name: String, modifier: Modifier = Modifier.size(24.dp), color: Color = LocalContentColor.current) {
     val source = when (name) {
+        "drag" -> "M9 5h.01M15 5h.01M9 12h.01M15 12h.01M9 19h.01M15 19h.01"
         "food" -> "M4 3v6a2 2 0 0 0 4 0V3M6 3v18M16 3v18M16 3c5 4 5 9 0 9"
         "shop" -> "M4 7h16l1 14H3L4 7M8 7V5a4 4 0 0 1 8 0v2"
         "home" -> "M3 11l9-8 9 8M5 10v11h14V10M10 21v-7h4v7"

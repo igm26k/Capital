@@ -113,7 +113,6 @@ fun AccountPanel(model: AuthViewModel) {
         }
         if (settings) {
             CapitalSelect("Показать счета", accountFilter, listOf("active" to "Активные", "archived" to "Архивные", "all" to "Все")) { accountFilter = it }
-            Text("Стрелки меняют порядок счетов на главном экране и в списках выбора.", style = MaterialTheme.typography.bodySmall)
             TextButton(enabled = !state.busy, onClick = model::loadAccounts) { Text("Обновить счета") }
         }
         val visibleAccounts = (if (managing) ordered else state.accounts).filter { it.deleted_at == null && when (if (managing) accountFilter else "active") { "archived" -> it.archived_at != null; "all" -> true; else -> it.archived_at == null } }
@@ -125,28 +124,19 @@ fun AccountPanel(model: AuthViewModel) {
                     TextButton(enabled = !state.busy, onClick = { draftOrder = null; orderVersion = null }) { Text("Отменить") }
                 }
             }
-            visibleAccounts.forEachIndexed { index, account ->
-                OutlinedCard(Modifier.fillMaxWidth()) {
-                    Row(Modifier.padding(12.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text(account.name, fontWeight = FontWeight.SemiBold)
-                            Text(Money.display(account.posted_balance_minor, account.currency), style = MaterialTheme.typography.bodySmall)
-                            if (account.archived_at != null) Text("В архиве", style = MaterialTheme.typography.bodySmall)
-                        }
-                        fun move(delta: Int) {
-                            val other = visibleAccounts.getOrNull(index + delta) ?: return
-                            val ids = ordered.map { it.id }.toMutableList()
-                            val from = ids.indexOf(account.id); val to = ids.indexOf(other.id)
-                            java.util.Collections.swap(ids, from, to)
-                            if (orderVersion == null) orderVersion = state.accountOrder.version
-                            draftOrder = ids
-                        }
-                        IconButton(enabled = enabled && !state.offline && index > 0, onClick = { move(-1) }, modifier = Modifier.semantics { contentDescription = "Поднять счет ${account.name}" }) { Text("↑") }
-                        IconButton(enabled = enabled && !state.offline && index < visibleAccounts.lastIndex, onClick = { move(1) }, modifier = Modifier.semantics { contentDescription = "Опустить счет ${account.name}" }) { Text("↓") }
-                        IconButton(enabled = enabled && !scope.saving, onClick = { editAccount(account) }, modifier = Modifier.semantics { contentDescription = "Изменить счет ${account.name}" }) { CapitalIcon("settings") }
+            AccountReorderList(visibleAccounts, enabled && !state.offline && !scope.saving,
+                move = { id, target ->
+                    val visibleIDs = visibleAccounts.map { it.id }.toMutableList()
+                    val from = visibleIDs.indexOf(id)
+                    if (from >= 0 && target in visibleIDs.indices && from != target) {
+                        visibleIDs.removeAt(from); visibleIDs.add(target, id)
+                        val visibleSet = visibleIDs.toSet()
+                        var index = 0
+                        val ids = ordered.map { if (it.id in visibleSet) visibleIDs[index++] else it.id }
+                        if (orderVersion == null) orderVersion = state.accountOrder.version
+                        draftOrder = ids
                     }
-                }
-            }
+                }, edit = ::editAccount, editEnabled = enabled && !scope.saving)
         } else CapitalAccountGrid(visibleAccounts, enabled && !scope.saving, false, { router.request = FinancialCreationRequest(FinancialCreation.EXPENSE) },
             onOpen = { account -> model.applyHistoryFilter(TransactionFilter(accountId = account.id)); section.value = "operations" },
             onEdit = ::editAccount)
