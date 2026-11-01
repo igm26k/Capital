@@ -169,8 +169,8 @@ fun TransferPanel(model: AuthViewModel) {
     if (editorOpen) FinancialEditorScreen(model, "transfer", guard, "Вернуться к истории переводов", ::close) {
         if (editingId == null) OperationTypeSelect(model, "transfer", enabled)
         Text(if (editingId == null) "Новый перевод" else "Изменение перевода", style = MaterialTheme.typography.titleLarge)
-        CapitalSelect("Со счета", source?.id ?: "", accounts.filter { editingId == null || sourceCurrency == it.currency }.map { it.id to "${it.name} · ${it.currency}" }, enabled) { sourceId = it }
-        CapitalSelect("На счет", target?.id ?: "", accounts.filter { it.id != source?.id && (editingId == null || targetCurrency == it.currency) }.map { it.id to "${it.name} · ${it.currency}" }, enabled) { targetId = it }
+        AccountSelect("Со счета", source?.id ?: "", accounts.filter { editingId == null || sourceCurrency == it.currency }.map { it.id to "${it.name} · ${it.currency}" }, enabled) { sourceId = it }
+        AccountSelect("На счет", target?.id ?: "", accounts.filter { it.id != source?.id && (editingId == null || targetCurrency == it.currency) }.map { it.id to "${it.name} · ${it.currency}" }, enabled) { targetId = it }
         Text("Списание: ${source?.name ?: "Выберите счет"}; зачисление: ${target?.name ?: "Выберите другой счет"}")
         ValidatedTextField(sourceAmount, { sourceAmount = it }, "Сумма списания перевода", "sourceAmount", validation, enabled)
         ValidatedTextField(receivingAmount, { targetAmount = it }, "Сумма зачисления перевода", "targetAmount", validation, enabled && !sameCurrency)
@@ -191,7 +191,7 @@ fun TransferPanel(model: AuthViewModel) {
         TextButton(enabled = enabled, onClick = { feeEnabled = !feeEnabled }) { Text(if (feeEnabled) "Убрать комиссию перевода" else "Добавить комиссию перевода") }
         if (feeEnabled) {
             Text("Комиссия — отдельный расход, сохраняемый вместе с переводом.")
-            accounts.forEach { item -> TextButton(enabled = enabled && (feeCurrency == null || feeCurrency == item.currency), onClick = { feeAccountId = item.id }) { Text("Счет комиссии: ${item.name} · ${item.currency}") } }
+            AccountSelect("Счет комиссии", feeAccount?.id ?: "", accounts.filter { feeCurrency == null || feeCurrency == it.currency }.map { it.id to "${it.name} · ${it.currency}" }, enabled) { feeAccountId = it }
             Text("Комиссия списывается: ${feeAccount?.name ?: "Выберите счет"}")
             ValidatedTextField(feeAmount, { feeAmount = it }, "Сумма комиссии перевода", "feeAmount", validation, enabled)
             ValidatedTextField(feeNote, { feeNote = it }, "Примечание комиссии перевода", "feeNote", validation, enabled, singleLine = false)

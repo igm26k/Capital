@@ -136,7 +136,7 @@ fun RefundPanel(model: AuthViewModel) {
         else {
             Text("Исходный расход: ${parent?.note ?: "Обновите историю"}")
             Text("Категории возврата наследуются от частей исходного расхода.")
-            accounts.forEach { item -> TextButton(enabled = enabled, onClick = { accountId = item.id }) { Text("Счет возврата: ${item.name} · ${item.currency}") } }
+            AccountSelect("Счет возврата", account?.id ?: "", accounts.map { it.id to "${it.name} · ${it.currency}" }, enabled) { accountId = it }
             Text("Возврат зачисляется: ${account?.name ?: "Выберите активный счет той же валюты"}")
             parts.forEachIndexed { index, part ->
                 val original = parent?.allocations?.find { it.id == part.originalId }

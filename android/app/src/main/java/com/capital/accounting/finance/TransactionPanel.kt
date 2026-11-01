@@ -176,7 +176,7 @@ fun TransactionPanel(model: AuthViewModel) {
                 DraftGuardControls(guard, "transaction", enabled)
                 Text(if (editingId == null) "Новая операция" else "Изменение операции", style = MaterialTheme.typography.titleLarge)
                 if (editingId == null) OperationTypeSelect(model, kind, enabled)
-                CapitalSelect("Счет", account?.id ?: "", eligible.map { it.id to "${it.name} · ${it.currency}" }, enabled) { accountId = it }
+                AccountSelect("Счет", account?.id ?: "", eligible.map { it.id to "${it.name} · ${it.currency}" }, enabled) { accountId = it }
                 Text(if (account == null) "Добавьте активный счет в Настройки → Счета." else "Выбран счет: ${account.name} · ${account.currency}")
                 parts.forEachIndexed { index, part ->
                     CapitalSelect("Категория${if (parts.size > 1) " части ${index + 1}" else ""}", part.categoryId ?: "",

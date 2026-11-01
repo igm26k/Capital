@@ -95,7 +95,7 @@ fun AdjustmentPanel(model: AuthViewModel) {
     if (editorOpen) FinancialEditorScreen(model, "adjustment", guard, "Вернуться к истории корректировок", ::close) {
         if (editingId == null) {
             OperationTypeSelect(model, "adjustment", enabled)
-            CapitalSelect("Счет", accountId ?: "", state.accounts.filter { it.archived_at == null && it.deleted_at == null }.map { it.id to "${it.name} · ${it.currency}" }, enabled) { selected ->
+            AccountSelect("Счет", accountId ?: "", state.accounts.filter { it.archived_at == null && it.deleted_at == null }.map { it.id to "${it.name} · ${it.currency}" }, enabled) { selected ->
                 val item = state.accounts.first { it.id == selected }; accountId = item.id; balanceVersion = item.balance_version
                 target = Money.display(item.posted_balance_minor, item.currency).removeSuffix(" ${item.currency}").replace('−', '-')
                 error = ""; validation.reset()

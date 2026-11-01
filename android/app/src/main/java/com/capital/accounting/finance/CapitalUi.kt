@@ -32,6 +32,7 @@ import java.math.BigInteger
 
 val LocalSettingsGroup = staticCompositionLocalOf { "profile" }
 val capitalAccountColors = listOf(0xff167b68, 0xff2463af, 0xff8545a4, 0xffb64a32, 0xff466d30, 0xff3c578d).map { Color(it) }
+fun capitalAccountColor(id: String): Color = capitalAccountColors[id.sumOf { it.code } % capitalAccountColors.size]
 fun capitalColors(dark: Boolean): ColorScheme = if (dark) darkColorScheme(
     primary = Color(0xffadc7ff), onPrimary = Color(0xff172c4f), primaryContainer = Color(0xff293e62), onPrimaryContainer = Color(0xffd8e5ff),
     onSurface = Color(0xffe6edf8), background = Color(0xff101722), surface = Color(0xff1a2433), surfaceVariant = Color(0xff202d41), onSurfaceVariant = Color(0xffaab9ce), outline = Color(0xff34445c)
@@ -136,6 +137,16 @@ fun CapitalSelect(label: String, value: String, options: List<Pair<String, Strin
     }
 }
 
+@Composable
+fun AccountSelect(label: String, value: String, options: List<Pair<String, String>>, enabled: Boolean = true, onSelect: (String) -> Unit) {
+    CapitalSelect(label, value, options, enabled, optionIcon = { id ->
+        if (id.isNotEmpty()) Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(16.dp).background(capitalAccountColor(id), androidx.compose.foundation.shape.CircleShape))
+            Spacer(Modifier.width(8.dp))
+        }
+    }, onSelect = onSelect)
+}
+
 // Dimensions and paths mirror web/src/style.css and shared/Icon.tsx.
 @Composable
 fun CapitalIcon(name: String, modifier: Modifier = Modifier.size(24.dp), color: Color = LocalContentColor.current) {
@@ -185,7 +196,7 @@ fun CapitalAccountGrid(accounts: List<Account>, enabled: Boolean, editing: Boole
                                 Text(if (editing) "Добавить счет" else "Добавить операцию", fontSize = 10.sp, color = MaterialTheme.colorScheme.primary)
                             }
                         } else Card(modifier = Modifier.weight(1f).fillMaxHeight(), shape = RoundedCornerShape(9.dp),
-                            colors = CardDefaults.cardColors(containerColor = capitalAccountColors[account.id.sumOf { it.code } % capitalAccountColors.size], contentColor = Color.White)) {
+                            colors = CardDefaults.cardColors(containerColor = capitalAccountColor(account.id), contentColor = Color.White)) {
                             Column(Modifier.fillMaxWidth().heightIn(min = 56.dp).clickable(enabled = enabled) { onOpen(account) }.padding(8.dp)) {
                                 Text(account.name, fontSize = 10.sp, lineHeight = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 Spacer(Modifier.height(5.dp))
