@@ -62,6 +62,7 @@ data class AuthState(
     val auth: BearerAuth? = null, val restorePending: Boolean = false, val emailStep: String = "",
     val logoutPending: Boolean = false, val persisted: Boolean = true,
     val sessions: List<Session> = emptyList(), val revokePendingId: String? = null,
+    val accountOrder: AccountOrder = AccountOrder(),
     val accounts: List<Account> = emptyList(), val transactions: List<Transaction> = emptyList(), val categories: List<Category> = emptyList(), val tags: List<Tag> = emptyList(), val financialCommand: FinancialCommand? = null,
     val detailOpeningAccountId: String? = null, val detailLocal: Boolean = false,
     val detailStack: List<String> = emptyList(), val detailTransaction: Transaction? = null, val detailMissing: Boolean = false, val detailError: String = "",
@@ -342,8 +343,11 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             active.sessionId == saved.sessionId && active.generationId == saved.generationId && active.token == saved.token && !active.logoutPending && active.revokeSessionId == null
     }
 
-    private fun AuthState.withFinance(finance: MirrorFinance): AuthState = copy(accounts = finance.accounts, accountsLoaded = true,
-        transactions = finance.transactions, transactionsLoaded = true, categories = finance.categories, tags = finance.tags, overviewLoaded = true)
+    private fun AuthState.withFinance(finance: MirrorFinance): AuthState {
+        val order = candidate?.let { com.capital.accounting.data.AccountOrderStore(app).read(it) } ?: AccountOrder()
+        return copy(accountOrder = order, accounts = orderAccounts(finance.accounts, order.account_ids), accountsLoaded = true,
+            transactions = finance.transactions, transactionsLoaded = true, categories = finance.categories, tags = finance.tags, overviewLoaded = true)
+    }
 
     private fun AuthState.withProjection(projection: LocalProjection): AuthState = withFinance(projection.visible).copy(
         localPending = projection.pending.size, localBlocked = projection.blocked.size, localAffected = projection.affected,
@@ -361,7 +365,11 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         val projection = requireNotNull(LocalProjectionStore(app.database).read(MirrorScope(saved.origin, saved.ownerId, saved.workspaceId)))
         require(projection.confirmed.head.generation == mirror.head.generation)
         state = state.copy(localPending = projection.pending.size, localBlocked = projection.blocked.size, localAffected = projection.affected)
-        return projection.visible
+        val active = candidate ?: saved
+        val order = decodeResponse<AccountOrder>(ApiClient(active.origin).request("/workspaces/${active.workspaceId}/accounts/order", session = active))
+        com.capital.accounting.data.AccountOrderStore(app).save(active, order)
+        state = state.copy(accountOrder = order)
+        return projection.visible.copy(accounts = orderAccounts(projection.visible.accounts, order.account_ids))
     }
 
     private suspend fun fetchOverview(saved: StoredSession, holdBusy: Boolean = false) {
@@ -472,6 +480,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                         db.execSQL("DELETE FROM financial_commands WHERE origin=? AND ownerId=? AND workspaceId=?", arrayOf(saved.origin,saved.ownerId,saved.workspaceId))
                     }
                 }
+                com.capital.accounting.data.AccountOrderStore(app).erase(saved)
                 app.notificationInbox.eraseAfterAccountDeletion(saved)
                 app.financialDrafts.erase(saved.origin,saved.ownerId,saved.workspaceId)
                 com.capital.accounting.finance.PlanningStore(app).eraseAfterAccountDeletion(saved)
@@ -648,6 +657,11 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
 
     fun loadCatalog() = loadOverview()
 
+    fun reorderAccounts(ids: List<String>, expectedVersion: String) {
+        if (state.offline || ids.size != state.accounts.size || ids.toSet() != state.accounts.map { it.id }.toSet()) return
+        submitFinancial(ApiClient.json.encodeToString(AccountOrderUpdate(expectedVersion, ids)), "accounts/order", "PUT")
+    }
+
     fun submitAccount(body: String, id: String? = null) {
         if (!state.offline) { submitFinancial(body, if (id == null) "accounts" else "accounts/$id", if (id == null) "POST" else "PUT"); return }
         val saved = candidate ?: return
@@ -797,7 +811,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                 catch (e: CancellationException) { throw e }
                 catch (_: Exception) { }
             }
-            if (result.errorCode == "version_conflict" && result.method == "PUT" && result.path.contains("/accounts/")) {
+            if (result.errorCode == "version_conflict" && result.method == "PUT" && result.path.contains("/accounts/") && !result.path.endsWith("/order")) {
                 try { current = decodeResponse<Account>(ApiClient(saved.origin).request(result.path, session = saved)) }
                 catch (e: CancellationException) { throw e }
                 catch (_: Exception) { }
@@ -900,6 +914,7 @@ private fun errorMessage(error: Exception, authAttempt: Boolean = false): String
 }.let { it + ((error as? ApiFailure)?.requestReference ?: "") }
 
 private fun savedMessage(path: String): String = when {
+    path.endsWith("/accounts/order") -> "Порядок счетов сохранен"
     path.endsWith("/transactions/classification") -> "Классификация выбранных операций сохранена"
     path.endsWith("/adjustments") -> "Операция сохранена"
     path.contains("/accounts") -> "Счет сохранен"

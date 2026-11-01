@@ -8,6 +8,8 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -31,6 +33,13 @@ fun AccountPanel(model: AuthViewModel) {
     val router = LocalFinancialCreateRouter.current
     val managing = section.value == "more" && LocalSettingsGroup.current == "accounts"
     var accountFilter by rememberSaveable(state.origin, state.auth?.profile?.id, state.auth?.workspace?.id) { mutableStateOf("active") }
+    var draftOrder by rememberSaveable { mutableStateOf<List<String>?>(null) }
+    var orderVersion by rememberSaveable { mutableStateOf<String?>(null) }
+    val ordered = orderAccounts(state.accounts, draftOrder ?: state.accounts.map { it.id })
+    val orderChanged = ordered.map { it.id } != state.accounts.map { it.id }
+    LaunchedEffect(state.accountOrder, state.accounts.map { it.id }) {
+        if (draftOrder == state.accounts.map { it.id }) { draftOrder = null; orderVersion = null }
+    }
     val editorOpen = navigation.value == "account"
     var handledLocalReceipt by remember { mutableStateOf(state.localCollectionReceipt?.actionId) }
     var handledReceipt by remember { mutableStateOf(state.collectionReceipt?.commandId) }
@@ -49,6 +58,9 @@ fun AccountPanel(model: AuthViewModel) {
     fun reset() {
         editingId = null; editingVersion = ""; editingBalance = "0"; name = ""; type = "bank"; currency = "EUR"; balance = "0"
         opened = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.ROOT).format(Date()); zone = TimeZone.getDefault().id; archived = false; error = ""; validation.reset()
+    }
+    fun editAccount(account: Account) {
+        guard.request { editingId = account.id; editingVersion = account.version; currency = account.currency; editingBalance = account.posted_balance_minor; name = account.name; type = account.type; archived = account.archived_at != null; error = ""; validation.reset(); navigation.value = "account" }
     }
     fun close() {
         if (enabled && !scope.saving) guard.request { reset(); navigation.value = null }
@@ -75,7 +87,7 @@ fun AccountPanel(model: AuthViewModel) {
                 if (navigation.value == "account") navigation.value = null
             }
         }
-        if (command?.method == "PUT" && command.path.contains("/accounts/")) {
+        if (command?.method == "PUT" && command.path.contains("/accounts/") && !command.path.endsWith("/order")) {
             navigation.value = "account"
             val draft = decodeResponse<AccountUpdate>(command.body)
             editingId = command.path.substringAfterLast('/'); editingVersion = draft.expected_version
@@ -88,7 +100,7 @@ fun AccountPanel(model: AuthViewModel) {
             balance = Money.display(draft.opening_balance_minor, draft.currency).removeSuffix(" ${draft.currency}").replace('−', '-')
         }
     }
-    if (navigation.value == null && section.value == "accounts") FinancialCommandStatus(model, "Ваш черновик: $name, $type; ${if (archived) "в архив" else "активен"}")
+    if (navigation.value == null && (section.value == "accounts" || managing)) FinancialCommandStatus(model, "Ваш черновик: $name, $type; ${if (archived) "в архив" else "активен"}")
     if (!editorOpen && (section.value == "accounts" || managing)) {
         val settings = managing
         val visibleCount = state.accounts.count { it.deleted_at == null && when (if (managing) accountFilter else "active") { "archived" -> it.archived_at != null; "all" -> true; else -> it.archived_at == null } }
@@ -101,13 +113,43 @@ fun AccountPanel(model: AuthViewModel) {
         }
         if (settings) {
             CapitalSelect("Показать счета", accountFilter, listOf("active" to "Активные", "archived" to "Архивные", "all" to "Все")) { accountFilter = it }
-            Text("Нажмите счет, чтобы изменить его", style = MaterialTheme.typography.bodySmall)
+            Text("Стрелки меняют порядок счетов на главном экране и в списках выбора.", style = MaterialTheme.typography.bodySmall)
             TextButton(enabled = !state.busy, onClick = model::loadAccounts) { Text("Обновить счета") }
         }
-        val visibleAccounts = state.accounts.filter { it.deleted_at == null && when (if (managing) accountFilter else "active") { "archived" -> it.archived_at != null; "all" -> true; else -> it.archived_at == null } }
-        CapitalAccountGrid(visibleAccounts, enabled && !scope.saving, settings, { if (managing) createAccount() else run { router.request = FinancialCreationRequest(FinancialCreation.EXPENSE) } },
+        val visibleAccounts = (if (managing) ordered else state.accounts).filter { it.deleted_at == null && when (if (managing) accountFilter else "active") { "archived" -> it.archived_at != null; "all" -> true; else -> it.archived_at == null } }
+        if (managing) {
+            Button(enabled = enabled && !scope.saving, onClick = ::createAccount) { Text("Добавить счет") }
+            if (orderChanged) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(enabled = enabled && !state.offline && !scope.saving, onClick = { model.reorderAccounts(ordered.map { it.id }, orderVersion ?: state.accountOrder.version) }) { Text("Сохранить порядок") }
+                    TextButton(enabled = !state.busy, onClick = { draftOrder = null; orderVersion = null }) { Text("Отменить") }
+                }
+            }
+            visibleAccounts.forEachIndexed { index, account ->
+                OutlinedCard(Modifier.fillMaxWidth()) {
+                    Row(Modifier.padding(12.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(account.name, fontWeight = FontWeight.SemiBold)
+                            Text(Money.display(account.posted_balance_minor, account.currency), style = MaterialTheme.typography.bodySmall)
+                            if (account.archived_at != null) Text("В архиве", style = MaterialTheme.typography.bodySmall)
+                        }
+                        fun move(delta: Int) {
+                            val other = visibleAccounts.getOrNull(index + delta) ?: return
+                            val ids = ordered.map { it.id }.toMutableList()
+                            val from = ids.indexOf(account.id); val to = ids.indexOf(other.id)
+                            java.util.Collections.swap(ids, from, to)
+                            if (orderVersion == null) orderVersion = state.accountOrder.version
+                            draftOrder = ids
+                        }
+                        IconButton(enabled = enabled && !state.offline && index > 0, onClick = { move(-1) }, modifier = Modifier.semantics { contentDescription = "Поднять счет ${account.name}" }) { Text("↑") }
+                        IconButton(enabled = enabled && !state.offline && index < visibleAccounts.lastIndex, onClick = { move(1) }, modifier = Modifier.semantics { contentDescription = "Опустить счет ${account.name}" }) { Text("↓") }
+                        IconButton(enabled = enabled && !scope.saving, onClick = { editAccount(account) }, modifier = Modifier.semantics { contentDescription = "Изменить счет ${account.name}" }) { CapitalIcon("settings") }
+                    }
+                }
+            }
+        } else CapitalAccountGrid(visibleAccounts, enabled && !scope.saving, false, { router.request = FinancialCreationRequest(FinancialCreation.EXPENSE) },
             onOpen = { account -> model.applyHistoryFilter(TransactionFilter(accountId = account.id)); section.value = "operations" },
-            onEdit = { account -> guard.request { editingId = account.id; editingVersion = account.version; currency = account.currency; editingBalance = account.posted_balance_minor; name = account.name; type = account.type; archived = account.archived_at != null; error = ""; validation.reset(); navigation.value = "account" } })
+            onEdit = ::editAccount)
         if (visibleAccounts.isNotEmpty()) FlowRow(Modifier.fillMaxWidth().padding(start = 2.dp, top = 14.dp, bottom = 2.dp), horizontalArrangement = Arrangement.spacedBy(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text("Всего", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             visibleAccounts.groupBy { it.currency }.toSortedMap().forEach { (currency, accounts) ->
