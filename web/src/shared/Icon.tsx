@@ -1,5 +1,7 @@
-export type Name = 'drag' | 'menu' | 'refresh' | 'settings' | 'plus' | 'bank' | 'card' | 'cash' | 'records' | 'arrow' | 'expense' | 'income' | 'transfer' | 'food' | 'shop' | 'home' | 'transport' | 'health' | 'travel' | 'education' | 'leisure' | 'work' | 'category';
+export type Name = 'user' | 'clock' |  'drag' | 'menu' | 'refresh' | 'settings' | 'plus' | 'bank' | 'card' | 'cash' | 'records' | 'arrow' | 'expense' | 'income' | 'transfer' | 'food' | 'shop' | 'home' | 'transport' | 'health' | 'travel' | 'education' | 'leisure' | 'work' | 'category';
 const paths: Record<Name, string> = {
+  user: "M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8M4 21v-2a8 8 0 0 1 16 0v2",
+  clock: "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18M12 7v5l3 2",
   drag: "M9 5h.01M15 5h.01M9 12h.01M15 12h.01M9 19h.01M15 19h.01",
   food: "M4 3v6a2 2 0 0 0 4 0V3M6 3v18M16 3v18M16 3c5 4 5 9 0 9",
   shop: "M4 7h16l1 14H3L4 7M8 7V5a4 4 0 0 1 8 0v2",

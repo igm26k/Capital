@@ -3,10 +3,10 @@ const loadingListeners = new Set<() => void>();
 export const subscribeLoading = (listener: () => void) => { loadingListeners.add(listener); return () => { loadingListeners.delete(listener); }; };
 export const loadingSnapshot = () => activeRequests > 0;
 function notifyLoading() { loadingListeners.forEach(listener => listener()); }
-export async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-  activeRequests++; notifyLoading();
+export async function request<T>(path: string, init: RequestInit = {}, trackLoading = true): Promise<T> {
+  if (trackLoading) { activeRequests++; notifyLoading(); }
   try { return await performRequest<T>(path, init); }
-  finally { activeRequests--; notifyLoading(); }
+  finally { if (trackLoading) { activeRequests--; notifyLoading(); } }
 }
 import { presentTransactions } from '../shared/transactionText';
 export class RequestError extends Error {
@@ -30,7 +30,7 @@ async function performRequest<T>(path: string, init: RequestInit = {}): Promise<
   const value: unknown = await response.json();
   return (read && /^\/workspaces\/[^/]+\/transactions(?:\/[^/?]+)?(?:\?|$)/.test(path) ? presentTransactions(value) : value) as T;
 }
-export type Auth = { profile: { id: string; email: string }; session: { id: string }; workspace: Workspace; csrf_token: string; transport: 'cookie' };
+export type Auth = { profile: { id: string; email: string; timezone?: string }; session: { id: string }; workspace: Workspace; csrf_token: string; transport: 'cookie' };
 export type Workspace = { id: string; name: string; sync_generation_id: string };
 export type Account = { id: string; name: string; currency: string; version: string; type: 'bank' | 'cash' | 'card'; archived_at: string | null; balance_version: string; posted_balance_minor: string };
 export type Category = { id: string; name: string; parent_id: string | null; version: string; archived_at: string | null };

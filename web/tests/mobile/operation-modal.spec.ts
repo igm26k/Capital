@@ -22,7 +22,8 @@ for (const kind of ['expense', 'income', 'transfer', 'adjustment']) test(`modal 
   });
   await page.getByRole('button', { name: 'Добавить операцию' }).click();
   const modal = page.getByRole('dialog', { name: 'Новая операция' });
-  await modal.getByRole('combobox', { name: 'Тип операции', exact: true }).selectOption(kind);
+  if (kind === 'adjustment') await modal.getByText('Другие операции', { exact: true }).click();
+  await modal.getByRole('button', { name: ({expense: 'Расход', income: 'Доход', transfer: 'Перевод', adjustment: 'Корректировка'} as Record<string,string>)[kind], exact: true }).click();
   if (kind === 'transfer') {
     await modal.getByLabel('Сумма списания, EUR', { exact: true }).fill('12.34');
     await modal.getByLabel('Сумма зачисления, USD', { exact: true }).fill('13.45');
@@ -30,12 +31,12 @@ for (const kind of ['expense', 'income', 'transfer', 'adjustment']) test(`modal 
     await modal.getByLabel('Фактический остаток, EUR', { exact: true }).fill('120.00');
     await modal.getByLabel('Причина корректировки', { exact: true }).fill('Сверка наличных');
   } else {
-    await modal.getByLabel('Сумма', { exact: true }).fill('12.34');
+    await modal.getByRole('textbox', { name: /^Сумма ·/ }).fill('12.34');
     await modal.getByRole('button', { name: 'Категория', exact: true }).click();
     await modal.getByLabel('Поиск: Категория', { exact: true }).fill('оду');
     await modal.getByRole('option', { name: 'Продукты', exact: true }).click();
   }
-  await modal.getByRole('button', { name: 'Добавить', exact: true }).click();
+  await modal.getByRole('button', { name: 'Сохранить операцию', exact: true }).click();
   await expect(modal).toHaveCount(0);
   expect(writes).toHaveLength(1); expect(writes[0].key).toBeTruthy();
   if (kind === 'transfer') expect(writes[0].body).toMatchObject({ kind, source_account_id: 'cash', target_account_id: 'bank', source_amount_minor: '1234', target_amount_minor: '1345' });
@@ -46,11 +47,11 @@ test('modal preserves drafts between types, cancels without writes and restores 
   let writes = 0; page.on('request', r => { if (r.method() === 'POST') writes++; });
   const add = page.getByRole('button', { name: 'Добавить операцию', exact: true });
   await add.click(); const modal = page.getByRole('dialog');
-  await modal.getByLabel('Сумма', { exact: true }).fill('12.34');
-  await modal.getByRole('combobox', { name: 'Тип операции', exact: true }).selectOption('transfer');
-  await modal.getByRole('combobox', { name: 'Тип операции', exact: true }).selectOption('income');
-  await expect(modal.getByLabel('Сумма', { exact: true })).toHaveValue('12.34');
-  await modal.getByRole('button', { name: 'Отмена', exact: true }).click();
+  await modal.getByRole('textbox', { name: /^Сумма ·/ }).fill('12.34');
+  await modal.getByRole('button', { name: 'Перевод', exact: true }).click();
+  await modal.getByRole('button', { name: 'Доход', exact: true }).click();
+  await expect(modal.getByRole('textbox', { name: /^Сумма ·/ })).toHaveValue('12.34');
+  await modal.getByRole('button', { name: 'Закрыть окно', exact: true }).click();
   await expect(modal).toHaveCount(0); await expect(add).toBeFocused();
   await add.click(); await page.keyboard.press('Escape'); await expect(page.getByRole('dialog')).toHaveCount(0);
   expect(writes).toBe(0);
@@ -63,27 +64,30 @@ test('modal keeps validation and uncertain request visible and replays the same 
     return writes.length === 1 ? route.abort('connectionfailed') : route.fulfill({ status: 201, json: {} });
   });
   await page.getByRole('button', { name: 'Добавить операцию' }).click(); const modal = page.getByRole('dialog');
-  await modal.getByLabel('Сумма', { exact: true }).fill('-1');
-  await modal.getByRole('button', { name: 'Добавить', exact: true }).click();
+  await modal.getByRole('textbox', { name: /^Сумма ·/ }).fill('-1');
+  await modal.getByRole('button', { name: 'Сохранить операцию', exact: true }).click();
   await expect(modal.getByRole('alert')).toContainText('Сумма должна быть больше нуля'); expect(writes).toHaveLength(0);
-  await modal.getByLabel('Сумма', { exact: true }).fill('12.34');
-  await modal.getByRole('button', { name: 'Добавить', exact: true }).click();
+  await modal.getByRole('textbox', { name: /^Сумма ·/ }).fill('12.34');
+  await modal.getByRole('button', { name: 'Сохранить операцию', exact: true }).click();
   await expect(modal.getByRole('alert')).toContainText('Ответ не получен');
-  await expect(modal.getByRole('button', { name: 'Добавить', exact: true })).toBeDisabled();
-  await modal.getByRole('button', { name: 'Отмена', exact: true }).click();
+  await expect(modal.getByRole('button', { name: 'Сохранить операцию', exact: true })).toBeDisabled();
+  await modal.getByRole('button', { name: 'Закрыть окно', exact: true }).click();
   await page.getByRole('button', { name: 'Повторить ту же команду', exact: true }).click();
   await expect.poll(() => writes.length).toBe(2); expect(writes[1]).toEqual(writes[0]);
 });
 test('modal fits a narrow viewport with keyboard focus contained inside', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 568 });
   await page.getByRole('button', { name: 'Добавить операцию' }).click(); const modal = page.getByRole('dialog');
-  await modal.getByRole('combobox', { name: 'Тип операции', exact: true }).selectOption('transfer');
+  await modal.getByRole('button', { name: 'Перевод', exact: true }).click();
   await modal.getByLabel('Добавить комиссию', { exact: true }).check();
   const bounds = await modal.boundingBox(); expect(bounds!.x).toBeGreaterThanOrEqual(0); expect(bounds!.y).toBeGreaterThanOrEqual(0); expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(568);
-  await expect(modal.getByRole('button', { name: 'Добавить', exact: true })).toBeInViewport();
+  await expect(modal.getByRole('button', { name: 'Сохранить операцию', exact: true })).toBeInViewport();
   for (let i = 0; i < 25; i++) { await page.keyboard.press('Tab'); expect(await page.evaluate(() => document.querySelector('dialog')!.contains(document.activeElement))).toBe(true); }
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: test.info().outputPath('operation-modal-320.png') });
+  await page.evaluate(() => { Object.defineProperty(window.visualViewport, 'height', { configurable: true, value: 360 }); window.visualViewport!.dispatchEvent(new Event('resize')); });
+  await expect.poll(async () => { const box = await modal.boundingBox(); return box!.y + box!.height; }).toBeLessThanOrEqual(360);
+  await expect(modal.getByRole('button', { name: 'Сохранить операцию', exact: true })).toBeInViewport();
 });
 test('modal without accounts permits cancellation but cannot submit', async ({ page }) => {
   await page.route('**/accounts?*', route => route.fulfill({ json: { items: [], next_cursor: null } }));
@@ -91,8 +95,8 @@ test('modal without accounts permits cancellation but cannot submit', async ({ p
   await page.getByRole('button', { name: 'Добавить операцию' }).click();
   const modal = page.getByRole('dialog');
   await expect(modal.getByText('Сначала добавьте счет в разделе «Счета».')).toBeVisible();
-  await expect(modal.getByRole('button', { name: 'Добавить', exact: true })).toBeDisabled();
-  await modal.getByRole('button', { name: 'Отмена' }).click();
+  await expect(modal.getByRole('button', { name: 'Сохранить операцию', exact: true })).toBeDisabled();
+  await modal.getByRole('button', { name: 'Закрыть окно' }).click();
   await expect(modal).toHaveCount(0);
 });
 
@@ -108,6 +112,6 @@ test('operation date uses local calendar, seconds and current timezone; account 
   await modal.getByRole('option', { name: 'Доллары · USD' }).click();
   await expect(modal.getByRole('button', { name: 'Счет', exact: true })).toContainText('Доллары');
   const category = await modal.getByRole('button', { name: 'Категория', exact: true }).boundingBox();
-  const amount = await modal.getByLabel('Сумма', { exact: true }).boundingBox();
+  const amount = await modal.getByRole('textbox', { name: /^Сумма ·/ }).boundingBox();
   expect(category!.y).toBeLessThan(amount!.y);
 });

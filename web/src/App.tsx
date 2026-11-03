@@ -39,6 +39,8 @@ function restore(auth: Auth): Command | null {
 }
 function persist(command: Command | null) { try { command ? sessionStorage.setItem(storageKey, JSON.stringify(command)) : sessionStorage.removeItem(storageKey); } catch { /* In-memory fallback. */ } }
 export function App() {
+  const [theme, setTheme] = useState(() => { try { return localStorage.getItem('capital.theme') ?? 'system'; } catch { return 'system'; } });
+  useEffect(() => { document.documentElement.dataset.theme = theme; try { localStorage.setItem('capital.theme', theme); } catch { /* In-memory theme. */ } }, [theme]);
   const [settingsGroup, setSettingsGroup] = useState(restoreSettingsGroup);
   const [historyNavigation, setHistoryNavigation] = useState(0);
   const [operationOpen, setOperationOpen] = useState(false);
@@ -185,6 +187,12 @@ export function App() {
       if (current) { activeSession.current = null; setAuth(null); setAccounts([]); setCategories([]); setTags([]); setEditing(null); persist(null); }
     } finally { setBusy(false); }
   }
+  async function renewSession() {
+    if (!auth || busy || pending) return;
+    setBusy(true); setError('');
+    try { const value = await request<Auth>('/auth/renew', { method: 'POST', headers: { 'X-CSRF-Token': auth.csrf_token } }); setAuth(value); activeSession.current = value.session.id; setMessage('Сессия продлена.'); }
+    catch (error) { showError(error); } finally { setBusy(false); }
+  }
   async function logout() {
     if (!auth || pending) return;
     setBusy(true);
@@ -192,7 +200,7 @@ export function App() {
     catch (error) { showError(error); } finally { setBusy(false); }
   }
   function showRecords(query?: string) { setReportHistoryQuery(query ? `${query}&limit=25` : 'limit=25'); setHistoryNavigation(v => v + 1); navigate('operations'); }
-  return <main className={auth ? "app-shell wallet-shell" : "login-shell"}><header className="app-header">{auth ? <><div className="header-title">{section !== 'accounts' && <button type="button" className="header-back" aria-label="Назад" disabled={busy || loading} onClick={back}>‹</button>}<img className="capital-logo" src="/capital-icon.png?v=2" width="36" height="36" alt="" /><h1>Capital</h1></div><button className="header-logout" disabled={busy || !!pending} onClick={() => void logout()}>Выход</button></> : <div className="login-brand"><img className="capital-logo" src="/capital-icon.png?v=2" width="48" height="48" alt="" /><span className="eyebrow">ЛИЧНЫЕ ФИНАНСЫ</span><h1>Capital</h1></div>}</header>
+  return <main className={auth ? "app-shell wallet-shell" : "login-shell"}><header className="app-header">{auth ? <><div className="header-title">{section !== 'accounts' && <button type="button" className="header-back" aria-label="Назад" disabled={busy || loading} onClick={back}>‹</button>}<img className="capital-logo" src="/capital-icon.png?v=2" width="36" height="36" alt="" /><h1>Capital</h1></div></> : <div className="login-brand"><img className="capital-logo" src="/capital-icon.png?v=2" width="48" height="48" alt="" /><span className="eyebrow">ЛИЧНЫЕ ФИНАНСЫ</span><h1>Capital</h1></div>}</header>
     {!online && <p role="status" className="notice">Нет соединения. Данные на экране могут быть устаревшими; новые операции недоступны.</p>}
     {starting ? <p role="status">Проверяем сессию…</p> : startupError ? <section><p role="alert">{startupError}</p><button onClick={() => void session()}>Повторить проверку сессии</button></section> : !auth ? <><AuthForm onAuth={authenticated} />{error && <p role="alert">{error}</p>}</> : <>
     {message && <p role="status" className="notice success">{message}</p>}{error && <p role="alert" className="notice">{error}</p>}
@@ -217,7 +225,7 @@ export function App() {
     </div>
     {operationOpen && <OperationModal accounts={accounts.filter(a => !a.archived_at)} categories={categories} tags={tags} disabled={busy || loading || !!pending || needsRefresh || !online} saving={busy} error={error} submit={create} cancel={() => setOperationOpen(false)} />}
     <div hidden={section !== "more"} className="screen" aria-label="Настройки">
-    <SettingsNavigation value={settingsGroup} change={setSettingsGroup} active={section === 'more'} />
+    <SettingsNavigation value={settingsGroup} change={setSettingsGroup} active={section === 'more'} email={auth.profile.email} workspace={auth.workspace.name} timezone={auth.profile.timezone} />
     <div className="settings-group" hidden={settingsGroup !== 'accounts'}>
     <AccountManager manage orderVersion={accountOrder.version} records={() => showRecords()} history={id => showRecords(`account_id=${encodeURIComponent(id)}`)} key={`manage-accounts-${formVersion}-${resourceRevision}`} accounts={accounts} disabled={busy || loading || !!pending || needsRefresh || !online} loading={loading} submit={create} fail={setError} />
     </div>
@@ -235,7 +243,7 @@ export function App() {
     <BankSourcesSettings key={`${auth.profile.id}:${auth.workspace.id}:${auth.session.id}:${auth.workspace.sync_generation_id}`} auth={auth} accounts={accounts} blocked={busy || loading || !!pending || needsRefresh || !online} changed={() => { void refresh(auth).catch(showError); }} fail={showError} />
     </div>
     <div className="settings-group" hidden={settingsGroup !== 'profile'}>
-    <section className="profile-card"><h2>Профиль</h2><p>{auth.profile.email}</p><button className="secondary" disabled={busy || loading || !online} onClick={() => { setError(''); void refresh(auth).catch(showError); }}>{loading ? 'Загрузка…' : 'Обновить данные'}</button></section>
+    <section className="profile-card"><h2>Профиль</h2><button className="secondary" disabled={busy || !!pending || !online} onClick={() => void renewSession()}>Продлить сессию</button><p>{auth.profile.email}</p><label>Тема оформления<select aria-label="Тема оформления" value={theme} onChange={event => setTheme(event.target.value)}><option value="system">Системная</option><option value="dark">Тёмная</option><option value="light">Светлая</option></select></label><button className="secondary" disabled={busy || loading || !online} onClick={() => { setError(''); void refresh(auth).catch(showError); }}>{loading ? 'Загрузка…' : 'Обновить данные'}</button></section>
     </div>
     <div className="settings-group" hidden={settingsGroup !== 'security'}>
     <PrivacyPanel auth={auth} fail={showError} deleted={async()=>{
@@ -246,9 +254,10 @@ export function App() {
     <SessionManager key={auth.session.id} disabled={busy || loading || !!pending || !online} revoke={revokeSession} fail={showError} />
     </div>
     </div>
+    {settingsGroup === 'home' && section === 'more' && <button className="settings-logout secondary" disabled={busy || !!pending} onClick={() => void logout()}>Выйти из аккаунта</button>}
     <nav className="bottom-nav" aria-label="Основная навигация">
-      {([['accounts', 'Счета', '◫'], ['operations', 'Операции', '⇄'], ['more', 'Настройки', '⋯']] as const).map(([id, label, symbol]) =>
-        <a key={id} href={`#${id}`} onClick={event => { event.preventDefault(); navigate(id); }} aria-current={section === id ? 'page' : undefined}><span className="nav-symbol" aria-hidden="true">{symbol}</span><span>{label}</span></a>)}
+      {([['accounts', 'Счета', '◫'], ['operations', 'Операции', '⇄'], ['more', 'Настройки', '⋯']] as const).map(([id, label]) =>
+        <a key={id} href={`#${id}`} onClick={event => { event.preventDefault(); navigate(id); }} aria-current={section === id ? 'page' : undefined}><span className="nav-symbol" aria-hidden="true"><Icon name={id === 'accounts' ? 'card' : id === 'operations' ? 'transfer' : 'settings'} /></span><span>{label}</span></a>)}
     </nav>
     </>}
     <LoadingOverlay active={starting || busy || loading} />

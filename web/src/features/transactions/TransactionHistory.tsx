@@ -2,6 +2,8 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { request, RequestError, type Account, type Category, type List, type Tag, type Transaction } from '../../api/client';
 import { categoryLabel } from '../../shared/categories';
 import { BulkClassificationForm } from './BulkClassificationForm';
+import { money } from '../../shared/money';
+import { Icon } from '../../shared/Icon';
 import { OperationCard } from './OperationCard';
 const kinds: Record<string, string> = { opening: 'Начальный остаток', expense: 'Расход', income: 'Доход', transfer: 'Перевод', refund: 'Возврат', adjustment: 'Корректировка' };
 type Props = { filterRevision?: number; filterQuery?: string; workspace: string; revision: number; accounts: Account[]; categories: Category[]; tags: Tag[]; disabled: boolean; edit: (id: string) => void; refund: (id: string) => void; remove: (id: string) => void; classify: (body: object) => void; fail: (error: unknown) => void };
@@ -10,6 +12,45 @@ export function TransactionHistory({ filterRevision, filterQuery, workspace, rev
   const [filterFormRevision, setFilterFormRevision] = useState(0);
   const [selected, setSelected] = useState<Transaction[]>([]);
   const sequence = useRef(0);
+  const [totals, setTotals] = useState<Record<string, { income: bigint; expense: bigint }> | null>(null);
+  const [dayTotals, setDayTotals] = useState<Record<string, Record<string, bigint>> | null>(null);
+  const [summaryError, setSummaryError] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  useEffect(() => {
+    const controller = new AbortController(); setTotals(null); setDayTotals(null); setSummaryError(false);
+    const params = new URLSearchParams(query); params.set('limit', '100');
+    void (async () => {
+      const result: Record<string, { income: bigint; expense: bigint }> = {}; const days: Record<string, Record<string, bigint>> = {}; const transactionsSeen = new Set<string>(); const seen = new Set<string>();
+      let next: string | null = null;
+      do {
+        if (next) params.set('cursor', next);
+        const page = await request<List<Transaction>>(`/workspaces/${workspace}/transactions?${params}`, { signal: controller.signal }, false);
+        for (const t of page.items) {
+          if (transactionsSeen.has(t.id) || !['income', 'expense', 'refund'].includes(t.kind)) continue;
+          transactionsSeen.add(t.id);
+          const day = days[new Date(t.occurred_at).toLocaleDateString('ru-RU')] ??= {};
+          for (const entry of t.entries) {
+            const row = result[entry.currency] ??= { income: 0n, expense: 0n };
+            const value = BigInt(entry.amount_minor);
+            day[entry.currency] = (day[entry.currency] ?? 0n) + value;
+            if (t.kind === 'income') row.income += value; else row.expense -= value;
+          }
+        }
+        next = page.next_cursor;
+        if (next && seen.has(next)) throw new Error('Повтор страницы');
+        if (next) seen.add(next);
+      } while (next);
+      if (!controller.signal.aborted) { setTotals(result); setDayTotals(days); }
+    })().catch(() => { if (!controller.signal.aborted) setSummaryError(true); });
+    return () => controller.abort();
+  }, [workspace, query, revision, retry]);
+  function quickFilter(key: string, value: string) { const params = new URLSearchParams(query); value ? params.set(key, value) : params.delete(key); setQuery(params.toString()); }
+  const displayMoney = (amount: bigint, currency: string) => money(amount.toString(), currency).replace(currency, ({ EUR: '€', USD: '$', RUB: '₽', GBP: '£' } as Record<string, string>)[currency] ?? currency);
+  const dayKey = (t: Transaction) => new Date(t.occurred_at).toLocaleDateString('ru-RU');
+  function dayTotal(day: string) {
+    if (!dayTotals) return summaryError ? 'Итог недоступен' : '…';
+    return Object.entries(dayTotals[day] ?? {}).map(([currency, amount]) => displayMoney(amount, currency)).join(' · ');
+  }
   useEffect(() => { if (filterQuery) {setQuery(filterQuery);setRetry(v=>v+1);} },[filterQuery, filterRevision]);
   const root = `/workspaces/${workspace}/transactions`;
   useEffect(() => {
@@ -58,22 +99,26 @@ export function TransactionHistory({ filterRevision, filterQuery, workspace, rev
     setItems([]); setCursor(null); setSelected([]); setError('');
   }
   const applied = new URLSearchParams(query);
-  return <section className="operation-history"><h2>История операций</h2><details className="history-filters"><summary>Фильтры операций</summary><form key={`${query}:${filterFormRevision}`} onSubmit={filter}><fieldset disabled={disabled || loading}>
+  return <section className="operation-history"><div className="operations-tools"><button className="icon-button" aria-label="Поиск операций" aria-expanded={searchOpen} onClick={() => setSearchOpen(v => !v)}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="10" cy="10" r="6.5"/><path d="m15 15 6 6"/></svg></button><button className="icon-button" aria-label="Дополнительные действия" onClick={() => { const tools = document.querySelector<HTMLDetailsElement>('.history-bulk-tools'); if (tools) tools.open = !tools.open; }}><Icon name="menu" /></button></div>
+    {searchOpen && <form className="operation-search" onSubmit={event => { event.preventDefault(); quickFilter('q', String(new FormData(event.currentTarget).get('search') ?? '')); }}><input autoFocus aria-label="Поиск операций" name="search" defaultValue={applied.get('q') ?? ''} placeholder="Получатель или примечание"/><button>Найти</button></form>}
+    <div className="quick-filters"><label><span className="sr-only">Период</span><select aria-label="Период" value={applied.get('from') || applied.get('to') ? 'custom' : 'all'} onChange={event => { const params = new URLSearchParams(query); params.delete('to'); if (event.target.value === 'month') { const now = new Date(); params.set('from', new Date(now.getFullYear(), now.getMonth(), 1).toISOString()); } else params.delete('from'); setQuery(params.toString()); }}><option value="all">Весь период</option><option value="month">Этот месяц</option>{(applied.get('from') || applied.get('to')) && <option value="custom">Выбранный период</option>}</select></label><label><span className="sr-only">Счёт</span><select aria-label="Быстрый выбор счёта" value={applied.get('account_id') ?? ''} onChange={event => quickFilter('account_id', event.target.value)}><option value="">Все счета</option>{accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}</select></label><button className="icon-button" aria-label="Расширенные фильтры" onClick={() => { const filters = document.querySelector<HTMLDetailsElement>('.history-filters'); if (filters) filters.open = !filters.open; }}><Icon name="settings" /></button></div>
+    <div className="operation-summary" aria-label="Финансовая сводка">{totals ? Object.entries(totals).length ? Object.entries(totals).map(([currency, row]) => <div className="summary-currency" key={currency}><div><span>Расходы</span><strong className="expense-value">{displayMoney(-row.expense, currency)}</strong></div><div><span>Доходы</span><strong className="income-value">{displayMoney(row.income, currency)}</strong></div><div><span>Баланс периода</span><strong>{displayMoney(row.income - row.expense, currency)}</strong></div></div>) : <p>Нет доходов и расходов</p> : <p role="status">{summaryError ? 'Сводка недоступна. Обновите историю.' : 'Считаем сводку…'}</p>}</div>
+    <p className="summary-caption">Включая предварительные · без переводов</p><details className="history-filters"><summary>Фильтры операций</summary><form key={`${query}:${filterFormRevision}`} onSubmit={filter}><fieldset disabled={disabled || loading}>
     <div className="forms"><label>Счет истории<select aria-label="Счет истории" name="account_id" defaultValue={applied.get('account_id')??''}><option value="">Все счета</option>{accounts.map(a => <option key={a.id} value={a.id}>{a.name}{a.archived_at && ' · В архиве'}</option>)}</select></label>
     <label>Категория истории<select aria-label="Категория истории" name="category_id" defaultValue={applied.get('category_id')??''}><option value="">Все категории</option>{categories.map(c => <option key={c.id} value={c.id}>{categoryLabel(c, categories)}</option>)}</select></label>
     <label>Тег истории<select aria-label="Тег истории" name="tag_id" defaultValue={applied.get('tag_id')??''}><option value="">Все теги</option>{tags.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></label>
     <label>Тип в истории<select aria-label="Тип в истории" name="kind" defaultValue={applied.get('kind')??''}><option value="">Все типы</option>{Object.entries(kinds).map(([value, name]) => <option key={value} value={value}>{name}</option>)}</select></label>
     <label>Статус в истории<select aria-label="Статус в истории" name="status" defaultValue={applied.get('status')??''}><option value="">Все статусы</option><option value="posted">Подтвержденные</option><option value="pending">Предварительные</option></select></label>
-    <label>С даты<input type="date" name="from" /></label><label>По дату включительно<input type="date" name="to" /></label>
+    <label>С даты<input type="date" name="from" defaultValue={applied.get('from') ? new Date(applied.get('from')!).toLocaleDateString('sv-SE') : ''} /></label><label>По дату включительно<input type="date" name="to" defaultValue={applied.get('to') ? new Date(new Date(applied.get('to')!).getTime() - 86400000).toLocaleDateString('sv-SE') : ''} /></label>
     <label>Поиск в истории<input name="q" defaultValue={applied.get('q')??''} maxLength={200} placeholder="Получатель или примечание" /></label><label>Операций на странице<select aria-label="Операций на странице" name="limit" defaultValue={applied.get('limit')??'25'}>{[10, 25, 50, 100].map(n => <option key={n}>{n}</option>)}</select></label></div>
     <button>Применить фильтры</button>
   </fieldset></form><p className="hint">Категория фильтруется без потомков. Даты относятся к часовому поясу этого браузера.</p></details>
-    {error && <p role="alert">{error}</p>}<div className="history-actions"><button className="secondary" type="button" disabled={disabled || loading} onClick={resetFilters}>Сбросить фильтры</button><button className="secondary" disabled={disabled || loading} onClick={() => setRetry(v => v + 1)}>Обновить историю</button></div>
-    <details className="history-bulk-tools"><summary>Выбор операций</summary><p className="hint">Для массовой классификации доступны самостоятельные расходы и доходы с одной частью, без активных возвратов, на активных счетах. Максимум 100 за команду.</p>
+    {error && <p role="alert">{error}</p>}
+    <details className="history-bulk-tools"><summary>Выбор операций</summary><div className="history-actions"><button className="secondary" type="button" disabled={disabled || loading} onClick={resetFilters}>Сбросить фильтры</button><button className="secondary" disabled={disabled || loading} onClick={() => setRetry(v => v + 1)}>Обновить историю</button></div><p className="hint">Для массовой классификации доступны самостоятельные расходы и доходы с одной частью, без активных возвратов, на активных счетах. Максимум 100 за команду.</p>
     <button className="secondary" disabled={disabled || loading || !items.some(eligible)} onClick={() => setSelected(current => { const ids = new Set(current.map(t => t.id)); return [...current, ...items.filter(t => eligible(t) && !ids.has(t.id))].slice(0, 100); })}>Выбрать видимые операции</button></details>
     {selected.length > 0 && <BulkClassificationForm selected={selected} categories={categories} tags={tags} disabled={disabled || loading} submit={classify} clear={() => setSelected([])} />}
     {loading && <p role="status">Загружаем историю…</p>}
-    {items.length ? <ul className="history">{items.map(transaction => <OperationCard key={transaction.id} transaction={transaction} accounts={accounts} categories={categories} tags={tags} disabled={disabled || loading} selectable={eligible(transaction)} selected={selected.some(t => t.id === transaction.id)} selectionDisabled={disabled || loading || (selected.length >= 100 && !selected.some(t => t.id === transaction.id))} select={checked => setSelected(current => checked ? [...current, transaction] : current.filter(t => t.id !== transaction.id))} edit={() => edit(transaction.id)} refund={() => refund(transaction.id)} remove={() => remove(transaction.id)} />)}</ul> : !loading && <p>Операций по выбранным условиям нет.</p>}
+    {items.length ? <ul className="history">{items.map((transaction, index) => <li className="operation-group-item" key={transaction.id}>{(index === 0 || dayKey(items[index - 1]) !== dayKey(transaction)) && <div className="operation-day"><time>{new Date(transaction.occurred_at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric', weekday: 'short' })}</time><span>{dayTotal(dayKey(transaction))}</span></div>}<ul className="day-operations"><OperationCard key={transaction.id} transaction={transaction} accounts={accounts} categories={categories} tags={tags} disabled={disabled || loading} selectable={eligible(transaction)} selected={selected.some(t => t.id === transaction.id)} selectionDisabled={disabled || loading || (selected.length >= 100 && !selected.some(t => t.id === transaction.id))} select={checked => setSelected(current => checked ? [...current, transaction] : current.filter(t => t.id !== transaction.id))} edit={() => edit(transaction.id)} refund={() => refund(transaction.id)} remove={() => remove(transaction.id)} /></ul></li>)}</ul> : !loading && <p>Операций по выбранным условиям нет.</p>}
     {cursor && <button disabled={disabled || loading} onClick={() => void more()}>Загрузить еще операции</button>}<p className="hint">Показано операций: {items.length}{!cursor && !loading && ' · Все страницы загружены'}</p>
   </section>;
 }

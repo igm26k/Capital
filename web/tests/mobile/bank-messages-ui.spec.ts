@@ -27,8 +27,7 @@ async function mockAPI(context: BrowserContext, dropFirst = false) {
 }
 async function settings(page: Page) {
   await page.goto('/#more');
-  await page.getByRole('button', { name: 'Группы настроек', exact: true }).click();
-  await page.getByRole('navigation', { name: 'Группы настроек' }).getByRole('button', { name: 'Банки и уведомления', exact: true }).click();
+  await page.getByRole('button', { name: 'Банки и уведомления', exact: true }).click();
 }
 async function addRule(page: Page, channel: 'sms' | 'push' = 'sms') {
   await page.getByRole('button', { name: 'Добавить банк', exact: true }).click();
@@ -124,7 +123,7 @@ test('bank settings and recognition fit a narrow dark screen and preserve the ba
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.getByRole('article', { name: 'Правило Мой банк' }).getByRole('button', { name: 'Изменить', exact: true }).click();
   await page.getByLabel('Название банка', { exact: true }).fill('Черновик банка');
-  const choose = async (name: string) => { await page.getByRole('button', { name: 'Группы настроек', exact: true }).click(); await page.getByRole('navigation', { name: 'Группы настроек' }).getByRole('button', { name, exact: true }).click(); };
+  const choose = async (name: string) => { await page.getByRole('button', { name: 'Назад к настройкам' }).click(); await page.getByRole('button', { name: name === 'Профиль' ? 'Профиль и оформление' : name, exact: true }).click(); };
   await choose('Профиль'); await choose('Банки и уведомления');
   await expect(page.getByLabel('Название банка', { exact: true })).toHaveValue('Черновик банка');
   await expect(form.getByRole('textbox', { name: 'Текст сообщения', exact: true })).toHaveValue(raw);

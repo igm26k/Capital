@@ -40,12 +40,12 @@ test('Back skips settings changes and returns through screens to the dashboard',
   await nav.getByRole('link', { name: 'Операции', exact: true }).click();
   await nav.getByRole('link', { name: 'Настройки', exact: true }).click();
   for (const group of ['Счета', 'Категории и теги', 'Профиль']) {
-    await page.getByRole('button', { name: 'Группы настроек', exact: true }).click();
-    await page.getByRole('navigation', { name: 'Группы настроек' }).getByRole('button', { name: group, exact: true }).click();
+      if (await page.getByRole('button', { name: 'Назад к настройкам' }).count()) await page.getByRole('button', { name: 'Назад к настройкам' }).click();
+    await page.getByRole('button', { name: group === 'Профиль' ? 'Профиль и оформление' : group, exact: true }).click();
   }
-  await page.getByRole('button', { name: 'Назад', exact: true }).click();
+  await page.goBack();
   await expect(nav.getByRole('link', { name: 'Операции', exact: true })).toHaveAttribute('aria-current', 'page');
-  await page.getByRole('button', { name: 'Назад', exact: true }).click();
+  await page.goBack();
   await expect(nav.getByRole('link', { name: 'Счета', exact: true })).toHaveAttribute('aria-current', 'page');
   await expect(page.getByRole('region', { name: 'Структура расходов', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Назад', exact: true })).toHaveCount(0);
@@ -54,8 +54,8 @@ test('a deep link still has dashboard as its first screen, and Back dismisses th
   await page.goto('/#operations');
   await page.getByRole('button', { name: 'Добавить операцию', exact: true }).click();
   const operation = page.getByRole('dialog', { name: 'Новая операция', exact: true });
-  await operation.getByRole('combobox', { name: 'Тип операции', exact: true }).selectOption('income');
-  await operation.getByRole('combobox', { name: 'Тип операции', exact: true }).selectOption('expense');
+  await operation.getByRole('button', { name: 'Доход', exact: true }).click();
+  await operation.getByRole('button', { name: 'Расход', exact: true }).click();
   await page.goBack();
   await expect(operation).toHaveCount(0);
   await expect(page.getByRole('region', { name: 'Структура расходов', exact: true })).toBeVisible();
@@ -74,7 +74,7 @@ test('Back leaves no selector dialog open on the previous screen', async ({ page
 test('Back from a modal opened on the dashboard returns to that dashboard', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Добавить операцию', exact: true }).click();
-  await page.getByRole('dialog', { name: 'Новая операция' }).getByRole('combobox', { name: 'Тип операции', exact: true }).selectOption('income');
+  await page.getByRole('dialog', { name: 'Новая операция' }).getByRole('button', { name: 'Доход', exact: true }).click();
   await page.goBack();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page.getByRole('region', { name: 'Структура расходов', exact: true })).toBeVisible();

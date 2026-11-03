@@ -17,8 +17,8 @@ test('recognized browser message is accepted by the real source API and confirme
     // Cookies stay on the isolated backend origin; the development page receives only the JSON body.
     await route.fulfill({ status: response.status(), contentType: 'application/json', body: await response.body() });
   });
-  await page.goto('/#more'); await page.getByRole('button', { name: 'Группы настроек', exact: true }).click();
-  await page.getByRole('navigation', { name: 'Группы настроек' }).getByRole('button', { name: 'Банки и уведомления', exact: true }).click();
+  await page.goto('/#more');
+  await page.getByRole('button', { name: 'Банки и уведомления', exact: true }).click();
   await page.getByRole('button', { name: 'Добавить банк', exact: true }).click();
   await page.getByLabel('Название банка', { exact: true }).fill('Test real source');
   await page.getByLabel('Отправитель SMS', { exact: true }).fill('TESTBANK');

@@ -20,6 +20,7 @@ test.beforeEach(async ({ page }) => {
 });
 test('loading is centered and blocks navigation until all concurrent requests finish', async ({ page }) => {
   await page.goto('/#more');
+  await page.getByRole('button', { name: 'Профиль и оформление', exact: true }).click();
   const loader = page.getByRole('dialog', { name: 'Загрузка', exact: true });
   await expect(loader).not.toBeVisible();
   let releaseAccounts!: () => void, releaseCategories!: () => void;
@@ -72,8 +73,8 @@ test('saving an operation blocks the editor until the write finishes', async ({ 
   await page.goto('/');
   await page.getByRole('button', { name: 'Добавить операцию', exact: true }).click();
   const modal = page.getByRole('dialog', { name: 'Новая операция' });
-  await modal.getByLabel('Сумма', { exact: true }).fill('12.34');
-  await modal.getByRole('button', { name: 'Добавить', exact: true }).click();
+  await modal.getByRole('textbox', { name: /^Сумма ·/ }).fill('12.34');
+  await modal.getByRole('button', { name: 'Сохранить операцию', exact: true }).click();
   const loader = page.getByRole('dialog', { name: 'Загрузка', exact: true });
   await expect(loader).toBeVisible();
   await page.keyboard.press('Escape');

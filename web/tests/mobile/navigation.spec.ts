@@ -18,12 +18,11 @@ test.beforeEach(async ({ page }) => {
 });
 async function manageAccounts(page: Page) {
   await page.getByRole('navigation', { name: 'Основная навигация' }).getByRole('link', { name: 'Настройки', exact: true }).click();
-  await page.getByRole('button', { name: 'Группы настроек', exact: true }).click();
-  await page.getByRole('navigation', { name: 'Группы настроек' }).getByRole('button', { name: 'Счета', exact: true }).click();
+  await page.getByRole('button', { name: 'Счета', exact: true }).click();
 }
 test('accounts match Android, filters and history navigation preserve SPA and browser back', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByRole('navigation').getByRole('link', { name: 'Счета', exact: true })).toHaveAttribute('aria-current', 'page');
+  await expect(page.getByRole('navigation', { name: 'Основная навигация' }).getByRole('link', { name: 'Счета', exact: true })).toHaveAttribute('aria-current', 'page');
   await expect(page.getByLabel('Итоги по валютам')).toContainText('1150,00 EUR');
   await expect(page.getByRole('button', { name: 'Изменить счет Старая карта' })).toBeHidden();
   await expect(page.getByRole('button', { name: 'Настроить счета', exact: true })).toHaveCount(0);
@@ -32,15 +31,14 @@ test('accounts match Android, filters and history navigation preserve SPA and br
   await expect(page.getByLabel('Итоги счетов в настройках')).toContainText('7,00 USD');
   await expect(page.getByRole('button', { name: 'Изменить счет Старая карта', exact: true })).toBeVisible();
   await page.getByRole('navigation', { name: 'Основная навигация' }).getByRole('link', { name: 'Операции', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'История операций' })).toBeVisible();
-  await page.getByText('Фильтры операций', { exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Операции', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Расширенные фильтры', exact: true }).click();
   await page.getByLabel('Счет истории', { exact: true }).selectOption('archive');
-  await page.getByRole('navigation').getByRole('link', { name: 'Настройки', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Группы настроек', exact: true })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Управление счетами', exact: false })).toBeVisible();
+  await page.getByRole('navigation', { name: 'Основная навигация' }).getByRole('link', { name: 'Настройки', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Настройки', exact: true })).toBeVisible();
   await page.goBack();
-  await expect(page.getByRole('heading', { name: 'История операций' })).toBeVisible();
-  await page.getByRole('navigation').getByRole('link', { name: 'Счета', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Операции', exact: true })).toBeVisible();
+  await page.getByRole('navigation', { name: 'Основная навигация' }).getByRole('link', { name: 'Счета', exact: true }).click();
   await manageAccounts(page);
   await expect(page.getByRole('button', { name: 'Архивные счета', exact: true })).toHaveAttribute('aria-pressed', 'true');
 });
@@ -49,8 +47,9 @@ test('account draft survives section navigation and submits through existing API
   await manageAccounts(page);
   await page.getByRole('button', { name: 'Добавить счет', exact: true }).click();
   await page.getByLabel('Название счета', { exact: true }).fill('Мобильный счет');
-  await page.getByRole('navigation').getByRole('link', { name: 'Операции', exact: true }).click();
-  await page.getByRole('navigation').getByRole('link', { name: 'Настройки', exact: true }).click();
+  await page.getByRole('navigation', { name: 'Основная навигация' }).getByRole('link', { name: 'Операции', exact: true }).click();
+  await page.getByRole('navigation', { name: 'Основная навигация' }).getByRole('link', { name: 'Настройки', exact: true }).click();
+  await page.getByRole('button', { name: 'Счета', exact: true }).click();
   await expect(page.getByLabel('Название счета', { exact: true })).toHaveValue('Мобильный счет');
   const sent = page.waitForRequest(r => r.method() === 'POST' && r.url().endsWith('/accounts'));
   await page.getByRole('button', { name: 'Создать счет', exact: true }).click();
@@ -65,17 +64,17 @@ for (const width of [320, 390, 768]) test(`layout fits ${width}px viewport with 
   await page.goto('/');
   await expect(page.getByTestId('balance-bank')).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-  const nav = await page.getByRole('navigation').boundingBox();
+  const nav = await page.getByRole('navigation', { name: 'Основная навигация' }).boundingBox();
   expect(nav!.y + nav!.height).toBeLessThanOrEqual(845);
-  for (const link of await page.getByRole('navigation').getByRole('link').all()) expect((await link.boundingBox())!.height).toBeGreaterThanOrEqual(48);
+  for (const link of await page.getByRole('navigation', { name: 'Основная навигация' }).getByRole('link').all()) expect((await link.boundingBox())!.height).toBeGreaterThanOrEqual(48);
   await page.screenshot({ path: test.info().outputPath(`accounts-${width}.png`), fullPage: true });
 });
 test('dark theme and direct section URL work', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'dark' });
   await page.goto('/#operations');
-  await expect(page.getByRole('heading', { name: 'История операций' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Операции', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Добавить операцию', exact: true }).click();
-  await expect(page.getByRole('dialog', { name: 'Новая операция' }).getByRole('button', { name: 'Добавить', exact: true })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Новая операция' }).getByRole('button', { name: 'Сохранить операцию', exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 test('uncertain account save keeps the same command and key after reload', async ({ page }) => {
@@ -109,7 +108,7 @@ test('empty accounts explain the next action', async ({ page }) => {
   await expect(page.getByLabel('Итоги по валютам')).toHaveCount(0);
   await page.getByRole('button', { name: 'Добавить операцию', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'Новая операция' })).toBeVisible();
-  await page.getByRole('button', { name: 'Отмена', exact: true }).click();
+  await page.getByRole('dialog', { name: 'Новая операция' }).getByRole('button', { name: 'Закрыть окно', exact: true }).click();
   await manageAccounts(page);
   await page.getByRole('button', { name: 'Добавить счет', exact: true }).click();
   await expect(page.getByLabel('Название счета', { exact: true })).toBeVisible();

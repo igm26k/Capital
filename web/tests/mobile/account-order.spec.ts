@@ -8,8 +8,7 @@ const initial = [
 ].map(a => ({ ...a, currency: 'EUR', type: 'bank', version: '1', balance_version: '1', posted_balance_minor: '10000' }));
 async function manage(page: Page) {
   await page.getByRole('navigation', { name: 'Основная навигация' }).getByRole('link', { name: 'Настройки', exact: true }).click();
-  await page.getByRole('button', { name: 'Группы настроек', exact: true }).click();
-  await page.getByRole('navigation', { name: 'Группы настроек' }).getByRole('button', { name: 'Счета', exact: true }).click();
+  await page.getByRole('button', { name: 'Счета', exact: true }).click();
 }
 async function dragAccount(page: Page, name: string, targetName: string) {
   const handle = page.getByRole('button', { name: `Перетащить счет ${name}`, exact: true });
@@ -56,7 +55,7 @@ test('saved account order reaches home and selectors and survives reload, while 
   const picker = page.getByRole('dialog', { name: 'Выбор: Счет', exact: true });
   await expect(picker.getByRole('option')).toHaveText(['Наличные · EUR', 'Карта · EUR', 'Вклад · EUR']);
   await page.keyboard.press('Escape');
-  await page.getByRole('button', { name: 'Отмена', exact: true }).click();
+  await page.getByRole('dialog', { name: 'Новая операция' }).getByRole('button', { name: 'Закрыть окно', exact: true }).click();
   await page.reload();
   await expect(page.locator('.screen[aria-label="Счета"] .tile-name')).toHaveText(['Наличные', 'Карта', 'Вклад']);
   await manage(page);

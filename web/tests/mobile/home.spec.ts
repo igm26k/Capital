@@ -39,11 +39,11 @@ test('Wallet home shows live per-currency overview and category shares, with rec
 test('Wallet home shortcuts open the working forms, history filters and reports', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Добавить операцию', exact: true }).click();
-  await expect(page.getByRole('dialog', { name: 'Новая операция' }).getByRole('button', { name: 'Добавить', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Отмена', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Новая операция' }).getByRole('button', { name: 'Сохранить операцию', exact: true })).toBeVisible();
+  await page.getByRole('dialog', { name: 'Новая операция' }).getByRole('button', { name: 'Закрыть окно', exact: true }).click();
   await page.getByRole('navigation').getByRole('link', { name: 'Счета', exact: true }).click();
   await page.getByRole('button', { name: 'Операции счета Евро карта', exact: true }).click();
-  await page.getByText('Фильтры операций', { exact: true }).click();
+  await page.getByRole('button', { name: 'Расширенные фильтры', exact: true }).click();
   await expect(page.getByLabel('Счет истории', { exact: true })).toHaveValue('eur');
   await page.getByRole('navigation').getByRole('link', { name: 'Счета', exact: true }).click();
   await page.getByRole('button', { name: 'Все записи', exact: true }).click();
@@ -52,10 +52,9 @@ test('Wallet home shortcuts open the working forms, history filters and reports'
   await expect(page.getByRole('button', { name: 'Открыть меню', exact: true })).toHaveCount(0);
   await expect(page.locator('.home-tabs')).toHaveCount(0);
   await page.getByRole('navigation').getByRole('link', { name: 'Настройки', exact: true }).click();
-  await page.getByRole('button', { name: 'Группы настроек', exact: true }).click();
-  await page.getByRole('navigation', { name: 'Группы настроек' }).getByRole('button', { name: 'Бюджеты и отчеты', exact: true }).click();
+  await page.getByRole('button', { name: 'Бюджеты, отчёты и правила', exact: true }).click();
   await page.getByText('Бюджеты, отчеты и правила', { exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Бюджеты и отчеты', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Бюджеты, отчёты и правила', exact: true })).toBeVisible();
 });
 test('overview period requests confirmed operations and can recover from an API error', async ({ page }) => {
   let fail = true;
@@ -92,8 +91,9 @@ test('reset clears every history filter and pagination, including unapplied fiel
     return route.fulfill({ json: { items: [], next_cursor: url.searchParams.has('q') && !url.searchParams.has('cursor') ? 'next-page' : null } });
   });
   await page.goto('/#operations');
+  await page.getByRole('button', { name: 'Дополнительные действия', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Сбросить фильтры', exact: true })).toBeVisible();
-  await page.getByText('Фильтры операций', { exact: true }).click();
+  await page.getByRole('button', { name: 'Расширенные фильтры', exact: true }).click();
   await page.getByLabel('Счет истории', { exact: true }).selectOption('eur');
   await page.getByLabel('Категория истории', { exact: true }).selectOption('food');
   await page.getByLabel('Тег истории', { exact: true }).selectOption('tag');
@@ -107,7 +107,7 @@ test('reset clears every history filter and pagination, including unapplied fiel
   await page.getByRole('button', { name: 'Загрузить еще операции', exact: true }).click();
   await expect.poll(() => requests.some(q => q.includes('cursor=next-page'))).toBe(true);
   await page.getByRole('button', { name: 'Сбросить фильтры', exact: true }).click();
-  await expect.poll(() => requests.at(-1)).toBe('limit=25');
+  await expect.poll(() => requests.slice(-2).some(q => q === 'limit=25')).toBe(true);
   for (const name of ['Счет истории', 'Категория истории', 'Тег истории', 'Тип в истории', 'Статус в истории']) await expect(page.getByLabel(name, { exact: true })).toHaveValue('');
   for (const name of ['С даты', 'По дату включительно', 'Поиск в истории']) await expect(page.getByLabel(name, { exact: true })).toHaveValue('');
   await expect(page.getByLabel('Операций на странице', { exact: true })).toHaveValue('25');

@@ -58,7 +58,7 @@ test('account picker colors match home cards, remain after searching and appear 
   await picker.getByRole('option').click();
   await expect(account).toContainText('Банковский счет 39');
   await expect(account.locator('.account-color-dot')).toHaveCSS('background-color', colors[39]);
-  await operation.getByRole('combobox', { name: 'Тип операции', exact: true }).selectOption('transfer');
+  await operation.getByRole('button', { name: 'Перевод', exact: true }).click();
   for (const label of ['Со счета', 'На счет']) await expect(operation.getByRole('button', { name: label, exact: true }).locator('.account-color-dot')).toBeVisible();
   await operation.getByLabel('Добавить комиссию', { exact: true }).check();
   await expect(operation.getByRole('button', { name: 'Счет комиссии', exact: true }).locator('.account-color-dot')).toBeVisible();

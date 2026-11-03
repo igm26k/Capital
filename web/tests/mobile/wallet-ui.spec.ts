@@ -12,8 +12,7 @@ test.beforeEach(async ({ page }) => {
     return route.fulfill({ json: body });
   });
   await page.goto('/#more');
-  await page.getByRole('button', { name: 'Группы настроек', exact: true }).click();
-  await page.getByRole('navigation', { name: 'Группы настроек' }).getByRole('button', { name: 'Импорт и экспорт', exact: true }).click();
+  await page.getByRole('button', { name: 'Импорт и экспорт', exact: true }).click();
   await page.locator('summary').filter({ hasText: /^Импорт из Wallet$/ }).click();
 });
 test('Wallet previews before writes and imports accounts, categories, expenses and paired transfers', async ({ page }) => {
