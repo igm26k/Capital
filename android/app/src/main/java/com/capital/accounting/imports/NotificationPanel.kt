@@ -120,15 +120,21 @@ private fun BankMessagesContent(model:AuthViewModel,binding:NotificationBinding)
     val completed=sources.items.filter {it.state=="applied"}.map {it.id to it.version}
     LaunchedEffect(completed,model.state.busy){if(completed.isNotEmpty()&&completed!=refreshed&&!model.state.busy){refreshed=completed;model.loadOverview()}}
 
-    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Text("Банки и уведомления",style=MaterialTheme.typography.titleLarge)}
+
     Text("Добавьте банк, отправителя, счет и шаблон. Правила сохраняются на этом устройстве; предложения на сервере доступны и в веб-версии.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
     if(message.isNotEmpty())Text(message,color=MaterialTheme.colorScheme.primary)
     if(busy)LinearProgressIndicator(Modifier.fillMaxWidth())
-    Button(enabled=localEnabled&&profiles.size<20,onClick={edit(null)}){Text("Добавить банк")}
+    Button(modifier=Modifier.fillMaxWidth(),enabled=localEnabled&&profiles.size<20,onClick={edit(null)}){Text("Добавить банк")}
     Card(Modifier.fillMaxWidth(),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surface)){
         Column(Modifier.padding(12.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){
             Text("Прием новых сообщений",style=MaterialTheme.typography.titleMedium)
-            Text("Push: ${if(pushAccess)"доступ включен" else "доступ выключен"} · SMS: ${if(smsAccess)"доступ включен" else "доступ выключен"}",style=MaterialTheme.typography.bodySmall)
+            listOf(Triple("Push-уведомления",pushAccess,profiles.any {it.enabled&&it.channel=="push"}),Triple("SMS-сообщения",smsAccess,profiles.any {it.enabled&&it.channel=="sms"})).forEach { (label,permission,hasRule) ->
+                HorizontalDivider()
+                Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {
+                    Column(Modifier.weight(1f)) {Text(label,style=MaterialTheme.typography.bodyMedium);Text(if(permission)"Разрешено Android" else "Нет разрешения Android",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
+                    Text(if(inbox?.enabled==true&&permission&&hasRule)"Приём включён" else if(!hasRule)"Нет правил" else "Приём выключен",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.primary)
+                }
+            }
             TextButton(onClick={try{val intent=if(Build.VERSION.SDK_INT>=30)Intent(Settings.ACTION_NOTIFICATION_LISTENER_DETAIL_SETTINGS).putExtra(Settings.EXTRA_NOTIFICATION_LISTENER_COMPONENT_NAME,ComponentName(context,BankNotificationListener::class.java).flattenToString()) else Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS);context.startActivity(intent)}catch(_:Exception){message="Откройте доступ к уведомлениям Capital в настройках Android."}}){Text("Разрешить push-уведомления")}
             TextButton(enabled=!smsAccess,onClick={permissionRequest.launch(Manifest.permission.RECEIVE_SMS)}){Text("Разрешить новые SMS")}
             Text("Обрабатываются только выбранные приложения и SMS-отправители. История SMS не читается. Без системного разрешения доступна ручная вставка.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
@@ -136,6 +142,7 @@ private fun BankMessagesContent(model:AuthViewModel,binding:NotificationBinding)
             Text("Прием: ${if(inbox?.enabled==true)"включен" else "выключен"}",style=MaterialTheme.typography.labelMedium)
         }
     }
+    Text("Подключённые банки",style=MaterialTheme.typography.titleSmall)
     profiles.forEach {value->Card(Modifier.fillMaxWidth(),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surface)){
         Column(Modifier.padding(12.dp),verticalArrangement=Arrangement.spacedBy(4.dp)){
             Text(value.bankName.ifEmpty {value.packageName},style=MaterialTheme.typography.titleSmall)

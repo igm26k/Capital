@@ -33,6 +33,7 @@ data class FinancialTransactionRequest(val action: FinancialTransactionAction, v
 
 /** An ephemeral UI intent scoped to the signed-in owner, never a submitted command. */
 class FinancialCreateRouter {
+    var historySearchOpen by mutableStateOf(false)
     var operationTarget by mutableStateOf<String?>(null)
     var request by mutableStateOf<FinancialCreationRequest?>(null)
     var transactionRequest by mutableStateOf<FinancialTransactionRequest?>(null)

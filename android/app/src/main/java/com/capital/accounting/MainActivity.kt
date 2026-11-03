@@ -70,19 +70,22 @@ class MainActivity : ComponentActivity() {
             val scroll = rememberScrollState()
             val settingsGroup = navigation.settingsGroup
             val settingsState = rememberSaveableStateHolder()
-            var settingsMenu by remember { mutableStateOf(false) }
+            val preferences = remember { getSharedPreferences("capital.appearance", MODE_PRIVATE) }
+            var appearance by remember { mutableStateOf(preferences.getString("theme", "system") ?: "system") }
+            val dark = appearance == "dark" || (appearance == "system" && isSystemInDarkTheme())
+            LaunchedEffect(section.value) { if (section.value != "more") navigation.settingsGroup = "home" }
             // Dialogs handle Back in their own windows before this root handler.
             BackHandler {
-                if (state.auth != null) navigation.back()
+                if (state.auth != null) { if (section.value == "more" && settingsGroup != "home") navigation.settingsGroup = "home" else navigation.back() }
             }
-            MaterialTheme(colorScheme = capitalColors(isSystemInDarkTheme()), typography = capitalTypography) {
+            MaterialTheme(colorScheme = capitalColors(dark), typography = capitalTypography) {
                 CompositionLocalProvider(LocalFinancialSection provides section, LocalFinancialCreateRouter provides createRouter, LocalSettingsGroup provides settingsGroup, LocalFinancialScrollState provides scroll) {
                     if (state.auth != null && state.recoveryOpen) QueueRecovery(model)
                     if (state.auth != null && state.detailStack.isNotEmpty()) TransactionDetails(model)
                     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                         Box(Modifier.fillMaxSize()) {
                             Column(Modifier.fillMaxSize()) {
-                            Surface(color = if (isSystemInDarkTheme()) Color(0xff18263f) else Color(0xff1f3155), contentColor = Color.White) {
+                            if (state.auth == null) Surface(color = if (isSystemInDarkTheme()) Color(0xff18263f) else Color(0xff1f3155), contentColor = Color.White) {
                                 Row(Modifier.fillMaxWidth().heightIn(min = 76.dp).statusBarsPadding().padding(start = 20.dp, end = 12.dp, top = 10.dp, bottom = 10.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                                     Row(Modifier.weight(1f), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                                         if (state.auth != null && section.value != "accounts") IconButton(onClick = navigation::back, enabled = !state.busy, modifier = Modifier.semantics { contentDescription = "Назад" }) { CapitalIcon("back") }
@@ -94,7 +97,7 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                             LaunchedEffect(section.value, settingsGroup) { scroll.scrollTo(0) }
-                            Column(Modifier.weight(1f).windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)).imePadding().verticalScroll(scroll).padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Column(Modifier.weight(1f).windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)).imePadding().verticalScroll(scroll).statusBarsPadding().padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 if (state.message.isNotEmpty()) Text(state.message)
 
                                 if (state.revokePendingId != null) {
@@ -122,20 +125,42 @@ class MainActivity : ComponentActivity() {
                                     }
                                     if (!state.persisted) Button(enabled = !state.busy, onClick = model::persist) { Text("Повторить сохранение сессии") }
                                     if (section.value == "more") {
-                                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                                            Text("Настройки", style = MaterialTheme.typography.titleLarge)
-                                            Box {
-                                                TextButton(onClick = { settingsMenu = true }, modifier = Modifier.semantics { contentDescription = "Группы настроек" }) { Text("☰", style = MaterialTheme.typography.titleLarge) }
-                                                DropdownMenu(expanded = settingsMenu, onDismissRequest = { settingsMenu = false }) {
-                                                    listOf("profile" to "Профиль", "accounts" to "Счета", "classification" to "Категории и теги", "analytics" to "Бюджеты и отчеты", "data" to "Импорт и экспорт", "sources" to "Банки и уведомления", "security" to "Безопасность и данные").forEach { (id, label) ->
-                                                        DropdownMenuItem(text = { Text((if (settingsGroup == id) "✓ " else "") + label) }, onClick = { navigation.settingsGroup = id; settingsMenu = false })
-                                                    }
+                                        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                                            if (settingsGroup != "home") IconButton(onClick = { navigation.settingsGroup = "home" }) { CapitalIcon("back") }
+                                            Text(when(settingsGroup) { "sources" -> "Банки и уведомления"; "profile" -> "Профиль"; "security" -> "Безопасность и сессии"; else -> "Настройки" }, style = MaterialTheme.typography.titleLarge)
+                                        }
+                                        if (settingsGroup == "home") {
+                                            Card(onClick = { navigation.settingsGroup = "profile" }, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
+                                                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                    Text("Профиль", style = MaterialTheme.typography.titleMedium)
+                                                    Text(state.auth.profile.email, style = MaterialTheme.typography.bodyMedium)
+                                                    HorizontalDivider()
+                                                    Text("Пространство · ${state.auth.workspace.name}", style = MaterialTheme.typography.bodySmall)
+                                                    Text("Часовой пояс · ${state.auth.profile.timezone}", style = MaterialTheme.typography.bodySmall)
                                                 }
                                             }
+                                            listOf(
+                                                "Управление финансами" to listOf(Triple("accounts", "Счета", "card"), Triple("classification", "Категории и теги", "category"), Triple("analytics", "Бюджеты, отчёты и правила", "records")),
+                                                "Интеграции и данные" to listOf(Triple("sources", "Банки и уведомления", "bank"), Triple("data", "Импорт и экспорт", "transfer")),
+                                                "Приложение" to listOf(Triple("profile", "Профиль и оформление", "settings"), Triple("security", "Безопасность и сессии", "settings"))
+                                            ).forEach { (title, rows) ->
+                                                Spacer(Modifier.height(8.dp)); Text(title, style = MaterialTheme.typography.titleSmall)
+                                                OutlinedCard(Modifier.fillMaxWidth()) { Column(Modifier.padding(horizontal = 12.dp)) {
+                                                    rows.forEachIndexed { index, (id, label, icon) ->
+                                                        if (index > 0) HorizontalDivider()
+                                                        TextButton(onClick = { navigation.settingsGroup = id }, modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(vertical = 12.dp)) {
+                                                            CapitalIcon(icon); Spacer(Modifier.width(12.dp)); Text(label, Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurface); Text("›")
+                                                        }
+                                                    }
+                                                } }
+                                            }
+                                            TextButton(enabled = !state.busy && !state.financeBlocked, onClick = model::renew) { Text("Продлить сессию") }
+                                            TextButton(enabled = !state.busy && (!state.financeBlocked || (state.offline && state.financialCommand == null && state.localPending == 0 && state.localBlocked == 0)), onClick = model::logout, modifier = Modifier.fillMaxWidth()) { Text("Выйти из аккаунта", color = MaterialTheme.colorScheme.error) }
                                         }
                                         when (settingsGroup) {
                                             "profile" -> {
                                                 Text("Профиль", style = MaterialTheme.typography.titleMedium)
+                                                CapitalSelect("Тема оформления", appearance, listOf("system" to "Системная", "dark" to "Тёмная", "light" to "Светлая")) { appearance = it; preferences.edit().putString("theme", it).apply() }
                                                 Text(state.auth.profile.email)
                                                 Text("Пространство: ${state.auth.workspace.name}")
                                                 Text("Часовой пояс: ${state.auth.profile.timezone}")
@@ -193,9 +218,9 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                             if (state.auth != null && !state.logoutPending && state.revokePendingId == null) {
-                                NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
+                                NavigationBar(containerColor = MaterialTheme.colorScheme.background, tonalElevation = 0.dp) {
                                     listOf(Triple("accounts", "Счета", "◫"), Triple("operations", "Операции", "⇄"), Triple("more", "Настройки", "⋯")).forEach { (id, label, symbol) ->
-                                        NavigationBarItem(selected = section.value == id, onClick = { section.value = id }, icon = { Text(symbol, fontSize = 22.sp) }, label = { Text(label) }, modifier = Modifier.semantics { contentDescription = "Раздел $label" })
+                                        NavigationBarItem(selected = section.value == id, onClick = { section.value = id }, icon = { CapitalIcon(if (id == "accounts") "card" else if (id == "operations") "transfer" else "settings") }, label = { Text(label) }, modifier = Modifier.semantics { contentDescription = "Раздел $label" })
                                     }
                                 }
                             }

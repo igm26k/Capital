@@ -39,6 +39,8 @@ fun HistoryFilters(model: AuthViewModel, onReset: () -> Unit = {}) {
         search = filter?.search ?: ""; from = filter?.from ?: ""; to = filter?.to ?: ""
         limit = state.historyLimit.toString(); error = ""; validation.reset()
     }
+    val router = LocalFinancialCreateRouter.current
+    LaunchedEffect(router.historySearchOpen) { if (router.historySearchOpen) { expanded = true; router.historySearchOpen = false } }
     val enabled = !state.busy && state.persisted
     val active = state.historyFilter?.active == true
     fun reset() {
@@ -46,13 +48,21 @@ fun HistoryFilters(model: AuthViewModel, onReset: () -> Unit = {}) {
         search = ""; from = ""; to = ""; limit = "25"; expanded = false; error = ""; validation.reset()
         onReset(); model.clearHistoryFilters()
     }
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-        TextButton(onClick = { expanded = true }, modifier = Modifier.semantics { contentDescription = "Открыть фильтры операций" }) {
-            Text(if (active) "Фильтры · применены" else "Фильтры", fontSize = 12.sp)
-            Spacer(Modifier.width(8.dp))
-            Text("⌄")
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedButton(enabled = enabled, onClick = {
+            val current = state.historyFilter ?: TransactionFilter()
+            val date = java.util.Calendar.getInstance().apply { set(java.util.Calendar.DAY_OF_MONTH, 1); set(java.util.Calendar.HOUR_OF_DAY, 0); set(java.util.Calendar.MINUTE, 0); set(java.util.Calendar.SECOND, 0); set(java.util.Calendar.MILLISECOND, 0) }
+            val instant = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.ROOT).apply { timeZone = java.util.TimeZone.getTimeZone("UTC") }.format(date.time)
+            onReset(); model.applyHistoryFilter(current.copy(from = if (current.from == null) instant else null, to = null), state.historyLimit)
+        }, modifier = Modifier.weight(1f), contentPadding = PaddingValues(8.dp)) { Text(if (state.historyFilter?.from != null || state.historyFilter?.to != null) "Период задан" else "Весь период", fontSize = 11.sp) }
+        Box(Modifier.weight(1f)) {
+            var choosing by remember { mutableStateOf(false) }
+            OutlinedButton(enabled = enabled, onClick = { choosing = true }, modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(8.dp)) { Text(state.accounts.find { it.id == state.historyFilter?.accountId }?.name ?: "Все счета", maxLines = 1, fontSize = 11.sp) }
+            DropdownMenu(expanded = choosing, onDismissRequest = { choosing = false }) {
+                (listOf("" to "Все счета") + state.accounts.map { it.id to it.name }).forEach { (id, label) -> DropdownMenuItem(text = { Text(label) }, onClick = { choosing = false; onReset(); model.applyHistoryFilter((state.historyFilter ?: TransactionFilter()).copy(accountId = id.ifEmpty { null }), state.historyLimit) }) }
+            }
         }
-        if (active) TextButton(enabled = enabled, onClick = ::reset) { Text("Сбросить", fontSize = 12.sp) }
+        IconButton(onClick = { expanded = true }, modifier = Modifier.semantics { contentDescription = "Открыть фильтры операций" }) { CapitalIcon("settings") }
     }
     if (expanded) Dialog(onDismissRequest = { expanded = false }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(Modifier.padding(12.dp).widthIn(max = 560.dp).fillMaxWidth().heightIn(max = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp - 48).coerceAtLeast(100).dp), shape = RoundedCornerShape(20.dp)) {

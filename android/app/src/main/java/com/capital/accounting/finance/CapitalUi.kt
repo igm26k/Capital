@@ -23,6 +23,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -34,11 +35,11 @@ val LocalSettingsGroup = staticCompositionLocalOf { "profile" }
 val capitalAccountColors = listOf(0xff167b68, 0xff2463af, 0xff8545a4, 0xffb64a32, 0xff466d30, 0xff3c578d).map { Color(it) }
 fun capitalAccountColor(id: String): Color = capitalAccountColors[id.sumOf { it.code } % capitalAccountColors.size]
 fun capitalColors(dark: Boolean): ColorScheme = if (dark) darkColorScheme(
-    primary = Color(0xffadc7ff), onPrimary = Color(0xff172c4f), primaryContainer = Color(0xff293e62), onPrimaryContainer = Color(0xffd8e5ff),
-    onSurface = Color(0xffe6edf8), background = Color(0xff101722), surface = Color(0xff1a2433), surfaceVariant = Color(0xff202d41), onSurfaceVariant = Color(0xffaab9ce), outline = Color(0xff34445c)
+    primary = Color(0xffa3a8ff), onPrimary = Color(0xff141c35), primaryContainer = Color(0xff484982), onPrimaryContainer = Color(0xfff0eeff),
+    onSurface = Color(0xfff1f2fa), background = Color(0xff111a2e), surface = Color(0xff202940), surfaceVariant = Color(0xff27314a), onSurfaceVariant = Color(0xffbbc2d7), outline = Color(0xff414c68)
 ) else lightColorScheme(
-    primary = Color(0xff365b9d), onPrimary = Color.White, primaryContainer = Color(0xffe4ebf8), onPrimaryContainer = Color(0xff203c70),
-    background = Color(0xfff2f5fa), surface = Color.White, onSurface = Color(0xff26354a), surfaceVariant = Color(0xffeaf0f8), onSurfaceVariant = Color(0xff5e6f87), outline = Color(0xffdbe2ed)
+    primary = Color(0xff6169bb), onPrimary = Color.White, primaryContainer = Color(0xffe3e2fa), onPrimaryContainer = Color(0xff34365f),
+    background = Color(0xfff5f6fb), surface = Color.White, onSurface = Color(0xff20283c), surfaceVariant = Color(0xffedf0f8), onSurfaceVariant = Color(0xff626b80), outline = Color(0xffd0d5e3)
 )
 // CSS uses normal line-height and no Material letter spacing. Explicit compact
 // font sizes must not inherit a 24sp body line box from the Material defaults.
@@ -88,10 +89,10 @@ fun CapitalSelect(label: String, value: String, options: List<Pair<String, Strin
     var expanded by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-        Text(label, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(label, fontSize = 12.sp, fontWeight = FontWeight.Normal, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Box(Modifier.fillMaxWidth()) {
-            OutlinedButton(onClick = { query = ""; expanded = true }, enabled = enabled, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp), shape = RoundedCornerShape(8.dp),
-                contentPadding = PaddingValues(14.dp), border = BorderStroke(1.dp, Color(0xff79747e)), colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface)) {
+            OutlinedButton(onClick = { query = ""; expanded = true }, enabled = enabled, modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp), shape = RoundedCornerShape(8.dp),
+                contentPadding = PaddingValues(10.dp), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline), colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface)) {
                 optionIcon?.invoke(value)
                 Text(options.find { it.first == value }?.second ?: "Выберите", modifier = Modifier.weight(1f), fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text("▾")
@@ -151,6 +152,7 @@ fun AccountSelect(label: String, value: String, options: List<Pair<String, Strin
 @Composable
 fun CapitalIcon(name: String, modifier: Modifier = Modifier.size(24.dp), color: Color = LocalContentColor.current) {
     val source = when (name) {
+        "search" -> "M10 3a7 7 0 1 0 0 14 7 7 0 0 0 0-14M15 15l6 6"
         "close" -> "M6 6l12 12M18 6L6 18"
         "back" -> "M15 5l-7 7 7 7"
         "drag" -> "M9 5h.01M15 5h.01M9 12h.01M15 12h.01M9 19h.01M15 19h.01"
@@ -223,27 +225,27 @@ fun CapitalOperationRow(model: AuthViewModel, item: Transaction, expandedContent
     val title = operationTitle(item, state.categories)
     Card(onClick = { if (expandedContent == null) model.openTransactionDetails(item.id) else expanded = !expanded },
         modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(9.dp), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-        Row(Modifier.heightIn(min = 64.dp).padding(horizontal = 8.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-            Box(Modifier.width(24.dp).height(28.dp), contentAlignment = Alignment.Center) {
+        Row(Modifier.heightIn(min = 56.dp).padding(horizontal = 8.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+            Box(Modifier.size(32.dp).background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(16.dp)), contentAlignment = Alignment.Center) {
                 if (item.kind in listOf("expense", "income")) CategoryIcon(item.allocations.firstOrNull()?.category_id, state.categories) else CapitalIcon(if (item.kind in listOf("opening", "adjustment")) "bank" else item.kind, Modifier.size(19.dp), MaterialTheme.colorScheme.primary)
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(title, fontSize = 12.sp, lineHeight = 15.6.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 val accounts = item.entries.sortedBy { BigInteger(it.amount_minor).signum() }.map { entry -> state.accounts.find { it.id == entry.account_id }?.name ?: entry.currency }.distinct().joinToString(" → ")
                 Text(listOf(item.payee, accounts).filter { it.isNotBlank() }.joinToString(" · "), fontSize = 10.sp, lineHeight = 12.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                transactionNote(item.note).takeIf { it.isNotBlank() }?.let { Text(it, fontSize = 10.sp, lineHeight = 12.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                if (item.status == "pending") Text("Предварительная", fontSize = 10.sp, color = MaterialTheme.colorScheme.primary)
             }
             Column(Modifier.widthIn(max = 125.dp), horizontalAlignment = Alignment.End) {
                 item.entries.sortedBy { BigInteger(it.amount_minor).signum() }.forEach { entry ->
-                    val dark = androidx.compose.foundation.isSystemInDarkTheme()
+                    val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
                     val amountColor = when {
-                        item.kind in listOf("transfer", "opening", "adjustment") -> MaterialTheme.colorScheme.primary
-                        BigInteger(entry.amount_minor).signum() > 0 -> Color(if (dark) 0xff6cd2a8 else 0xff16846a)
-                        else -> Color(if (dark) 0xfff69283 else 0xffc75345)
+                        item.kind in listOf("transfer", "opening", "adjustment") -> Color(if (dark) 0xffa7c8ff else 0xff497bb7)
+                        BigInteger(entry.amount_minor).signum() > 0 -> Color(if (dark) 0xff79dba7 else 0xff18734e)
+                        else -> Color(if (dark) 0xfff1878e else 0xffbd4652)
                     }
                     Text(capitalMoney(entry.amount_minor, entry.currency), fontSize = 12.sp, lineHeight = 15.sp, fontWeight = FontWeight.SemiBold, color = amountColor)
                 }
-                Text(operationDate(item.occurred_at), fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(operationDate(item.occurred_at).takeLast(5), fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Text(if (expanded) "⌃" else "⌄", fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
@@ -259,8 +261,15 @@ fun CapitalOperationRow(model: AuthViewModel, item: Transaction, expandedContent
 @Composable
 fun OperationTypeSelect(model: AuthViewModel, type: String, enabled: Boolean) {
     val router = LocalFinancialCreateRouter.current
-    CapitalSelect("Тип операции", type, listOf("expense" to "Расход", "income" to "Доход", "transfer" to "Перевод", "adjustment" to "Корректировка"), enabled) { value ->
-        if (value != type) router.operationTarget = value
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surface, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)) {
+            Row(Modifier.fillMaxWidth().padding(4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                listOf("expense" to "Расход", "income" to "Доход", "transfer" to "Перевод").forEach { (value, label) ->
+                    TextButton(enabled = enabled, onClick = { if (value != type) router.operationTarget = value }, modifier = Modifier.weight(1f), shape = RoundedCornerShape(10.dp), contentPadding = PaddingValues(4.dp), colors = ButtonDefaults.textButtonColors(containerColor = if (value == type) MaterialTheme.colorScheme.primaryContainer else Color.Transparent, contentColor = MaterialTheme.colorScheme.onSurface)) { Text(label, fontSize = 12.sp) }
+                }
+            }
+        }
+        TextButton(enabled = enabled, onClick = { router.operationTarget = "adjustment" }) { Text("Корректировка остатка", fontSize = 11.sp) }
     }
 }
 
@@ -284,7 +293,7 @@ fun HandleOperationType(prefix: String, editing: Boolean, enabled: Boolean, guar
 @Composable
 fun CapitalRecentRow(model: AuthViewModel, item: Transaction) {
     val state = model.state
-    val dark = androidx.compose.foundation.isSystemInDarkTheme()
+    val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val positive = item.kind in listOf("income", "refund")
     val background = when (item.kind) {
         "income", "refund" -> if (dark) 0xff23473a else 0xffdef3e9
@@ -310,7 +319,7 @@ fun CapitalRecentRow(model: AuthViewModel, item: Transaction) {
             Text(state.accounts.find { it.id == entry?.account_id }?.name.orEmpty(), fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Column(Modifier.widthIn(max = 135.dp), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(5.dp)) {
-            val valueColor = if (item.kind == "transfer") MaterialTheme.colorScheme.onSurfaceVariant else if (positive || entry?.let { BigInteger(it.amount_minor).signum() > 0 } == true) Color(if (dark) 0xff6cd2a8 else 0xff16846a) else Color(if (dark) 0xfff69283 else 0xffc75345)
+            val valueColor = if (item.kind == "transfer") MaterialTheme.colorScheme.onSurfaceVariant else if (positive || entry?.let { BigInteger(it.amount_minor).signum() > 0 } == true) Color(if (dark) 0xff79dba7 else 0xff18734e) else Color(if (dark) 0xfff1878e else 0xffbd4652)
             Text(entry?.let { Money.displayAggregate(it.amount_minor, it.currency) } ?: "—", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = valueColor)
             target?.let { Text("→ ${Money.displayAggregate(it.amount_minor, it.currency)}", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             Text(openingLocal(item.occurred_at, java.util.TimeZone.getDefault().id).take(10).split('-').reversed().take(2).joinToString("."), fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)

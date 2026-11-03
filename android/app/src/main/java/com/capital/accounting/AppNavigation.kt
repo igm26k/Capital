@@ -7,9 +7,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.listSaver
 
 /** Only complete screens enter history; forms and settings controls never add Back steps. */
-internal class AppNavigation(routes: List<String> = listOf("accounts:profile")) {
+internal class AppNavigation(routes: List<String> = listOf("accounts:home")) {
     private var history by mutableStateOf(listOf("accounts"))
-    private var group by mutableStateOf(routes.lastOrNull()?.substringAfter(':', "profile") ?: "profile")
+    private var group by mutableStateOf(routes.lastOrNull()?.substringAfter(':', "home") ?: "home")
     init {
         routes.forEach { route ->
             val screen = route.substringBefore(':')

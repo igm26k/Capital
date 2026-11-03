@@ -47,10 +47,12 @@ fun ValidatedTextField(value: String, onValueChange: (String) -> Unit, label: St
         }
     }
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-        Text(label, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(label, fontSize = 12.sp, fontWeight = FontWeight.Normal, color = MaterialTheme.colorScheme.onSurfaceVariant)
         OutlinedTextField(value, { onValueChange(it); validation.changed(key) },
-            modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).focusRequester(focus).bringIntoViewRequester(location),
-            shape = RoundedCornerShape(8.dp), colors = OutlinedTextFieldDefaults.colors(unfocusedBorderColor = Color(0xff79747e)),
+            modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp).focusRequester(focus).bringIntoViewRequester(location),
+            shape = RoundedCornerShape(10.dp), colors = OutlinedTextFieldDefaults.colors(unfocusedBorderColor = MaterialTheme.colorScheme.outline),
+            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = if (key == "amount" || key.startsWith("part.") || key in setOf("sourceAmount", "targetAmount", "feeAmount", "balance")) androidx.compose.ui.text.input.KeyboardType.Decimal else androidx.compose.ui.text.input.KeyboardType.Text),
+            textStyle = MaterialTheme.typography.bodyLarge.copy(fontSize = if (key == "amount") 24.sp else 16.sp),
             enabled = enabled, singleLine = singleLine, isError = key in validation.errors,
             supportingText = validation.errors[key]?.let { message -> { Text(message) } })
     }

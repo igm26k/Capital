@@ -151,7 +151,8 @@ fun TransactionPanel(model: AuthViewModel) {
         var bulkOpen by remember { mutableStateOf(false) }
         var actionsOpen by remember { mutableStateOf(false) }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-            Text("Операции", style = MaterialTheme.typography.titleLarge)
+            Text("Операции", modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
+            IconButton(onClick = { createRouter.historySearchOpen = true }, modifier = Modifier.semantics { contentDescription = "Поиск операций" }) { CapitalIcon("search") }
             Box {
                 IconButton(onClick = { actionsOpen = true }, modifier = Modifier.semantics { contentDescription = "Действия с операциями" }) { Text("⋮", style = MaterialTheme.typography.titleLarge) }
                 DropdownMenu(expanded = actionsOpen, onDismissRequest = { actionsOpen = false }) {
@@ -163,43 +164,9 @@ fun TransactionPanel(model: AuthViewModel) {
         if (bulkOpen && navigation.value == null) BulkClassificationControls(bulk)
         DraftGuardControls(guard, "transaction", enabled) { navigation.value = "transaction" }
     } else if (editorOpen) Dialog(onDismissRequest = ::close, properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)) {
-        Surface(Modifier.padding(12.dp).widthIn(max = 560.dp).fillMaxWidth().heightIn(max = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp - 24).coerceAtLeast(100).dp), shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp)) {
-            ModalScrollContent(if (editingId == null) "Новая операция" else "Изменение операции", ::close, enabled && !scope.saving) {
-
-                if (state.message.isNotEmpty()) Text(state.message)
-                if (scope.failed) {
-                    Text("Не удалось сохранить черновики на устройстве. Повторите сохранение.")
-                    Button(enabled = !scope.saving, onClick = { scope.persist(retry = true) }) { Text("Повторить локальное сохранение") }
-                }
-                FinancialCommandStatus(model)
-                DraftGuardControls(guard, "transaction", enabled)
-                if (editingId == null) OperationTypeSelect(model, kind, enabled)
-                AccountSelect("Счет", account?.id ?: "", eligible.map { it.id to "${it.name} · ${it.currency}" }, enabled) { accountId = it }
-                Text(if (account == null) "Добавьте активный счет в Настройки → Счета." else "Выбран счет: ${account.name} · ${account.currency}")
-                parts.forEachIndexed { index, part ->
-                    CapitalSelect("Категория${if (parts.size > 1) " части ${index + 1}" else ""}", part.categoryId ?: "",
-                        listOf("" to "Без категории") + state.categories.filter { it.archived_at == null || it.id == part.categoryId }.map { it.id to categoryPath(it.id, state.categories) }.sortedBy { it.second }, enabled, optionIcon = { CategoryIcon(it.ifEmpty { null }, state.categories) }, optionColor = { categoryAppearance(it.ifEmpty { null }, state.categories).color }) { chosen ->
-                        parts = parts.map { if (it.id == part.id) it.copy(categoryId = chosen.ifEmpty { null }) else it }
-                    }
-                    if (parts.size > 1) {
-                        key(part.id) { ValidatedTextField(part.amount, { value -> parts = parts.map { if (it.id == part.id) it.copy(amount = value) else it } }, "Сумма части ${index + 1}", "part.${part.id}", validation, enabled) }
-                        TextButton(enabled = enabled, onClick = { parts = parts.filterNot { it.id == part.id } }) { Text("Убрать часть ${index + 1}") }
-                    }
-                }
-                AllocationSummaryView(amount, account?.currency, parts)
-                TextButton(enabled = enabled && parts.size < 100, onClick = { parts = parts + AllocationDraft() }) { Text("Добавить часть операции") }
-                ValidatedTextField(amount, { amount = it }, "Сумма операции", "amount", validation, enabled)
-                OperationDateField(occurred, { occurred = it }, enabled)
-                ValidatedTextField(payee, { payee = it }, "Получатель операции", "payee", validation, enabled)
-                ValidatedTextField(transactionNote(note), { note = it }, "Примечание операции", "note", validation, enabled, singleLine = false)
-                state.tags.filter { it.archived_at == null || it.id in selectedTags }.forEach { tag ->
-                    Row {
-                        Checkbox(tag.id in selectedTags, { checked -> selectedTags = if (checked) (selectedTags + tag.id).distinct() else selectedTags - tag.id }, enabled = enabled, modifier = Modifier.semantics { contentDescription = "Выбрать тег ${tag.name}" })
-                        Text("Тег операции: ${tag.name}")
-                    }
-                }
-                if (error.isNotEmpty()) Text(error)
-                Button(enabled = enabled && account != null && (editingId == null || state.transactions.any { it.id == editingId }), onClick = save@{
+        Surface(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing), color = MaterialTheme.colorScheme.background) {
+            val saveButton: @Composable () -> Unit = {
+                Button(modifier = Modifier.fillMaxWidth(), shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp), enabled = enabled && account != null && (editingId == null || state.transactions.any { it.id == editingId }), onClick = save@{
                     error = ""
                     zone = TimeZone.getDefault().id
                     val currency = account?.currency ?: return@save
@@ -223,7 +190,44 @@ fun TransactionPanel(model: AuthViewModel) {
                         error = ""; model.submitTransaction(request, editingId)
                         if (editingId == null) parts = parts.map { it.copy(id = UUID.randomUUID().toString()) }
                     } catch (e: Exception) { error = if (e is IllegalArgumentException && e.message == "Сумма частей должна точно совпадать с суммой операции.") e.message!! else "Проверьте положительную сумму, счет, дату, часовой пояс и длину текста." }
-                }) { Text(if (editingId == null) "Добавить" else "Сохранить изменения операции") }
+                }) { Text(if (editingId == null) "Сохранить операцию" else "Сохранить изменения операции") }
+            }
+            ModalScrollContent(if (editingId == null) "Новая операция" else "Изменение операции", ::close, enabled && !scope.saving, footer = saveButton) {
+
+                if (state.message.isNotEmpty()) Text(state.message)
+                if (scope.failed) {
+                    Text("Не удалось сохранить черновики на устройстве. Повторите сохранение.")
+                    Button(enabled = !scope.saving, onClick = { scope.persist(retry = true) }) { Text("Повторить локальное сохранение") }
+                }
+                FinancialCommandStatus(model)
+                DraftGuardControls(guard, "transaction", enabled)
+                if (editingId == null) OperationTypeSelect(model, kind, enabled)
+                AccountSelect("Счет", account?.id ?: "", eligible.map { it.id to "${it.name} · ${it.currency}" }, enabled) { accountId = it }
+                if (account == null) Text("Добавьте активный счет в Настройки → Счета.")
+                parts.forEachIndexed { index, part ->
+                    CapitalSelect("Категория${if (parts.size > 1) " части ${index + 1}" else ""}", part.categoryId ?: "",
+                        listOf("" to "Без категории") + state.categories.filter { it.archived_at == null || it.id == part.categoryId }.map { it.id to categoryPath(it.id, state.categories) }.sortedBy { it.second }, enabled, optionIcon = { CategoryIcon(it.ifEmpty { null }, state.categories) }, optionColor = { categoryAppearance(it.ifEmpty { null }, state.categories).color }) { chosen ->
+                        parts = parts.map { if (it.id == part.id) it.copy(categoryId = chosen.ifEmpty { null }) else it }
+                    }
+                    if (parts.size > 1) {
+                        key(part.id) { ValidatedTextField(part.amount, { value -> parts = parts.map { if (it.id == part.id) it.copy(amount = value) else it } }, "Сумма части ${index + 1}", "part.${part.id}", validation, enabled) }
+                        TextButton(enabled = enabled, onClick = { parts = parts.filterNot { it.id == part.id } }) { Text("Убрать часть ${index + 1}") }
+                    }
+                }
+                AllocationSummaryView(amount, account?.currency, parts)
+                TextButton(enabled = enabled && parts.size < 100, onClick = { parts = parts + AllocationDraft() }) { Text("Добавить часть операции") }
+                ValidatedTextField(amount, { amount = it }, "Сумма · ${account?.currency.orEmpty()}", "amount", validation, enabled)
+                OperationDateField(occurred, { occurred = it }, enabled)
+                ValidatedTextField(payee, { payee = it }, "Получатель операции", "payee", validation, enabled)
+                ValidatedTextField(transactionNote(note), { note = it }, "Примечание операции", "note", validation, enabled, singleLine = false)
+                state.tags.filter { it.archived_at == null || it.id in selectedTags }.forEach { tag ->
+                    Row {
+                        Checkbox(tag.id in selectedTags, { checked -> selectedTags = if (checked) (selectedTags + tag.id).distinct() else selectedTags - tag.id }, enabled = enabled, modifier = Modifier.semantics { contentDescription = "Выбрать тег ${tag.name}" })
+                        Text("Тег операции: ${tag.name}")
+                    }
+                }
+                if (error.isNotEmpty()) Text(error)
+
                 if (editingId != null) {
                     if (state.transactionsLoaded && state.transactions.none { it.id == editingId }) Text("Операция удалена на сервере. Черновик сохранен; отмените редактирование.")
                     val current = state.transactions.find { it.id == editingId }
@@ -249,7 +253,18 @@ fun TransactionPanel(model: AuthViewModel) {
             TextButton(enabled = enabled, onClick = { deleting = null }) { Text("Отменить удаление") }
         }
         HistoryFilters(model) { bulk.selection.value = emptyList(); bulk.category.value = null; bulk.tags.value = emptyList() }
-        (state.historyItems ?: state.transactions.take(state.historyLimit)).forEach { transaction ->
+        MinimalSummary(state.transactions, state.historyFilter)
+        val visibleOperations = state.historyItems ?: state.transactions.take(state.historyLimit)
+        val fullSummary = summaryOperations(state.transactions, state.historyFilter)
+        fun dateKey(item: Transaction) = openingLocal(item.occurred_at, java.util.TimeZone.getDefault().id).take(10)
+        visibleOperations.forEachIndexed { index, transaction ->
+            if (index == 0 || dateKey(visibleOperations[index - 1]) != dateKey(transaction)) {
+                val totals = operationTotals(fullSummary.filter { dateKey(it) == dateKey(transaction) })
+                Row(Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(java.text.SimpleDateFormat("d MMMM yyyy, EE", java.util.Locale.forLanguageTag("ru")).format(java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.ROOT).parse(dateKey(transaction))!!), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(totals.entries.joinToString(" · ") { (currency, amount) -> capitalMoney((amount.first - amount.second).toString(), currency) }, modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.End, style = MaterialTheme.typography.bodySmall)
+                }
+            }
             CapitalOperationRow(model, transaction) {
                 if (navigation.value == null) BulkClassificationRow(bulk, transaction)
                 if (transaction.kind in listOf("income", "expense") && transaction.parent_transaction_id == null) {

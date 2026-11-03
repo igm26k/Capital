@@ -20,12 +20,16 @@ fun ModalHeader(title: @Composable () -> Unit, onClose: () -> Unit, enabled: Boo
 }
 
 @Composable
-fun ModalScrollContent(title: String, onClose: () -> Unit, enabled: Boolean = true, modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
-    Column(modifier.imePadding()) {
+fun ModalScrollContent(title: String, onClose: () -> Unit, enabled: Boolean = true, modifier: Modifier = Modifier, footer: (@Composable () -> Unit)? = null, content: @Composable ColumnScope.() -> Unit) {
+    Column((if (footer != null) modifier.fillMaxSize() else modifier).imePadding()) {
         Box(Modifier.padding(start = 20.dp, end = 8.dp, top = 8.dp)) {
-            ModalHeader({ Text(title, style = MaterialTheme.typography.titleLarge) }, onClose, enabled)
+            if (footer != null) Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(enabled = enabled, onClick = onClose, modifier = Modifier.semantics { contentDescription = "Закрыть окно" }) { CapitalIcon("back") }
+                Text(title, style = MaterialTheme.typography.titleLarge)
+            } else ModalHeader({ Text(title, style = MaterialTheme.typography.titleLarge) }, onClose, enabled)
         }
-        Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
+        Column(Modifier.weight(1f, fill = footer != null).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp), content = content)
+        if (footer != null) Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) { footer() }
     }
 }
 

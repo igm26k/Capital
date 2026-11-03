@@ -1,9 +1,11 @@
 package com.capital.accounting.finance
 
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import com.capital.accounting.api.*
@@ -166,7 +168,37 @@ fun TransferPanel(model: AuthViewModel) {
         }
     }
     HandleOperationType("transfer", editingId != null, enabled, guard) { _, wasEditing -> if (wasEditing) reset() }
-    if (editorOpen) FinancialEditorScreen(model, "transfer", guard, "Вернуться к истории переводов", ::close) {
+    val saveTransfer: @Composable () -> Unit = {
+        Button(modifier = Modifier.fillMaxWidth(), shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp), enabled = enabled && (editingId == null || state.transactions.any { it.id == editingId }) && source != null && target != null && source.id != target.id && (!feeEnabled || feeAccount != null), onClick = save@{
+            error = ""
+            val fromCurrency = source?.currency ?: return@save
+            val toCurrency = target?.currency ?: return@save
+            zone = TimeZone.getDefault().id
+            if (!validation.submit(transferFieldErrors(sourceAmount, targetAmount, fromCurrency, toCurrency, occurred, zone, payee, note, feeEnabled, feeAccount?.currency ?: fromCurrency, feeAmount, feeNote, feeParts))) return@save
+            try {
+                val from = requireNotNull(source); val to = requireNotNull(target)
+                require(from.id != to.id && note.length <= 2000 && payee.length <= 200 && tags.size <= 50)
+                val debit = Money.minor(sourceAmount, from.currency); val credit = Money.minor(receivingAmount, to.currency)
+                val exactRate = transferRate(debit, credit, from.currency, to.currency)
+                val fee = if (!feeEnabled) null else {
+                    val account = requireNotNull(feeAccount)
+                    require(feeNote.length <= 2000 && feeTags.size <= 50)
+                    val minor = Money.minor(feeAmount, account.currency)
+                    val inputs = allocationInputs(minor, account.currency, feeParts)
+                    val allocations = if (editingId == null) inputs.map { it.copy(id = UUID.randomUUID().toString()) } else inputs
+                    FeeInput(if (editingId == null) UUID.randomUUID().toString() else feeDraftId, account.id, minor, allocations, feeNote, feeTags)
+                }
+                require(editingId == null || (from.currency == sourceCurrency && to.currency == targetCurrency))
+                require(fee == null || feeCurrency == null || requireNotNull(feeAccount).currency == feeCurrency)
+                require(editingId == null || expectedFeeVersion == null || fee == null || fee.id == feeAnchorId)
+                val instant = if (preservedInstant != null && zone == preservedZone && occurred == openingLocal(preservedInstant!!, preservedZone!!)) preservedInstant!! else openingInstant(occurred, zone)
+                val request = if (editingId == null) ApiClient.json.encodeToString(TransferCreate(UUID.randomUUID().toString(), instant, zone, note, payee, tags, "transfer", from.id, to.id, debit, credit, exactRate, fee))
+                else ApiClient.json.encodeToString(TransferReplace(instant, zone, note, payee, tags, "transfer", from.id, to.id, debit, credit, exactRate, fee, editingVersion, expectedFeeVersion))
+                error = ""; model.submitTransaction(request, editingId)
+            } catch (_: Exception) { error = "Проверьте разные счета, положительные суммы, точную сумму частей комиссии, дату и длину текста." }
+        }) { Text(if (editingId == null) "Сохранить перевод" else "Сохранить изменения перевода") }
+    }
+    if (editorOpen) FinancialEditorScreen(model, "transfer", guard, "Вернуться к истории переводов", ::close, footer = saveTransfer) {
         if (editingId == null) OperationTypeSelect(model, "transfer", enabled)
         Text(if (editingId == null) "Новый перевод" else "Изменение перевода", style = MaterialTheme.typography.titleLarge)
         AccountSelect("Со счета", source?.id ?: "", accounts.filter { editingId == null || sourceCurrency == it.currency }.map { it.id to "${it.name} · ${it.currency}" }, enabled) { sourceId = it }
@@ -217,34 +249,7 @@ fun TransferPanel(model: AuthViewModel) {
         }
         if (error.isNotEmpty()) Text(error)
         if (editingId != null && state.transactionsLoaded && state.transactions.none { it.id == editingId }) Text("Перевод удален на сервере. Черновик сохранен; отмените редактирование.")
-        Button(enabled = enabled && (editingId == null || state.transactions.any { it.id == editingId }) && source != null && target != null && source.id != target.id && (!feeEnabled || feeAccount != null), onClick = save@{
-            error = ""
-            val fromCurrency = source?.currency ?: return@save
-            val toCurrency = target?.currency ?: return@save
-            zone = TimeZone.getDefault().id
-            if (!validation.submit(transferFieldErrors(sourceAmount, targetAmount, fromCurrency, toCurrency, occurred, zone, payee, note, feeEnabled, feeAccount?.currency ?: fromCurrency, feeAmount, feeNote, feeParts))) return@save
-            try {
-                val from = requireNotNull(source); val to = requireNotNull(target)
-                require(from.id != to.id && note.length <= 2000 && payee.length <= 200 && tags.size <= 50)
-                val debit = Money.minor(sourceAmount, from.currency); val credit = Money.minor(receivingAmount, to.currency)
-                val exactRate = transferRate(debit, credit, from.currency, to.currency)
-                val fee = if (!feeEnabled) null else {
-                    val account = requireNotNull(feeAccount)
-                    require(feeNote.length <= 2000 && feeTags.size <= 50)
-                    val minor = Money.minor(feeAmount, account.currency)
-                    val inputs = allocationInputs(minor, account.currency, feeParts)
-                    val allocations = if (editingId == null) inputs.map { it.copy(id = UUID.randomUUID().toString()) } else inputs
-                    FeeInput(if (editingId == null) UUID.randomUUID().toString() else feeDraftId, account.id, minor, allocations, feeNote, feeTags)
-                }
-                require(editingId == null || (from.currency == sourceCurrency && to.currency == targetCurrency))
-                require(fee == null || feeCurrency == null || requireNotNull(feeAccount).currency == feeCurrency)
-                require(editingId == null || expectedFeeVersion == null || fee == null || fee.id == feeAnchorId)
-                val instant = if (preservedInstant != null && zone == preservedZone && occurred == openingLocal(preservedInstant!!, preservedZone!!)) preservedInstant!! else openingInstant(occurred, zone)
-                val request = if (editingId == null) ApiClient.json.encodeToString(TransferCreate(UUID.randomUUID().toString(), instant, zone, note, payee, tags, "transfer", from.id, to.id, debit, credit, exactRate, fee))
-                else ApiClient.json.encodeToString(TransferReplace(instant, zone, note, payee, tags, "transfer", from.id, to.id, debit, credit, exactRate, fee, editingVersion, expectedFeeVersion))
-                error = ""; model.submitTransaction(request, editingId)
-            } catch (_: Exception) { error = "Проверьте разные счета, положительные суммы, точную сумму частей комиссии, дату и длину текста." }
-        }) { Text(if (editingId == null) "Добавить" else "Сохранить изменения перевода") }
+
         if (editingId != null) {
             val current = state.transactions.find { it.id == editingId }
             val currentFee = state.transactions.find { it.id == current?.fee_transaction_id }
